@@ -1,0 +1,100 @@
+.comment-wall-container {
+    margin-top: 20px;
+}
+
+.comment-wall-container h3.section-header {
+    background-color: var(--myspace-orange);
+    color: black;
+    padding: 3px 10px;
+    margin-bottom: 0px;
+    font-weight: bold;
+    text-align: left;
+    border: 1px solid black;
+    border-bottom: none;
+}
+
+.comments-table {
+    width: 100%;
+    border: 1px solid black;
+    border-collapse: collapse;
+}
+
+.comments-table tr {
+    border-bottom: 1px solid #ccc;
+}
+
+.comments-table td {
+    padding: 10px;
+    vertical-align: top;
+}
+
+.comments-table tr:nth-child(even) .comment-author-col {
+    background-color: #ffcc99;
+}
+
+.comments-table tr:nth-child(even) .comment-content-col {
+    background-color: #ffcc99;
+}
+
+.comments-table tr:nth-child(odd) .comment-author-col {
+    background-color: #ffffff;
+}
+
+.comments-table tr:nth-child(odd) .comment-content-col {
+    background-color: #ffffff;
+}
+
+.comment-author-col {
+    width: 150px;
+    /* Light orange for left side */
+    text-align: center;
+    border-right: 1px solid #ccc;
+}
+
+.comment-author-col.reply {
+    width: 100px;
+    background-color: #ffffff;
+    padding-left: 20px;
+}
+
+.comment-content-col {
+    background-color: #ffffff;
+}
+
+.comment-body {
+    font-size: 10pt;
+    line-height: 1.4;
+    margin-bottom: 5px;
+}
+
+.comment-date {
+    font-weight: bold;
+    font-size: 8pt;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+.nested-replies-container {
+    margin-top: 10px;
+    border-top: 1px dashed #ccc;
+}
+
+.comment-form {
+    border: 1px solid black;
+    padding: 10px;
+    background-color: #f5f5f5;
+    margin-bottom: 15px;
+}
+
+.comment-form textarea {
+    border: 1px solid #999;
+    padding: 5px;
+    font-family: inherit;
+}
+
+.reply-form {
+    margin-top: 10px;
+    background: #f0f0f0;
+    padding: 8px;
+    border: 1px solid #ccc;
+}

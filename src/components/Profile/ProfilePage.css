@@ -1,0 +1,213 @@
+/* Global Box Model Fix */
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --myspace-blue: #6699cc;
+  --myspace-orange: #ff9933;
+  --myspace-bg: #e5e5e5;
+  --myspace-container-bg: #ffffff;
+  --myspace-link: #003399;
+  --myspace-text: #000000;
+  --myspace-light-blue: #b1d0f0;
+  --myspace-header-bg: #6699cc;
+}
+
+body {
+  background-color: var(--myspace-bg);
+  margin: 0;
+  padding: 10px 0;
+}
+
+.profile-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--myspace-container-bg);
+  color: var(--myspace-text);
+  font-family: verdana, arial, sans-serif, helvetica;
+  font-size: 10pt;
+  padding-bottom: 20px;
+}
+
+a {
+  color: var(--myspace-link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+  color: var(--myspace-link);
+}
+
+.profile-header {
+  background-color: var(--myspace-header-bg);
+  /* The Navbar component handles its own internal structure now */
+}
+
+/* Layout Columns */
+.profile-body {
+  display: flex;
+  gap: 15px;
+  padding: 15px;
+  align-items: flex-start;
+  /* Prevent columns from stretching to equal height if content differs */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.left-column {
+  width: 300px;
+  flex-shrink: 0;
+  overflow: hidden;
+  /* Prevent blowout */
+}
+
+.right-column {
+  flex-grow: 1;
+  width: 100%;
+  /* Ensure it fills remaining space */
+  min-width: 0;
+  /* Flexbox trick to allow shrinking if needed */
+}
+
+.profile-pic-box h1 {
+  font-size: 16pt;
+  margin-top: 0;
+}
+
+.profile-pic {
+  max-width: 100%;
+  /* Ensure image doesn't overflow container */
+  margin-bottom: 5px;
+}
+
+/* Headlines & Sections */
+h3,
+.section-header {
+  background-color: var(--myspace-orange);
+  color: black;
+  padding: 3px 5px;
+  margin-bottom: 5px;
+  font-size: 10pt;
+  font-weight: bold;
+  text-align: left;
+}
+
+/* Tables */
+.myspace-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  font-size: 8pt;
+  table-layout: fixed;
+  /* Important for keeping within widths */
+}
+
+.myspace-table td {
+  padding: 3px;
+  vertical-align: top;
+  word-wrap: break-word;
+}
+
+.myspace-label,
+.interests-table .label {
+  background-color: var(--myspace-light-blue);
+  color: #336699;
+  font-weight: bold;
+  width: 100px;
+  /* Fixed width for labels */
+}
+
+.interests-table td {
+  background-color: #ffffff;
+  border: 1px solid white;
+}
+
+/* Blurbs */
+.blurbs-section h4 {
+  color: var(--myspace-orange);
+  font-size: 10pt;
+  font-weight: bold;
+  margin-bottom: 0;
+  margin-top: 10px;
+}
+
+/* Top 8 Grid */
+.top-8-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.friend-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+.friend-slot a {
+  display: block;
+}
+
+.friend-name {
+  margin: 3px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
+
+.friend-pic,
+.friend-pic-placeholder {
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border: 0px solid white;
+  /* Reference style usually no border or small one */
+}
+
+.friend-pic-placeholder {
+  background: #ccc;
+}
+
+.url-box {
+  border: 1px solid #6699cc;
+  padding: 5px;
+  margin: 10px 0;
+  font-size: 8pt;
+  word-break: break-all;
+}
+
+/* Contact Box Grid adjustment */
+.contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  /* Force 2 columns */
+  gap: 2px;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .profile-body {
+    flex-direction: column;
+  }
+
+  .left-column {
+    width: 100%;
+  }
+
+  .top-8-grid {
+    grid-template-columns: repeat(2, 1fr);
+    /* 2 columns on mobile so images aren't tiny */
+  }
+
+  .profile-container {
+    padding-bottom: 50px;
+    /* Extra padding for mobile scroll */
+  }
+}

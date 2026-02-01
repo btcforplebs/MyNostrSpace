@@ -1,7 +1,7 @@
 # 🪶 mynostrspace.com
 ### *a place for friends... on the protocol*
 
-![Mynostrspace Logo](public/favicon.png)
+![Mynostrspace Logo](https://i.nostr.build/hT1vHIIQIB10OGFS.jpg)
 
 Welcome to **mynostrspace.com**, the ultimate fusion of 2005 social media nostalgia and the 2025 sovereign web. We've brought back the "golden age" of profile customization and social discovery, powered entirely by the **Nostr** protocol.
 

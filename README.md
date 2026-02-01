@@ -1,73 +1,78 @@
-# React + TypeScript + Vite
+# 🪶 mynostrspace.com
+### *a place for friends... on the protocol*
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![Mynostrspace Logo](public/favicon.png)
 
-Currently, two official plugins are available:
+Welcome to **mynostrspace.com**, the ultimate fusion of 2005 social media nostalgia and the 2025 sovereign web. We've brought back the "golden age" of profile customization and social discovery, powered entirely by the **Nostr** protocol.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## ⚡️ Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **🎨 Total Profile Freedom**: Use the built-in **Layout Editor** to inject custom CSS directly into your profile. Go Emo, Go Cyberpunk, or Go Geocities—it's your space.
+- **🔝 The Legendary Top 8**: Hand-pick your closest allies and display them proudly on your profile.
+- **🎵 Music Player**: Integrated with **Wavlake** to bring your favorite tracks to your page. Retro player skin? Included.
+- **🖼️ Photo Lightbox**: High-performance image viewing with a simple click.
+- **💬 Comment Wall**: Leave notes for your friends, just like the old days, but signed with your Nostr keys.
+- **🌩️ Blossom Support**: Seamlessly upload background images and media using the Blossom media protocol.
+- **📱 Mobile Optimized**: A responsive experience that feels native on your phone while keeping that desktop-retro vibe.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🏗️ Tech Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **React 19 + TypeScript**: Built with the latest and greatest for maximum stability.
+- **Vite**: Ultra-fast development and build pipeline.
+- **NDK (Nostr Dev Kit)**: Robust interaction with the Nostr decentralized network.
+- **Docker**: Ready to deploy anywhere in seconds.
+- **Nginx**: Hardened and configured for single-page application routing.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🚀 Getting Started
+
+### 🐳 Docker (The Quick Start)
+
+The easiest way to get mynostrspace running is with Docker:
+
+```bash
+docker-compose up --build -d
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Your app will be live at `http://localhost:6767`. 
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 🛠️ Local Development
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+   *(Note: We use `legacy-peer-deps=true` via `.npmrc` to handle React 19 compatibility across the ecosystem.)*
+
+2. **Run Dev Server**:
+   ```bash
+   npm run dev
+   ```
+
+3. **Build for Production**:
+   ```bash
+   npm run build
+   ```
+
+---
+
+## 🐳 Infrastructure & Deployment
+
+The project is pre-configured with a multi-stage **Dockerfile** and customized **nginx.conf** to handle:
+- Client-side routing fallbacks.
+- Tiny final image sizes.
+- Hardened Content Security Policy (CSP).
+- Custom internal port 6767 for specialized deployments.
+
+---
+
+## 🤝 Contributing
+
+This is a place for friends! If you want to add a new retro theme, fix a bug, or implement a new Nostr NIP, feel free to open a PR.
+
+**Stay Sovereign. Stay Retro.** ✌️🪶

@@ -1,13 +1,13 @@
 .wavlake-player {
-    margin-top: 20px;
+  margin-top: 20px;
 }
 
 .wavlake-player h3 {
-    margin-bottom: 2px;
+  margin-bottom: 2px;
 }
 
 .player-embed {
-    border: 1px solid var(--myspace-blue);
-    background: black;
-    padding: 2px;
+  border: 1px solid var(--myspace-blue);
+  background: black;
+  padding: 2px;
 }

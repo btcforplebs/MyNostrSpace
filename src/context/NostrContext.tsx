@@ -1,173 +1,246 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import NDK, { NDKUser, NDKNip07Signer } from '@nostr-dev-kit/ndk';
+import { NIP46Client } from '../lib/nip46-client';
 
 interface NostrContextType {
-    ndk: NDK;
-    user: NDKUser | null;
-    isLoading: boolean;
-    login: () => Promise<void>;
-    logout: () => void;
-    relays: string[];
-    updateRelays: (relays: string[]) => void;
+  ndk: NDK;
+  user: NDKUser | null;
+  isLoading: boolean;
+  login: () => Promise<void>;
+  loginWithNip46: (connectionString: string) => Promise<void>;
+  logout: () => void;
+  relays: string[];
+  updateRelays: (relays: string[]) => void;
 }
 
 const NostrContext = createContext<NostrContextType | undefined>(undefined);
 
 const DEFAULT_RELAYS = [
-    'wss://relay.damus.io',
-    'wss://relay.primal.net',
-    'wss://relay.nostr.band',
-    'wss://nos.lol',
+  'wss://relay.damus.io',
+  'wss://relay.primal.net',
+  'wss://nos.lol',
+  'wss://relay.nostr.bg',
+  'wss://relay.snort.social',
+  'wss://purplepag.es',
 ];
 
 export const NostrProvider = ({ children }: { children: ReactNode }) => {
+  const [relays, setRelays] = useState<string[]>(() => {
+    const saved = localStorage.getItem('mynostrspace_relays');
+    return saved ? JSON.parse(saved) : DEFAULT_RELAYS;
+  });
 
-    const [relays, setRelays] = useState<string[]>(() => {
-        const saved = localStorage.getItem('mynostrspace_relays');
-        return saved ? JSON.parse(saved) : DEFAULT_RELAYS;
+  // Re-initialize NDK if we wanted to support hot-swapping fully,
+  // but for now we just initialize once with the current storage state.
+  // However, to support adding relays dynamically, we'll keep the single instance
+  // and just use addExplicitRelay via updateRelays.
+
+  // We need to keep the NDK instance construction stable or we loop.
+  // So we just use the initial state for the constructor.
+  const [ndk] = useState(() => {
+    const n = new NDK({ explicitRelayUrls: relays });
+    return n;
+  });
+
+  const [user, setUser] = useState<NDKUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const updateRelays = (newRelays: string[]) => {
+    setRelays(newRelays);
+    localStorage.setItem('mynostrspace_relays', JSON.stringify(newRelays));
+
+    // Add any new ones immediately
+    newRelays.forEach((url) => {
+      try {
+        ndk.addExplicitRelay(url);
+      } catch (e) {
+        console.warn('Error adding relay', e);
+      }
     });
 
-    // Re-initialize NDK if we wanted to support hot-swapping fully, 
-    // but for now we just initialize once with the current storage state.
-    // However, to support adding relays dynamically, we'll keep the single instance 
-    // and just use addExplicitRelay via updateRelays.
+    // Note: Removing relays from a live NDK instance is complex.
+    // We'll rely on the localStorage update taking full effect on the next reload.
+  };
 
-    // We need to keep the NDK instance construction stable or we loop. 
-    // So we just use the initial state for the constructor.
-    const [ndk] = useState<NDK>(() => new NDK({ explicitRelayUrls: relays }));
+  useEffect(() => {
+    const connect = async () => {
+      try {
+        // Wait for connection OR timeout after 5 seconds
+        await Promise.race([
+          ndk.connect(5000),
+          new Promise((resolve) => setTimeout(resolve, 5000)),
+        ]);
+      } catch (e) {
+        console.warn('NDK connection warning:', e);
+      } finally {
+        console.log('NDK Initialized (Connected or Timeout)');
 
-    const [user, setUser] = useState<NDKUser | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const updateRelays = (newRelays: string[]) => {
-        setRelays(newRelays);
-        localStorage.setItem('mynostrspace_relays', JSON.stringify(newRelays));
-
-        // Add any new ones immediately
-        newRelays.forEach(url => {
-            try {
-                ndk.addExplicitRelay(url);
-            } catch (e) { console.warn("Error adding relay", e); }
-        });
-
-        // Note: Removing relays from a live NDK instance is complex. 
-        // We'll rely on the localStorage update taking full effect on the next reload.
+        // Only set not loading if we are NOT waiting for auto-login
+        // If there's a saved pubkey or bunker config, we let the auth effect handle turning off loading
+        if (
+          !localStorage.getItem('mynostrspace_pubkey') &&
+          !localStorage.getItem('mynostrspace_semiconnected_bunker')
+        ) {
+          setIsLoading(false);
+        }
+      }
     };
 
-    useEffect(() => {
-        const connect = async () => {
-            try {
-                // Wait for connection OR timeout after 2 seconds
-                await Promise.race([
-                    ndk.connect(2000),
-                    new Promise(resolve => setTimeout(resolve, 2000))
-                ]);
-            } catch (e) {
-                console.warn('NDK connection warning:', e);
-            } finally {
-                console.log('NDK Initialized (Connected or Timeout)');
+    // Initial connect
+    connect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // ndk is stable from useState
 
-                // Only set not loading if we are NOT waiting for auto-login
-                // If there's a saved pubkey, we let the auth effect handle turning off loading
-                if (!localStorage.getItem('mynostrspace_pubkey')) {
-                    setIsLoading(false);
-                }
-            }
-        };
+  const login = async () => {
+    if (!window.nostr) {
+      alert('Nostr extension not found! Please install Alby, nos2x, or similar.');
+      return;
+    }
 
-        connect();
-    }, [ndk]);
+    try {
+      const signer = new NDKNip07Signer();
+      ndk.signer = signer;
 
-    const login = async () => {
-        if (!window.nostr) {
-            alert('Nostr extension not found! Please install Alby, nos2x, or similar.');
-            return;
-        }
-
+      // Fetch User Relays if available
+      if (window.nostr.getRelays) {
         try {
-            const signer = new NDKNip07Signer();
-            ndk.signer = signer;
-
-            // Fetch User Relays if available
-            if (window.nostr.getRelays) {
-                try {
-                    const extRelays = await window.nostr.getRelays();
-                    // relays is usually { "url": { read: boolean, write: boolean } }
-                    const relayUrls = Object.keys(extRelays);
-                    console.log("Found extension relays:", relayUrls);
-                    relayUrls.forEach(url => ndk.addExplicitRelay(url));
-
-                    // Optional: Should we auto-add these to our custom list? 
-                    // Maybe better to ask the user or keeping them separate for now.
-                } catch (err) {
-                    console.warn("Failed to get relays from extension", err);
-                }
-            }
-
-            const user = await signer.user();
-            await user.fetchProfile();
-            setUser(user);
-            localStorage.setItem('mynostrspace_pubkey', user.pubkey);
-        } catch (error) {
-            console.error('Login failed:', error);
+          const extRelays = await window.nostr.getRelays();
+          // relays is usually { "url": { read: boolean, write: boolean } }
+          const relayUrls = Object.keys(extRelays);
+          console.log('Found extension relays:', relayUrls);
+          relayUrls.forEach((url) => ndk.addExplicitRelay(url));
+        } catch (err) {
+          console.warn('Failed to get relays from extension', err);
         }
-    };
+      }
 
-    const logout = () => {
-        ndk.signer = undefined;
-        setUser(null);
-        localStorage.removeItem('mynostrspace_pubkey');
-    };
+      const user = await signer.user();
+      await user.fetchProfile();
+      setUser(user);
+      localStorage.setItem('mynostrspace_pubkey', user.pubkey);
+      // Clear any previous remote signing sessions
+      localStorage.removeItem('mynostrspace_semiconnected_bunker');
+      localStorage.removeItem('mynostrspace_local_key');
+    } catch (error) {
+      console.error('Login failed:', error);
+    }
+  };
 
-    // Auto-login if previously logged in
-    useEffect(() => {
-        const savedPubkey = localStorage.getItem('mynostrspace_pubkey');
+  const loginWithNip46 = async (connectionString: string) => {
+    try {
+      console.log('=== Starting NIP-46 login ===');
+      console.log('Connection string:', connectionString);
 
-        if (savedPubkey) {
-            // We expect to login, so keep loading true
+      // Clear previous state
+      localStorage.removeItem('mynostrspace_pubkey');
+      localStorage.removeItem('mynostrspace_semiconnected_bunker');
+      localStorage.removeItem('mynostrspace_local_key');
+      setUser(null);
+      ndk.signer = undefined;
 
-            let attempts = 0;
-            const maxAttempts = 20; // 5 seconds total (250ms * 20)
+      // Ensure NDK is connected
+      console.log('Connecting to NDK relays...');
+      await ndk.connect(5000).catch((e) => console.warn('NDK connect:', e));
 
-            const checkAndLogin = async () => {
-                if (window.nostr) {
-                    try {
-                        await login();
-                    } catch (err) {
-                        console.error("Auto-login failed:", err);
-                        // If auto-login fails (e.g. user rejected), we might want to plain logout?
-                        // For now, we'll just stop loading so they see the landing page.
-                    } finally {
-                        setIsLoading(false);
-                    }
-                } else {
-                    attempts++;
-                    if (attempts < maxAttempts) {
-                        setTimeout(checkAndLogin, 250);
-                    } else {
-                        // Extension didn't load in time
-                        console.warn("Nostr extension not found after polling.");
-                        setIsLoading(false);
-                    }
-                }
-            };
+      // Create NIP46 client and connect
+      console.log('Creating NIP46Client...');
+      const nip46Client = new NIP46Client(ndk);
+      nip46Client.onAuthUrl = (url) => {
+        console.log('🔗 NIP-46 Auth URL received:', url);
+        window.open(url, 'signet-auth', 'width=450,height=700');
+      };
+      await nip46Client.connect(connectionString);
+      console.log('✅ NIP-46 connection established!');
 
-            // Start polling
-            checkAndLogin();
+      // Wrap as NDKSigner and set user
+      ndk.signer = nip46Client.asSigner();
+      const user = await ndk.signer.user();
+      await user.fetchProfile();
+
+      setUser(user);
+      localStorage.setItem('mynostrspace_pubkey', user.pubkey);
+      localStorage.setItem('mynostrspace_semiconnected_bunker', connectionString);
+
+      console.log('NIP-46 login complete for:', user.pubkey);
+    } catch (error) {
+      console.error('NIP-46 Login failed:', error);
+      alert(
+        'Failed to connect to remote signer: ' +
+          (error instanceof Error ? error.message : String(error))
+      );
+      throw error;
+    }
+  };
+
+  const logout = () => {
+    ndk.signer = undefined;
+    setUser(null);
+    localStorage.removeItem('mynostrspace_pubkey');
+    localStorage.removeItem('mynostrspace_semiconnected_bunker');
+    localStorage.removeItem('mynostrspace_local_key');
+    localStorage.removeItem('mynostrspace_nip46_client_key');
+  };
+
+  // Auto-login if previously logged in
+  useEffect(() => {
+    const savedPubkey = localStorage.getItem('mynostrspace_pubkey');
+    const savedBunker = localStorage.getItem('mynostrspace_semiconnected_bunker');
+
+    if (savedBunker) {
+      // Handle NIP-46 Reconnection
+      const reconnectNip46 = async () => {
+        try {
+          await loginWithNip46(savedBunker);
+        } catch (err) {
+          console.error('Auto-login w/ NIP-46 failed:', err);
+        } finally {
+          setIsLoading(false);
         }
-    }, []);
+      };
+      reconnectNip46();
+    } else if (savedPubkey) {
+      let attempts = 0;
+      const maxAttempts = 20;
 
-    return (
-        <NostrContext.Provider value={{ ndk, user, isLoading, login, logout, relays, updateRelays }}>
-            {children}
-        </NostrContext.Provider>
-    );
+      const checkAndLogin = async () => {
+        if (window.nostr) {
+          try {
+            await login();
+          } catch (err) {
+            console.error('Auto-login failed:', err);
+          } finally {
+            setIsLoading(false);
+          }
+        } else {
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(checkAndLogin, 250);
+          } else {
+            console.warn('Nostr extension not found after polling.');
+            setIsLoading(false);
+          }
+        }
+      };
+
+      checkAndLogin();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <NostrContext.Provider
+      value={{ ndk, user, isLoading, login, loginWithNip46, logout, relays, updateRelays }}
+    >
+      {children}
+    </NostrContext.Provider>
+  );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNostr = () => {
-    const context = useContext(NostrContext);
-    if (!context) {
-        throw new Error('useNostr must be used within a NostrProvider');
-    }
-    return context;
+  const context = useContext(NostrContext);
+  if (!context) {
+    throw new Error('useNostr must be used within a NostrProvider');
+  }
+  return context;
 };

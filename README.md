@@ -1,5 +1,6 @@
 # 🪶 mynostrspace.com
-### *a place for friends... on the protocol*
+
+### _a place for friends... on the protocol_
 
 ![Mynostrspace Logo](https://i.nostr.build/hT1vHIIQIB10OGFS.jpg)
 
@@ -39,17 +40,20 @@ The easiest way to get mynostrspace running is with Docker:
 docker-compose up --build -d
 ```
 
-Your app will be live at `http://localhost:6767`. 
+Your app will be live at `http://localhost:6767`.
 
 ### 🛠️ Local Development
 
 1. **Install Dependencies**:
+
    ```bash
    npm install
    ```
-   *(Note: We use `legacy-peer-deps=true` via `.npmrc` to handle React 19 compatibility across the ecosystem.)*
+
+   _(Note: We use `legacy-peer-deps=true` via `.npmrc` to handle React 19 compatibility across the ecosystem.)_
 
 2. **Run Dev Server**:
+
    ```bash
    npm run dev
    ```
@@ -64,6 +68,7 @@ Your app will be live at `http://localhost:6767`.
 ## 🐳 Infrastructure & Deployment
 
 The project is pre-configured with a multi-stage **Dockerfile** and customized **nginx.conf** to handle:
+
 - Client-side routing fallbacks.
 - Tiny final image sizes.
 - Hardened Content Security Policy (CSP).

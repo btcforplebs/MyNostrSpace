@@ -5,119 +5,132 @@ import { useNostr } from '../../context/NostrContext';
 import { NDKUser } from '@nostr-dev-kit/ndk';
 
 export const Top8Editor = () => {
-    const { user } = useNostr();
-    const { top8, saveTop8, loading: top8Loading } = useTop8(user?.pubkey);
-    // Fetch all friends (pubkeys only first) then we can resolve names
-    const { friends: friendPubkeys, fetchProfiles } = useFriends(user?.pubkey);
+  const { user } = useNostr();
+  const { top8, saveTop8, loading: top8Loading } = useTop8(user?.pubkey);
+  // Fetch all friends (pubkeys only first) then we can resolve names
+  const { friends: friendPubkeys, fetchProfiles } = useFriends(user?.pubkey);
 
-    const [currentTop8, setCurrentTop8] = useState<NDKUser[]>([]);
-    const [allFriends, setAllFriends] = useState<NDKUser[]>([]);
-    const [search, setSearch] = useState('');
-    const [loadingFriends, setLoadingFriends] = useState(false);
+  const [currentTop8, setCurrentTop8] = useState<NDKUser[]>([]);
+  const [allFriends, setAllFriends] = useState<NDKUser[]>([]);
+  const [search, setSearch] = useState('');
+  const [loadingFriends, setLoadingFriends] = useState(false);
 
-    // Initialize state from hooks
-    useEffect(() => {
-        if (top8) setCurrentTop8(top8);
-    }, [top8]);
+  // Initialize state from hooks
+  useEffect(() => {
+    if (top8) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCurrentTop8((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(top8)) return prev;
+        return top8;
+      });
+    }
+  }, [top8]);
 
-    // Load friend profiles when component mounts or pubkeys change (debounce or load all?)
-    // For editor, we probably want to load a chunk or allow searching. 
-    // Let's load the first 100 for now or implement search-based loading.
-    useEffect(() => {
-        const loadFriends = async () => {
-            if (friendPubkeys.length > 0 && allFriends.length === 0 && fetchProfiles) {
-                setLoadingFriends(true);
-                // Load ALL friends as requested
-                const profiles = await fetchProfiles(friendPubkeys);
-                setAllFriends(profiles);
-                setLoadingFriends(false);
-            }
-        };
-        loadFriends();
-    }, [friendPubkeys, fetchProfiles, allFriends.length]);
-
-    const addToTop8 = (friend: NDKUser) => {
-        if (currentTop8.find(u => u.pubkey === friend.pubkey)) return;
-        if (currentTop8.length >= 8) {
-            alert("Top 8 is full! Remove someone first.");
-            return;
-        }
-        setCurrentTop8([...currentTop8, friend]);
+  // Load friend profiles when component mounts or pubkeys change (debounce or load all?)
+  // For editor, we probably want to load a chunk or allow searching.
+  // Let's load the first 100 for now or implement search-based loading.
+  useEffect(() => {
+    const loadFriends = async () => {
+      if (friendPubkeys.length > 0 && allFriends.length === 0 && fetchProfiles) {
+        setLoadingFriends(true);
+        // Load ALL friends as requested
+        const profiles = await fetchProfiles(friendPubkeys);
+        setAllFriends(profiles);
+        setLoadingFriends(false);
+      }
     };
+    loadFriends();
+  }, [friendPubkeys, fetchProfiles, allFriends.length]);
 
-    const removeFromTop8 = (pubkey: string) => {
-        setCurrentTop8(currentTop8.filter(u => u.pubkey !== pubkey));
-    };
+  const addToTop8 = (friend: NDKUser) => {
+    if (currentTop8.find((u) => u.pubkey === friend.pubkey)) return;
+    if (currentTop8.length >= 8) {
+      alert('Top 8 is full! Remove someone first.');
+      return;
+    }
+    setCurrentTop8([...currentTop8, friend]);
+  };
 
-    const handleSave = async () => {
-        await saveTop8(currentTop8);
-    };
+  const removeFromTop8 = (pubkey: string) => {
+    setCurrentTop8(currentTop8.filter((u) => u.pubkey !== pubkey));
+  };
 
-    const filteredFriends = allFriends.filter(f => {
-        const name = f.profile?.displayName || f.profile?.name || '';
-        return name.toLowerCase().includes(search.toLowerCase());
-    });
+  const handleSave = async () => {
+    await saveTop8(currentTop8);
+  };
 
-    if (top8Loading) return <div>Loading Top 8...</div>;
+  const filteredFriends = allFriends.filter((f) => {
+    const name = f.profile?.displayName || f.profile?.name || '';
+    return name.toLowerCase().includes(search.toLowerCase());
+  });
 
-    return (
-        <div className="top8-editor">
-            <h3>Manage Your Top 8</h3>
+  if (top8Loading) return <div>Loading Top 8...</div>;
 
-            {/* Current Top 8 */}
-            <div className="current-top8-container">
-                {currentTop8.map((friend, idx) => (
-                    <div key={friend.pubkey} className="top8-slot-editor">
-                        <span className="slot-number">{idx + 1}</span>
-                        <img
-                            src={friend.profile?.image || 'https://via.placeholder.com/50'}
-                            alt="friend"
-                        />
-                        <div className="name">{friend.profile?.name || 'Unknown'}</div>
-                        <button className="remove-btn" onClick={() => removeFromTop8(friend.pubkey)}>x</button>
-                    </div>
-                ))}
-                {/* Empty Slots */}
-                {[...Array(8 - currentTop8.length)].map((_, i) => (
-                    <div key={`empty-${i}`} className="top8-slot-editor empty">
-                        <span className="slot-number">{currentTop8.length + i + 1}</span>
-                        <div className="empty-circle"></div>
-                        <div className="name">Empty</div>
-                    </div>
-                ))}
-            </div>
+  return (
+    <div className="top8-editor">
+      <h3>Manage Your Top 8</h3>
 
-            <div className="controls">
-                <button onClick={handleSave} className="save-btn">Save Top 8 Changes</button>
-            </div>
+      {/* Current Top 8 */}
+      <div className="current-top8-container">
+        {currentTop8.map((friend, idx) => (
+          <div key={friend.pubkey} className="top8-slot-editor">
+            <span className="slot-number">{idx + 1}</span>
+            <img src={friend.profile?.image || 'https://via.placeholder.com/50'} alt="friend" />
+            <div className="name">{friend.profile?.name || 'Unknown'}</div>
+            <button className="remove-btn" onClick={() => removeFromTop8(friend.pubkey)}>
+              x
+            </button>
+          </div>
+        ))}
+        {/* Empty Slots */}
+        {[...Array(8 - currentTop8.length)].map((_, i) => (
+          <div key={`empty-${i}`} className="top8-slot-editor empty">
+            <span className="slot-number">{currentTop8.length + i + 1}</span>
+            <div className="empty-circle"></div>
+            <div className="name">Empty</div>
+          </div>
+        ))}
+      </div>
 
-            <hr />
+      <div className="controls">
+        <button onClick={handleSave} className="save-btn">
+          Save Top 8 Changes
+        </button>
+      </div>
 
-            {/* Friend Selector */}
-            <div className="friend-selector">
-                <h4>Select Friends to Add</h4>
-                <input
-                    type="text"
-                    placeholder="Search loaded friends..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    style={{ marginBottom: 10, width: '100%' }}
-                />
+      <hr />
 
-                <div className="friend-list-scroll">
-                    {loadingFriends ? <div>Loading {friendPubkeys.length} friends...</div> : (
-                        filteredFriends.map(friend => (
-                            <div key={friend.pubkey} className="friend-select-item" onClick={() => addToTop8(friend)}>
-                                <img src={friend.profile?.image || 'https://via.placeholder.com/40'} alt="friend" />
-                                <span>{friend.profile?.name || 'Unknown'}</span>
-                                <span className="add-icon">+</span>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
+      {/* Friend Selector */}
+      <div className="friend-selector">
+        <h4>Select Friends to Add</h4>
+        <input
+          type="text"
+          placeholder="Search loaded friends..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ marginBottom: 10, width: '100%' }}
+        />
 
-            <style>{`
+        <div className="friend-list-scroll">
+          {loadingFriends ? (
+            <div>Loading {friendPubkeys.length} friends...</div>
+          ) : (
+            filteredFriends.map((friend) => (
+              <div
+                key={friend.pubkey}
+                className="friend-select-item"
+                onClick={() => addToTop8(friend)}
+              >
+                <img src={friend.profile?.image || 'https://via.placeholder.com/40'} alt="friend" />
+                <span>{friend.profile?.name || 'Unknown'}</span>
+                <span className="add-icon">+</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <style>{`
                 /* ... existing styles ... */
                 
                 .top8-editor {
@@ -203,6 +216,6 @@ export const Top8Editor = () => {
                     color: green;
                 }
             `}</style>
-        </div>
-    );
+    </div>
+  );
 };

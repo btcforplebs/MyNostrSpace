@@ -2,49 +2,69 @@ import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 
 export const Navbar = () => {
-    const { user, logout } = useNostr();
+  const { user, logout } = useNostr();
 
-    // Links trying to mimic the reference image while keeping our functionality
-    const leftLinks = [
-        { label: "Home", to: "/" },
-        { label: "Browse", to: "/browse" },
-        { label: "Profile", to: user ? `/p/${user.pubkey}` : "#" },
-        { label: "Friends", to: user ? `/p/${user.pubkey}/friends` : "#" },
-    ];
+  // Links trying to mimic the reference image while keeping our functionality
+  const leftLinks = [
+    { label: 'Home', to: '/' },
+    { label: 'Browse', to: '/browse' },
+    { label: 'Profile', to: user ? `/p/${user.pubkey}` : '#' },
+    { label: 'Friends', to: user ? `/p/${user.pubkey}/friends` : '#' },
+  ];
 
-    return (
-        <div className="navbar-wrapper">
-            {/* Blue Nav Bar */}
-            <div className="navbar-container">
-                <div className="navbar-inner">
-                    <div className="navbar-left-links">
-                        {leftLinks.map((link, index) => (
-                            <span key={link.label}>
-                                {index > 0 && " | "}
-                                {link.to === "#" ? (
-                                    <a href="#" onClick={(e) => { e.preventDefault(); alert("Coming soon!"); }}>{link.label} {index > 0 && index < 3 && "▼"}</a>
-                                ) : (
-                                    <Link to={link.to}>{link.label} {index > 0 && index < 3 && "▼"}</Link>
-                                )}
-                            </span>
-                        ))}
-                    </div>
+  return (
+    <div className="navbar-wrapper">
+      {/* Blue Nav Bar */}
+      <div className="navbar-container">
+        <div className="navbar-inner">
+          <div className="navbar-left-links">
+            {leftLinks.map((link, index) => (
+              <span key={link.label}>
+                {index > 0 && ' | '}
+                {link.to === '#' ? (
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      alert('Coming soon!');
+                    }}
+                  >
+                    {link.label} {index > 0 && index < 3 && '▼'}
+                  </a>
+                ) : (
+                  <Link to={link.to}>
+                    {link.label} {index > 0 && index < 3 && '▼'}
+                  </Link>
+                )}
+              </span>
+            ))}
+          </div>
 
-                    <div className="navbar-right">
-                        {user ? (
-                            <>
-                                <Link to="/edit-profile">Edit Profile</Link> | <Link to="/settings">Settings</Link> | <a href="#" onClick={(e) => { e.preventDefault(); logout(); }}>Sign Out</a>
-                            </>
-                        ) : (
-                            <>
-                                <a href="#">Login</a> | <a href="#">Sign Up</a>
-                            </>
-                        )}
-                    </div>
-                </div>
-            </div>
+          <div className="navbar-right">
+            {user ? (
+              <>
+                <Link to="/edit-profile">Edit Profile</Link> | <Link to="/settings">Settings</Link>{' '}
+                |{' '}
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    logout();
+                  }}
+                >
+                  Sign Out
+                </a>
+              </>
+            ) : (
+              <>
+                <a href="#">Login</a> | <a href="#">Sign Up</a>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
 
-            <style>{`
+      <style>{`
                 .navbar-wrapper {
                     font-family: Arial, Helvetica, sans-serif;
                     width: 100%;
@@ -102,6 +122,6 @@ export const Navbar = () => {
                     }
                 }
             `}</style>
-        </div>
-    );
+    </div>
+  );
 };

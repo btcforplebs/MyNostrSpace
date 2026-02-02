@@ -3,81 +3,85 @@ import { useNostr } from '../../context/NostrContext';
 import { Navbar } from '../Shared/Navbar';
 
 export const RelaySettings = () => {
-    const { relays, updateRelays } = useNostr();
-    const [newRelay, setNewRelay] = useState('');
+  const { relays, updateRelays } = useNostr();
+  const [newRelay, setNewRelay] = useState('');
 
-    const handleAdd = () => {
-        if (!newRelay) return;
-        let url = newRelay.trim();
-        if (!url.startsWith('wss://') && !url.startsWith('ws://')) {
-            url = 'wss://' + url;
-        }
+  const handleAdd = () => {
+    if (!newRelay) return;
+    let url = newRelay.trim();
+    if (!url.startsWith('wss://') && !url.startsWith('ws://')) {
+      url = 'wss://' + url;
+    }
 
-        if (relays.includes(url)) {
-            alert('Relay already in list');
-            return;
-        }
+    if (relays.includes(url)) {
+      alert('Relay already in list');
+      return;
+    }
 
-        const updated = [...relays, url];
-        updateRelays(updated);
-        setNewRelay('');
-    };
+    const updated = [...relays, url];
+    updateRelays(updated);
+    setNewRelay('');
+  };
 
-    const handleRemove = (url: string) => {
-        if (confirm(`Remove ${url}? You may need to refresh the page for this to take full effect.`)) {
-            const updated = relays.filter(r => r !== url);
-            updateRelays(updated);
-        }
-    };
+  const handleRemove = (url: string) => {
+    if (confirm(`Remove ${url}? You may need to refresh the page for this to take full effect.`)) {
+      const updated = relays.filter((r) => r !== url);
+      updateRelays(updated);
+    }
+  };
 
-    const handleReset = () => {
-        if (confirm("Reset to default relays?")) {
-            const DEFAULT_RELAYS = [
-                'wss://relay.damus.io',
-                'wss://relay.primal.net',
-                'wss://relay.nostr.band',
-                'wss://nos.lol',
-            ];
-            updateRelays(DEFAULT_RELAYS);
-        }
-    };
+  const handleReset = () => {
+    if (confirm('Reset to default relays?')) {
+      const DEFAULT_RELAYS = [
+        'wss://relay.damus.io',
+        'wss://relay.primal.net',
+        'wss://relay.nostr.band',
+        'wss://nos.lol',
+      ];
+      updateRelays(DEFAULT_RELAYS);
+    }
+  };
 
-    return (
-        <div className="relay-settings-container">
-            <Navbar />
-            <div className="settings-content">
-                <h2>Relay Configuration</h2>
+  return (
+    <div className="relay-settings-container">
+      <Navbar />
+      <div className="settings-content">
+        <h2>Relay Configuration</h2>
 
-                <div className="settings-box">
-                    <p>Manage the relays you connect to. These help you find profiles and events.</p>
+        <div className="settings-box">
+          <p>Manage the relays you connect to. These help you find profiles and events.</p>
 
-                    <div className="add-relay-box">
-                        <input
-                            type="text"
-                            placeholder="wss://relay.example.com"
-                            value={newRelay}
-                            onChange={(e) => setNewRelay(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                        />
-                        <button onClick={handleAdd}>Add Relay</button>
-                    </div>
+          <div className="add-relay-box">
+            <input
+              type="text"
+              placeholder="wss://relay.example.com"
+              value={newRelay}
+              onChange={(e) => setNewRelay(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            />
+            <button onClick={handleAdd}>Add Relay</button>
+          </div>
 
-                    <div className="relay-list">
-                        {relays.map(url => (
-                            <div key={url} className="relay-item">
-                                <span className="relay-url">{url}</span>
-                                <button className="remove-btn" onClick={() => handleRemove(url)}>Remove</button>
-                            </div>
-                        ))}
-                    </div>
+          <div className="relay-list">
+            {relays.map((url) => (
+              <div key={url} className="relay-item">
+                <span className="relay-url">{url}</span>
+                <button className="remove-btn" onClick={() => handleRemove(url)}>
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
 
-                    <div className="reset-section">
-                        <button className="reset-btn" onClick={handleReset}>Reset to Defaults</button>
-                    </div>
-                </div>
-            </div>
+          <div className="reset-section">
+            <button className="reset-btn" onClick={handleReset}>
+              Reset to Defaults
+            </button>
+          </div>
+        </div>
+      </div>
 
-            <style>{`
+      <style>{`
                 .relay-settings-container {
                     max-width: 800px;
                     margin: 0 auto;
@@ -160,6 +164,6 @@ export const RelaySettings = () => {
                     font-size: 9pt;
                 }
             `}</style>
-        </div>
-    );
+    </div>
+  );
 };

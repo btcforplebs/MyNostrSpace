@@ -1,144 +1,144 @@
 /* MySpace Browse Page Styles */
 
 .browse-page-container {
-    width: 800px;
-    margin: 0 auto;
-    background-color: #ffffff;
-    font-family: verdana, arial, sans-serif, helvetica;
-    font-size: 8pt;
+  width: 800px;
+  margin: 0 auto;
+  background-color: #ffffff;
+  font-family: verdana, arial, sans-serif, helvetica;
+  font-size: 8pt;
 }
 
 .browse-layout {
-    display: flex;
-    gap: 15px;
-    padding: 10px;
+  display: flex;
+  gap: 15px;
+  padding: 10px;
 }
 
 .browse-left-column {
-    width: 320px;
-    /* Slightly wider for 4 cols if needed */
-    flex-shrink: 0;
+  width: 320px;
+  /* Slightly wider for 4 cols if needed */
+  flex-shrink: 0;
 }
 
 .browse-right-column {
-    flex-grow: 1;
-    width: 100%;
-    min-width: 0;
-    /* Prevent flex blowout */
+  flex-grow: 1;
+  width: 100%;
+  min-width: 0;
+  /* Prevent flex blowout */
 }
 
 .section-header {
-    background-color: #ffcc99;
-    /* MySpace Orange */
-    color: #000000;
-    padding: 3px 5px;
-    margin-bottom: 5px;
-    font-size: 9pt;
-    font-weight: bold;
-    border: 1px solid #000000;
+  background-color: #ffcc99;
+  /* MySpace Orange */
+  color: #000000;
+  padding: 3px 5px;
+  margin-bottom: 5px;
+  font-size: 9pt;
+  font-weight: bold;
+  border: 1px solid #000000;
 }
 
 /* People Grid - "Cool New People" style */
 .browse-people-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 5px;
-    margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin-bottom: 20px;
 }
 
 .browse-profile-card {
-    text-align: center;
-    font-size: 8pt;
-    margin-bottom: 5px;
+  text-align: center;
+  font-size: 8pt;
+  margin-bottom: 5px;
 }
 
 .browse-profile-pic {
-    width: 70px;
-    height: 70px;
-    object-fit: cover;
-    border: 0;
-    /* No border typically */
-    margin-bottom: 3px;
+  width: 70px;
+  height: 70px;
+  object-fit: cover;
+  border: 0;
+  /* No border typically */
+  margin-bottom: 3px;
 }
 
 .browse-profile-name {
-    display: block;
-    color: #003399;
-    /* MySpace Blue Link */
-    text-decoration: none;
-    font-weight: normal;
-    /* Not usually bold in the grid */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 80px;
-    margin: 0 auto;
+  display: block;
+  color: #003399;
+  /* MySpace Blue Link */
+  text-decoration: none;
+  font-weight: normal;
+  /* Not usually bold in the grid */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+  margin: 0 auto;
 }
 
 .browse-profile-name:hover {
-    text-decoration: underline;
-    color: #cc0000;
-    /* MySpace Red hover sometimes, or just underline */
+  text-decoration: underline;
+  color: #cc0000;
+  /* MySpace Red hover sometimes, or just underline */
 }
 
 /* Popular Sites */
 .popular-sites-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    border: 1px solid #6699cc;
-    /* Blue border box */
-    padding: 5px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #6699cc;
+  /* Blue border box */
+  padding: 5px;
 }
 
 .popular-sites-list li {
-    margin-bottom: 3px;
+  margin-bottom: 3px;
 }
 
 .popular-sites-list a {
-    color: #003399;
-    text-decoration: none;
-    font-weight: bold;
+  color: #003399;
+  text-decoration: none;
+  font-weight: bold;
 }
 
 .popular-sites-list a:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 /* Recent Notes - "Bulletin Board" style */
 .browse-notes-list {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .browse-note-item {
-    border: 1px solid #000000;
-    /* Use standard box styling */
-    padding: 10px;
-    background: #ffffff;
-    margin-bottom: 10px;
+  border: 1px solid #000000;
+  /* Use standard box styling */
+  padding: 10px;
+  background: #ffffff;
+  margin-bottom: 10px;
 }
 
 .browse-note-header {
-    background-color: #b1d0f0;
-    /* Light blue header */
-    padding: 3px;
-    font-weight: bold;
-    margin: -5px -5px 5px -5px;
-    /* Pull to edges */
-    font-size: 8pt;
-    border-bottom: 1px solid #000000;
+  background-color: #b1d0f0;
+  /* Light blue header */
+  padding: 3px;
+  font-weight: bold;
+  margin: -5px -5px 5px -5px;
+  /* Pull to edges */
+  font-size: 8pt;
+  border-bottom: 1px solid #000000;
 }
 
 .browse-note-header a {
-    color: #003399;
+  color: #003399;
 }
 
 .browse-note-content {
-    font-size: 9pt;
-    color: #000000;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
+  font-size: 9pt;
+  color: #000000;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }

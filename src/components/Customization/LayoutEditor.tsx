@@ -14,8 +14,8 @@ body {
 `;
 
 const THEME_PRESETS = {
-    classic: DEFAULT_CSS,
-    matrix: `/* Matrix Digital Rain */
+  classic: DEFAULT_CSS,
+  matrix: `/* Matrix Digital Rain */
 body { 
     background-color: #000 !important; 
     color: #00ff41 !important;
@@ -40,7 +40,7 @@ a { color: #00ff41 !important; text-transform: uppercase; letter-spacing: 1px; }
 a:hover { color: #fff !important; text-shadow: 0 0 5px #00ff41; }
 * { border-color: #003b00 !important; }
 `,
-    y2k: `/* Y2K Glitter / Pop */
+  y2k: `/* Y2K Glitter / Pop */
 body { 
     background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%) !important;
     background-attachment: fixed !important;
@@ -60,7 +60,7 @@ body {
 a { color: #ff00ff !important; font-weight: bold; }
 .home-box { border-radius: 15px; overflow: hidden; border: 2px solid #fecfef !important; }
 `,
-    emo: `/* Emo / Scene Night */
+  emo: `/* Emo / Scene Night */
 body { 
     background: #000 url('https://www.transparenttextures.com/patterns/carbon-fibre.png') !important;
 }
@@ -82,7 +82,7 @@ body {
 a { color: #ff0000 !important; text-decoration: underline !important; }
 a:hover { background: #cc0000; color: #000; }
 `,
-    geocities: `/* 1996 Time Machine */
+  geocities: `/* 1996 Time Machine */
 body { 
     background: #000080 url('https://www.transparenttextures.com/patterns/stardust.png') !important;
 }
@@ -101,7 +101,7 @@ body {
 a { color: #0000ee !important; font-weight: bold; }
 a:visited { color: #551a8b !important; }
 `,
-    cyberpunk: `/* Cyberpunk 2077 Night */
+  cyberpunk: `/* Cyberpunk 2077 Night */
 body { 
     background: #fcee0a !important; 
 }
@@ -119,142 +119,145 @@ body {
 }
 .home-box { border: 1px solid #00ffff !important; background: #111 !important; margin: 10px; }
 a { color: #00ffff !important; text-transform: lowercase; font-style: italic; }
-`
+`,
 };
 
 export const LayoutEditor = () => {
-    const { ndk, user, login } = useNostr();
-    const [code, setCode] = useState(DEFAULT_CSS);
-    const [status, setStatus] = useState('');
-    const [uploading, setUploading] = useState(false);
+  const { ndk, user, login } = useNostr();
+  const [code, setCode] = useState(DEFAULT_CSS);
+  const [status, setStatus] = useState('');
+  const [uploading, setUploading] = useState(false);
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !ndk) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !ndk) return;
 
-        setUploading(true);
-        setStatus('Uploading background image...');
+    setUploading(true);
+    setStatus('Uploading background image...');
 
-        try {
-            // Determine best server. Defaulting to one for now.
-            // Ideally we check NIP-65 or use a discovered one.
-            const server = 'https://nostr.build';
-            const result = await uploadToBlossom(ndk, file, server);
+    try {
+      // Determine best server. Defaulting to one for now.
+      // Ideally we check NIP-65 or use a discovered one.
+      const server = 'https://nostr.build';
+      const result = await uploadToBlossom(ndk, file, server);
 
-            setStatus('Image uploaded! Appending CSS.');
+      setStatus('Image uploaded! Appending CSS.');
 
-            const imageUrl = result.url;
-            const bgCss = `\n/* Background Image */\nbody {\n  background-image: url('${imageUrl}');\n  background-attachment: fixed;\n  background-repeat: repeat;\n}\n`;
+      const imageUrl = result.url;
+      const bgCss = `\n/* Background Image */\nbody {\n  background-image: url('${imageUrl}');\n  background-attachment: fixed;\n  background-repeat: repeat;\n}\n`;
 
-            setCode(prev => prev + bgCss);
-            setUploading(false);
-        } catch (err: any) {
-            console.error(err);
-            setStatus(`Upload failed: ${err.message}`);
-            setUploading(false);
-        }
-    };
-
-    const handleSave = async () => {
-        if (!ndk || !user) {
-            login();
-            return;
-        }
-        setStatus('Saving layout...');
-
-        try {
-            // Publish Kind 30078 event with the CSS content directly for simplicity
-            // (Blossom plan mentioned storing URL, but storing CSS (Kind 30001 or 30078) is faster for edits)
-            // Let's stick to Kind 30078 'mynostrspace_layout'
-
-            // We can also upload the CSS file itself to Blossom + store URL (as per original plan)
-            // BUT, direct storage is much snappier for this editor. 
-            // Let's provide BOTH: Upload CSS file to blossom (robust) OR direct. 
-            // Direct text in an event is limited by relay size (64kb usually fine for CSS).
-            // Let's use direct text for MVP seamlessness.
-
-            const event = new NDKEvent(ndk);
-            event.kind = 30078 as NDKKind;
-            event.content = code;
-            event.tags = [
-                ['d', 'mynostrspace_layout'],
-                ['t', 'css'],
-                ['alt', 'MyNostrSpace Custom Layout']
-            ];
-
-            await event.publish();
-            setStatus('Layout saved successfully! Go check your profile.');
-        } catch (e: any) {
-            console.error(e);
-            setStatus(`Error: ${e.message}`);
-        }
-    };
-
-    if (!user) {
-        return (
-            <div className="layout-editor-container">
-                <Navbar />
-                <div style={{ padding: 20, textAlign: 'center' }}>
-                    <h2>Please Login</h2>
-                    <button onClick={login}>Login to Customize</button>
-                </div>
-            </div>
-        );
+      setCode((prev) => prev + bgCss);
+      setUploading(false);
+    } catch (err: any) {
+      console.error(err);
+      setStatus(`Upload failed: ${err.message}`);
+      setUploading(false);
     }
+  };
 
+  const handleSave = async () => {
+    if (!ndk || !user) {
+      login();
+      return;
+    }
+    setStatus('Saving layout...');
+
+    try {
+      // Publish Kind 30078 event with the CSS content directly for simplicity
+      // (Blossom plan mentioned storing URL, but storing CSS (Kind 30001 or 30078) is faster for edits)
+      // Let's stick to Kind 30078 'mynostrspace_layout'
+
+      // We can also upload the CSS file itself to Blossom + store URL (as per original plan)
+      // BUT, direct storage is much snappier for this editor.
+      // Let's provide BOTH: Upload CSS file to blossom (robust) OR direct.
+      // Direct text in an event is limited by relay size (64kb usually fine for CSS).
+      // Let's use direct text for MVP seamlessness.
+
+      const event = new NDKEvent(ndk);
+      event.kind = 30078 as NDKKind;
+      event.content = code;
+      event.tags = [
+        ['d', 'mynostrspace_layout'],
+        ['t', 'css'],
+        ['alt', 'MyNostrSpace Custom Layout'],
+      ];
+
+      await event.publish();
+      setStatus('Layout saved successfully! Go check your profile.');
+    } catch (e: any) {
+      console.error(e);
+      setStatus(`Error: ${e.message}`);
+    }
+  };
+
+  if (!user) {
     return (
-        <div className="layout-editor-container">
-            <Navbar />
-            <div className="editor-wrapper">
-                <h2>Customize Your Space</h2>
-                <p>
-                    Write standard CSS to override the default styles.
-                    Upload an image to automatically add it as a background.
-                </p>
+      <div className="layout-editor-container">
+        <Navbar />
+        <div style={{ padding: 20, textAlign: 'center' }}>
+          <h2>Please Login</h2>
+          <button onClick={login}>Login to Customize</button>
+        </div>
+      </div>
+    );
+  }
 
-                <div className="toolbar">
-                    <label className="upload-btn">
-                        {uploading ? 'Uploading...' : 'Upload Background Image'}
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                            disabled={uploading}
-                            style={{ display: 'none' }}
-                        />
-                    </label>
-                    <div className="theme-presets">
-                        <select onChange={(e) => {
-                            const selected = THEME_PRESETS[e.target.value as keyof typeof THEME_PRESETS];
-                            if (selected) setCode(selected);
-                        }} style={{ padding: '5px', fontSize: '9pt' }}>
-                            <option value="">-- Select a Full Page Theme --</option>
-                            <option value="classic">Classic MySpace</option>
-                            <option value="matrix">Matrix Code</option>
-                            <option value="y2k">Y2K Glitter</option>
-                            <option value="emo">Emo/Scene Night</option>
-                            <option value="geocities">1996 GeoCities</option>
-                            <option value="cyberpunk">Cyberpunk 2077</option>
-                        </select>
-                    </div>
-                </div>
+  return (
+    <div className="layout-editor-container">
+      <Navbar />
+      <div className="editor-wrapper">
+        <h2>Customize Your Space</h2>
+        <p>
+          Write standard CSS to override the default styles. Upload an image to automatically add it
+          as a background.
+        </p>
 
-                <textarea
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    className="css-editor"
-                    spellCheck={false}
-                />
+        <div className="toolbar">
+          <label className="upload-btn">
+            {uploading ? 'Uploading...' : 'Upload Background Image'}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              disabled={uploading}
+              style={{ display: 'none' }}
+            />
+          </label>
+          <div className="theme-presets">
+            <select
+              onChange={(e) => {
+                const selected = THEME_PRESETS[e.target.value as keyof typeof THEME_PRESETS];
+                if (selected) setCode(selected);
+              }}
+              style={{ padding: '5px', fontSize: '9pt' }}
+            >
+              <option value="">-- Select a Full Page Theme --</option>
+              <option value="classic">Classic MySpace</option>
+              <option value="matrix">Matrix Code</option>
+              <option value="y2k">Y2K Glitter</option>
+              <option value="emo">Emo/Scene Night</option>
+              <option value="geocities">1996 GeoCities</option>
+              <option value="cyberpunk">Cyberpunk 2077</option>
+            </select>
+          </div>
+        </div>
 
-                <div className="actions">
-                    <button onClick={handleSave} className="save-btn">
-                        Save Layout
-                    </button>
-                    <span className="status-msg">{status}</span>
-                </div>
-            </div>
+        <textarea
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          className="css-editor"
+          spellCheck={false}
+        />
 
-            <style>{`
+        <div className="actions">
+          <button onClick={handleSave} className="save-btn">
+            Save Layout
+          </button>
+          <span className="status-msg">{status}</span>
+        </div>
+      </div>
+
+      <style>{`
                 .layout-editor-container {
                     width: 800px;
                     margin: 0 auto;
@@ -305,6 +308,6 @@ export const LayoutEditor = () => {
                     font-weight: bold;
                 }
             `}</style>
-        </div>
-    );
+    </div>
+  );
 };

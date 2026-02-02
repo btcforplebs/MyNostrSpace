@@ -164,8 +164,19 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setUser(user);
+      setUser(user);
       localStorage.setItem('mynostrspace_pubkey', user.pubkey);
-      localStorage.setItem('mynostrspace_semiconnected_bunker', connectionString);
+
+      // Save bunker URI *without* secret for future auto-logins
+      // The secret is likely one-time use; future logins rely on the established Client Key trust
+      try {
+        const urlObj = new URL(connectionString);
+        urlObj.searchParams.delete('secret');
+        localStorage.setItem('mynostrspace_semiconnected_bunker', urlObj.toString());
+      } catch (e) {
+        console.warn('Failed to parse/clean bunker string, saving raw:', e);
+        localStorage.setItem('mynostrspace_semiconnected_bunker', connectionString);
+      }
 
       console.log('NIP-46 login complete for:', user.pubkey);
     } catch (error) {

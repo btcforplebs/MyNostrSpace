@@ -134,7 +134,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
       // Clear previous state
       localStorage.removeItem('mynostrspace_pubkey');
       // Do NOT clear the bunker string yet, in case we fail transiently and want to retry on reload
-      // localStorage.removeItem('mynostrspace_semiconnected_bunker'); 
+      // localStorage.removeItem('mynostrspace_semiconnected_bunker');
       localStorage.removeItem('mynostrspace_local_key');
       setUser(null);
       ndk.signer = undefined;
@@ -183,7 +183,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
       console.error('NIP-46 Login failed:', error);
       alert(
         'Failed to connect to remote signer: ' +
-        (error instanceof Error ? error.message : String(error))
+          (error instanceof Error ? error.message : String(error))
       );
       throw error;
     }

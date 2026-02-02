@@ -188,7 +188,7 @@ export class NIP46Client {
     // Create request payload
     const request: RpcRequest = { id, method, params };
 
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       // 1. Register pending request FIRST to avoid race condition
       // where response comes back before we register the listener
       this.pendingRequests.set(id, { resolve, reject });
@@ -200,32 +200,34 @@ export class NIP46Client {
         }
       }, timeoutMs);
 
-      try {
-        // 2. Encrypt with NIP-44
-        const conversationKey = getConversationKey(this.clientSecretKey, this.bunkerPubkey);
-        const encrypted = nip44Encrypt(JSON.stringify(request), conversationKey);
+      (async () => {
+        try {
+          // 2. Encrypt with NIP-44
+          const conversationKey = getConversationKey(this.clientSecretKey, this.bunkerPubkey);
+          const encrypted = nip44Encrypt(JSON.stringify(request), conversationKey);
 
-        // 3. Create and sign event
-        const unsignedEvent = {
-          kind: 24133,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [['p', this.bunkerPubkey]],
-          content: encrypted,
-        };
+          // 3. Create and sign event
+          const unsignedEvent = {
+            kind: 24133,
+            created_at: Math.floor(Date.now() / 1000),
+            tags: [['p', this.bunkerPubkey]],
+            content: encrypted,
+          };
 
-        const signedEvent = finalizeEvent(unsignedEvent, this.clientSecretKey);
+          const signedEvent = finalizeEvent(unsignedEvent, this.clientSecretKey);
 
-        // 4. Publish to bunker relays
-        const ndkEvent = new NDKEvent(this.ndk, signedEvent);
-        await ndkEvent.publish();
+          // 4. Publish to bunker relays
+          const ndkEvent = new NDKEvent(this.ndk, signedEvent);
+          await ndkEvent.publish();
 
-        console.log(`✉️  Published request to ${this.bunkerRelays.length} relays`);
-      } catch (error) {
-        // Cleaning up on publish failure
-        clearTimeout(timeout);
-        this.pendingRequests.delete(id);
-        reject(error);
-      }
+          console.log(`✉️  Published request to ${this.bunkerRelays.length} relays`);
+        } catch (error) {
+          // Cleaning up on publish failure
+          clearTimeout(timeout);
+          this.pendingRequests.delete(id);
+          reject(error);
+        }
+      })();
     });
   }
 

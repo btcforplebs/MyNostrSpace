@@ -37,8 +37,8 @@ async function rawHandshake(connectionString: string) {
     .catch(() => null);
   if (profile) {
     console.log('✅ Bunker Metadata found!');
-    console.log('   Name:', (profile as any).name || 'Unknown');
-    console.log('   NIP-05:', (profile as any).nip05 || 'None');
+    console.log('   Name:', profile.name || 'Unknown');
+    console.log('   NIP-05:', profile.nip05 || 'None');
   } else {
     console.warn('⚠️ Bunker Metadata NOT FOUND. (Is it online?)');
   }

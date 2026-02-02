@@ -133,7 +133,8 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
 
       // Clear previous state
       localStorage.removeItem('mynostrspace_pubkey');
-      localStorage.removeItem('mynostrspace_semiconnected_bunker');
+      // Do NOT clear the bunker string yet, in case we fail transiently and want to retry on reload
+      // localStorage.removeItem('mynostrspace_semiconnected_bunker'); 
       localStorage.removeItem('mynostrspace_local_key');
       setUser(null);
       ndk.signer = undefined;
@@ -155,7 +156,12 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
       // Wrap as NDKSigner and set user
       ndk.signer = nip46Client.asSigner();
       const user = await ndk.signer.user();
-      await user.fetchProfile();
+
+      try {
+        await user.fetchProfile();
+      } catch (err) {
+        console.warn('Failed to fetch profile during login, proceeding anyway:', err);
+      }
 
       setUser(user);
       localStorage.setItem('mynostrspace_pubkey', user.pubkey);

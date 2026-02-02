@@ -156,6 +156,16 @@
   padding: 3px 10px;
   font-weight: bold;
   font-size: 10pt;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.refreshing-indicator {
+  font-size: 8pt;
+  font-weight: normal;
+  font-style: italic;
+  opacity: 0.7;
 }
 
 /* Cool People Box */

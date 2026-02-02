@@ -159,9 +159,11 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         console.log('Zap invoice generated:', invoiceData.pr);
 
         // Try to pay automatically if window.nostr supports it
-        if ((window.nostr as any)?.zap) {
+        if ((window.nostr as unknown as { zap?: (invoice: string) => Promise<void> | void })?.zap) {
           try {
-            await (window.nostr as any).zap(invoiceData.pr);
+            await (
+              window.nostr as unknown as { zap: (invoice: string) => Promise<void> | void }
+            ).zap(invoiceData.pr);
             setZaps((prev) => prev + 1);
             setZapInvoice(null);
             alert('Zap successful!');
@@ -172,9 +174,9 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       } else {
         throw new Error(invoiceData.reason || 'Failed to get invoice');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Zap flow failed:', error);
-      alert(`Zap failed: ${error.message || 'Unknown error'}`);
+      alert(`Zap failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsZapping(false);
     }

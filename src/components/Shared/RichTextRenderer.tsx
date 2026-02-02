@@ -138,7 +138,8 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
                 const { type, data } = nip19.decode(entity);
 
                 if (type === 'npub' || type === 'nprofile') {
-                  const pubkey = type === 'npub' ? (data as string) : (data as any).pubkey;
+                  const pubkey =
+                    type === 'npub' ? (data as string) : (data as { pubkey: string }).pubkey;
                   return (
                     <Link
                       key={wordIndex}
@@ -151,7 +152,7 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
                 }
 
                 if (type === 'note' || type === 'nevent') {
-                  const id = type === 'note' ? (data as string) : (data as any).id;
+                  const id = type === 'note' ? (data as string) : (data as { id: string }).id;
                   return <EmbeddedNote key={wordIndex} id={id} />;
                 }
               } catch (e) {

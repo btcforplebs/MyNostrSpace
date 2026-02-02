@@ -6,6 +6,8 @@ import { useCustomLayout } from '../../hooks/useCustomLayout';
 import { Navbar } from '../Shared/Navbar';
 import { FeedItem } from '../Shared/FeedItem';
 import { SEO } from '../Shared/SEO';
+import { MediaUpload } from './MediaUpload';
+import { BlogEditor } from './BlogEditor';
 import './HomePage.css';
 
 export const HomePage: React.FC = () => {
@@ -18,6 +20,19 @@ export const HomePage: React.FC = () => {
   const [notifications, setNotifications] = useState<NDKEvent[]>([]);
   const [parentEvents, setParentEvents] = useState<Record<string, NDKEvent>>({});
   const [showAllNotifications, setShowAllNotifications] = useState(false);
+  const [stats, setStats] = useState({
+    followers: 0,
+    zaps: 0,
+    posts: 0,
+  });
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+  const [mediaModalType, setMediaModalType] = useState<'photo' | 'video'>('photo');
+  const [mediaEvents, setMediaEvents] = useState<NDKEvent[]>([]);
+  const [blogEvents, setBlogEvents] = useState<NDKEvent[]>([]);
+  const [viewMode, setViewMode] = useState<
+    'feed' | 'photos' | 'videos' | 'blog' | 'calendar' | 'reviews'
+  >('feed');
+  const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
 
   const MOODS = [
     'None',
@@ -52,7 +67,7 @@ export const HomePage: React.FC = () => {
         };
         const events = await ndk.fetchEvents(filter);
         const sortedEvents = Array.from(events).sort(
-          (a, b) => (b.created_at || 0) - (a.created_at || 0)
+          (a: NDKEvent, b: NDKEvent) => (b.created_at || 0) - (a.created_at || 0)
         );
 
         // Fetch profiles for the feed
@@ -68,7 +83,7 @@ export const HomePage: React.FC = () => {
       };
       const notificationEvents = await ndk.fetchEvents(notificationFilter);
       const sortedNotifications = Array.from(notificationEvents).sort(
-        (a, b) => (b.created_at || 0) - (a.created_at || 0)
+        (a: NDKEvent, b: NDKEvent) => (b.created_at || 0) - (a.created_at || 0)
       );
 
       // Fetch profiles for notifications
@@ -82,7 +97,9 @@ export const HomePage: React.FC = () => {
         })
       );
 
-      setNotifications(sortedNotifications);
+      // Filter out self-notifications
+      const filteredNotifications = sortedNotifications.filter((n) => n.pubkey !== user.pubkey);
+      setNotifications(filteredNotifications);
 
       // 4. Fetch Parent Events for Replies (Kind 1)
       const replyEvents = sortedNotifications.filter((n) => n.kind === 1);
@@ -101,6 +118,61 @@ export const HomePage: React.FC = () => {
         });
         setParentEvents((prev) => ({ ...prev, ...parentMap }));
       }
+
+      // 5. Fetch Profile Stats
+      const statsPromises = [];
+
+      // Follower count (Kind 3 events tagging the user)
+      const followerFilter: NDKFilter = {
+        kinds: [3],
+        '#p': [user.pubkey],
+      };
+      statsPromises.push(ndk.fetchEvents(followerFilter).then((evs: Set<NDKEvent>) => evs.size));
+
+      // Zap count (Kind 9735)
+      const zapFilter: NDKFilter = {
+        kinds: [9735],
+        '#p': [user.pubkey],
+      };
+      statsPromises.push(ndk.fetchEvents(zapFilter).then((evs: Set<NDKEvent>) => evs.size));
+
+      // Post count (Kind 1)
+      const postFilter: NDKFilter = {
+        kinds: [1],
+        authors: [user.pubkey],
+      };
+      statsPromises.push(ndk.fetchEvents(postFilter).then((evs: Set<NDKEvent>) => evs.size));
+
+      const [followerCount, zapCount, postCount] = await Promise.all(statsPromises);
+      setStats({
+        followers: followerCount,
+        zaps: zapCount,
+        posts: postCount,
+      });
+
+      // 6. Fetch Media Events (Kind 1063)
+      const mediaFilter: NDKFilter = {
+        kinds: [1063],
+        authors: [user.pubkey],
+      };
+      const fetchedMedia = await ndk.fetchEvents(mediaFilter);
+      setMediaEvents(
+        Array.from(fetchedMedia).sort(
+          (a: NDKEvent, b: NDKEvent) => (b.created_at || 0) - (a.created_at || 0)
+        )
+      );
+
+      // 7. Fetch Blog Events (Kind 30023)
+      const blogFilter: NDKFilter = {
+        kinds: [30023],
+        authors: [user.pubkey],
+      };
+      const fetchedBlogs = await ndk.fetchEvents(blogFilter);
+      setBlogEvents(
+        Array.from(fetchedBlogs).sort(
+          (a: NDKEvent, b: NDKEvent) => (b.created_at || 0) - (a.created_at || 0)
+        )
+      );
     } catch (error) {
       console.error('Error fetching home data:', error);
     } finally {
@@ -177,7 +249,13 @@ export const HomePage: React.FC = () => {
               />
               <ul className="profile-stats">
                 <li>
-                  <strong>Profile Views:</strong> 1,102
+                  <strong>Followers:</strong> {stats.followers.toLocaleString()}
+                </li>
+                <li>
+                  <strong>Zaps:</strong> {stats.zaps.toLocaleString()}
+                </li>
+                <li>
+                  <strong>Posts:</strong> {stats.posts.toLocaleString()}
                 </li>
                 <li>
                   <strong>Last Login:</strong> {new Date().toLocaleDateString()}
@@ -193,7 +271,7 @@ export const HomePage: React.FC = () => {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert('Coming soon!');
+                      setViewMode('photos');
                     }}
                   >
                     Edit
@@ -203,7 +281,8 @@ export const HomePage: React.FC = () => {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert('Coming soon!');
+                      setMediaModalType('photo');
+                      setIsMediaModalOpen(true);
                     }}
                   >
                     Upload
@@ -215,7 +294,7 @@ export const HomePage: React.FC = () => {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert('Coming soon!');
+                      setViewMode('videos');
                     }}
                   >
                     Edit
@@ -225,7 +304,8 @@ export const HomePage: React.FC = () => {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert('Coming soon!');
+                      setMediaModalType('video');
+                      setIsMediaModalOpen(true);
                     }}
                   >
                     Upload
@@ -236,7 +316,7 @@ export const HomePage: React.FC = () => {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert('Coming soon!');
+                      setViewMode('calendar');
                     }}
                   >
                     Manage Calendar
@@ -247,18 +327,29 @@ export const HomePage: React.FC = () => {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert('Coming soon!');
+                      setViewMode('blog');
                     }}
                   >
                     Manage Blog
-                  </a>
+                  </a>{' '}
+                  [{' '}
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsBlogModalOpen(true);
+                    }}
+                  >
+                    New
+                  </a>{' '}
+                  ]
                 </li>
                 <li>
                   <a
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert('Coming soon!');
+                      setViewMode('reviews');
                     }}
                   >
                     Manage Reviews
@@ -276,7 +367,7 @@ export const HomePage: React.FC = () => {
                   <>
                     <ul className="notifications-list">
                       {(showAllNotifications ? notifications : notifications.slice(0, 5)).map(
-                        (n) => {
+                        (n: NDKEvent) => {
                           const isLike = n.kind === 7;
                           const isZap = n.kind === 9735;
                           const isComment = n.kind === 1;
@@ -310,7 +401,7 @@ export const HomePage: React.FC = () => {
                                   <div className="notification-parent-snippet">
                                     {(() => {
                                       const parentId = n.tags.find(
-                                        (t) => t[0] === 'e' && (t[3] === 'reply' || !t[3])
+                                        (t: string[]) => t[0] === 'e' && (t[3] === 'reply' || !t[3])
                                       )?.[1];
                                       const parent = parentId ? parentEvents[parentId] : null;
                                       if (parent) {
@@ -409,18 +500,155 @@ export const HomePage: React.FC = () => {
                 </div>
               </div>
               <div className="feed-container">
-                {loading && <div style={{ padding: '10px' }}>Loading update stream...</div>}
-                {feed.map((event) => (
-                  <FeedItem key={event.id} event={event} />
-                ))}
-                {!loading && feed.length === 0 && (
-                  <div style={{ padding: '10px' }}>No updates from friends yet.</div>
+                <div className="view-mode-tabs">
+                  <button
+                    className={viewMode === 'feed' ? 'active' : ''}
+                    onClick={() => setViewMode('feed')}
+                  >
+                    Stream
+                  </button>
+                  <button
+                    className={viewMode === 'photos' ? 'active' : ''}
+                    onClick={() => setViewMode('photos')}
+                  >
+                    Photos
+                  </button>
+                  <button
+                    className={viewMode === 'videos' ? 'active' : ''}
+                    onClick={() => setViewMode('videos')}
+                  >
+                    Videos
+                  </button>
+                  <button
+                    className={viewMode === 'blog' ? 'active' : ''}
+                    onClick={() => setViewMode('blog')}
+                  >
+                    Blog
+                  </button>
+                </div>
+
+                {loading && <div style={{ padding: '10px' }}>Loading...</div>}
+
+                {viewMode === 'feed' && (
+                  <>
+                    {feed.map((event: NDKEvent) => (
+                      <FeedItem key={event.id} event={event} />
+                    ))}
+                    {!loading && feed.length === 0 && (
+                      <div style={{ padding: '10px' }}>No updates from friends yet.</div>
+                    )}
+                  </>
+                )}
+
+                {viewMode === 'photos' && (
+                  <div className="media-gallery">
+                    {mediaEvents
+                      .filter((e: NDKEvent) =>
+                        e.tags.find((t: string[]) => t[0] === 'm' && t[1].startsWith('image/'))
+                      )
+                      .map((event: NDKEvent) => (
+                        <div key={event.id} className="gallery-item">
+                          <img
+                            src={event.tags.find((t: string[]) => t[0] === 'url')?.[1]}
+                            alt={event.content}
+                            onClick={() =>
+                              window.open(
+                                event.tags.find((t: string[]) => t[0] === 'url')?.[1] || '',
+                                '_blank'
+                              )
+                            }
+                          />
+                        </div>
+                      ))}
+                    {!loading &&
+                      mediaEvents.filter((e: NDKEvent) =>
+                        e.tags.find((t: string[]) => t[0] === 'm' && t[1].startsWith('image/'))
+                      ).length === 0 && (
+                        <div style={{ padding: '20px', textAlign: 'center' }}>No photos yet.</div>
+                      )}
+                  </div>
+                )}
+
+                {viewMode === 'videos' && (
+                  <div className="media-gallery">
+                    {mediaEvents
+                      .filter((e: NDKEvent) =>
+                        e.tags.find((t: string[]) => t[0] === 'm' && t[1].startsWith('video/'))
+                      )
+                      .map((event: NDKEvent) => (
+                        <div key={event.id} className="gallery-item">
+                          <video
+                            src={event.tags.find((t: string[]) => t[0] === 'url')?.[1]}
+                            controls
+                          />
+                        </div>
+                      ))}
+                    {!loading &&
+                      mediaEvents.filter((e: NDKEvent) =>
+                        e.tags.find((t: string[]) => t[0] === 'm' && t[1].startsWith('video/'))
+                      ).length === 0 && (
+                        <div style={{ padding: '20px', textAlign: 'center' }}>No videos yet.</div>
+                      )}
+                  </div>
+                )}
+
+                {viewMode === 'blog' && (
+                  <div className="blog-gallery">
+                    {blogEvents.map((event: NDKEvent) => (
+                      <div key={event.id} className="blog-entry-card">
+                        {event.tags.find((t: string[]) => t[0] === 'image') && (
+                          <img
+                            src={event.tags.find((t: string[]) => t[0] === 'image')?.[1]}
+                            alt=""
+                            className="blog-entry-image"
+                          />
+                        )}
+                        <div className="blog-entry-content">
+                          <h3 className="blog-entry-title">
+                            {event.tags.find((t: string[]) => t[0] === 'title')?.[1]}
+                          </h3>
+                          <p className="blog-entry-summary">
+                            {event.tags.find((t: string[]) => t[0] === 'summary')?.[1]}
+                          </p>
+                          <div className="blog-entry-meta">
+                            {new Date((event.created_at || 0) * 1000).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {!loading && blogEvents.length === 0 && (
+                      <div style={{ padding: '20px', textAlign: 'center' }}>No blog posts yet.</div>
+                    )}
+                  </div>
+                )}
+
+                {viewMode === 'calendar' && (
+                  <div style={{ padding: '20px', textAlign: 'center' }}>
+                    Calendar functionality coming soon! (Kind 31922)
+                  </div>
+                )}
+
+                {viewMode === 'reviews' && (
+                  <div style={{ padding: '20px', textAlign: 'center' }}>
+                    Reviews functionality coming soon! (Kind 1985)
+                  </div>
                 )}
               </div>
             </div>
           </div>
         </div>
       </div>
+      <MediaUpload
+        isOpen={isMediaModalOpen}
+        type={mediaModalType}
+        onClose={() => setIsMediaModalOpen(false)}
+        onUploadComplete={fetchHomeData}
+      />
+      <BlogEditor
+        isOpen={isBlogModalOpen}
+        onClose={() => setIsBlogModalOpen(false)}
+        onPostComplete={fetchHomeData}
+      />
     </div>
   );
 };

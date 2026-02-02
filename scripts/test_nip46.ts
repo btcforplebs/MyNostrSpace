@@ -44,7 +44,7 @@ async function main() {
     relay.on('connect', () => console.log(`✅ Event: Connected to ${url}`));
     relay.on('disconnect', () => console.log(`❌ Event: Disconnected from ${url}`));
     // @ts-expect-error - NDK relay error event type mismatch
-    relay.on('error', (err: any) => console.log(`❗ Event: Error from ${url}:`, err));
+    relay.on('error', (err: unknown) => console.log(`❗ Event: Error from ${url}:`, err));
     relay.on('notice', (msg: string) => console.log(`📢 Event: Notice from ${url}: ${msg}`));
   });
 

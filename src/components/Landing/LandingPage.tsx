@@ -1,16 +1,35 @@
 import { useState, useEffect } from 'react';
 import { useNostr } from '../../context/NostrContext';
-import { NDKUser } from '@nostr-dev-kit/ndk';
+import { NDKUser, type NDKUserProfile } from '@nostr-dev-kit/ndk';
 import './LandingPage.css';
 
 export const LandingPage = () => {
   const { login, loginWithNip46, ndk } = useNostr();
-  const [coolPeople, setCoolPeople] = useState<NDKUser[]>([]);
+  const [coolPeople, setCoolPeople] = useState<NDKUser[]>(() => {
+    const saved = localStorage.getItem('mynostrspace_cool_people');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Note: ndk might not be fully initialized in the closure if we're not careful,
+        // but in our Provider it's created synchronously.
+        return parsed.map((p: { pubkey: string; profile: NDKUserProfile }) => {
+          const user = new NDKUser({ pubkey: p.pubkey });
+          user.profile = p.profile;
+          return user;
+        });
+      } catch (e) {
+        console.warn('Failed to parse cached cool people', e);
+        return [];
+      }
+    }
+    return [];
+  });
   const [loading, setLoading] = useState(false);
   const [bunkerInput, setBunkerInput] = useState('');
   const [loginMethod, setLoginMethod] = useState<'extension' | 'remote'>('extension');
 
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(coolPeople.length > 0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (!ndk) return;
@@ -20,15 +39,18 @@ export const LandingPage = () => {
     const maxRetries = 5;
 
     const fetchCoolPeople = async () => {
+      if (!isMounted) return;
+      setIsRefreshing(true);
+
       console.log(`fetchCoolPeople session: retryCount=${retryCount}, hasLoaded=${hasLoaded}`);
       try {
-        // Wait for relays if none are connected yet
+        // Reduced wait for relays - don't block the UI
         if (ndk.pool.stats().connected === 0) {
-          console.log(`No relays connected. Attempting connection...`);
+          console.log(`No relays connected. Attempting quick connection...`);
           try {
-            await ndk.connect(3000);
+            await ndk.connect(1000);
           } catch (e) {
-            console.warn('ndk.connect failed or timed out during fetchCoolPeople', e);
+            console.warn('ndk.connect timeout during fetchCoolPeople', e);
           }
         }
 
@@ -81,13 +103,25 @@ export const LandingPage = () => {
             0,
             8
           );
-          console.log(`Found ${uniqueUsers.length} unique profiles.`);
           setCoolPeople(uniqueUsers);
+
+          // Update cache
+          localStorage.setItem(
+            'mynostrspace_cool_people',
+            JSON.stringify(
+              uniqueUsers.map((u) => ({
+                pubkey: u.pubkey,
+                profile: u.profile,
+              }))
+            )
+          );
         }
 
         setHasLoaded(true);
+        setIsRefreshing(false);
       } catch (err) {
         console.error('Failed to fetch cool people', err);
+        setIsRefreshing(false);
         if (isMounted) {
           if (retryCount < maxRetries) {
             retryCount++;
@@ -181,7 +215,9 @@ export const LandingPage = () => {
           </section>
 
           <div className="content-box">
-            <div className="content-box-header">Cool New People</div>
+            <div className="content-box-header">
+              Cool New People {isRefreshing && <span className="refreshing-indicator">...</span>}
+            </div>
             <div className="people-grid">
               {coolPeople.length > 0 ? (
                 coolPeople.map((person) => (

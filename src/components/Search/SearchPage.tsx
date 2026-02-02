@@ -31,7 +31,7 @@ export const SearchPage = () => {
         });
 
         const profiles: SearchResult[] = Array.from(events).map((event) => {
-          let profile: any = {};
+          let profile: Record<string, string | undefined> = {};
           try {
             profile = JSON.parse(event.content);
           } catch {

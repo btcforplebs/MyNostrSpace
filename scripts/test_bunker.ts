@@ -52,7 +52,7 @@ async function testBunker(connectionString: string) {
       if (relay) {
         // NDK states: 0=DISCONNECTED, 1=CONNECTING, 2=CONNECTED, 3=FLAPPING, 4=PERMANENT_FAILURE, 5=RECONNECTING
         const statusNum = relay.status;
-        const isConnected = statusNum === 2 || (statusNum as any) === 5;
+        const isConnected = statusNum === 2 || (statusNum as unknown as number) === 5;
         statuses.push(`${url}: ${isConnected ? '✅ CONNECTED' : '❌ ' + statusNum}`);
         if (isConnected) connectedCount++;
         else relay.connect().catch(() => {});
@@ -85,7 +85,10 @@ async function testBunker(connectionString: string) {
   // MANUAL OVERRIDE: Ensure the signer uses the EXACT relay URLs from the pool
   // This stops NDK from trying to connect to "new" variants like with/without slashes
   remoteSigner.relayUrls = Array.from(ndk.pool.relays.keys());
-  console.log('Signer relayUrls overridden with pool keys:', (remoteSigner as any).relayUrls);
+  console.log(
+    'Signer relayUrls overridden with pool keys:',
+    (remoteSigner as unknown as { relayUrls: string[] }).relayUrls
+  );
 
   // 5. WIRE SNOOP: Listen for EVERY NIP-46 event on these relays (no filters!)
   console.log('\n--- STARTING WIRE SNOOP (ALL Kind 24133) ---');
@@ -139,8 +142,8 @@ async function testBunker(connectionString: string) {
     console.log(`Publishing manual connect event ${event.id.slice(0, 8)}...`);
     await event.publish();
     console.log('✅ Manual connect event published. Watching WIRE SNOOP for response...');
-  } catch (e: any) {
-    console.warn('❌ MANUAL CONNECT TEST FAILED:', e.message);
+  } catch (e: unknown) {
+    console.warn('❌ MANUAL CONNECT TEST FAILED:', e instanceof Error ? e.message : String(e));
   }
 
   // 7. Handshake with 60s timeout
@@ -151,8 +154,8 @@ async function testBunker(connectionString: string) {
       new Promise((_, reject) => setTimeout(() => reject(new Error('60s Timeout reached')), 60000)),
     ]);
     console.log('\nSUCCESS: Signer ready!');
-  } catch (e: any) {
-    console.error('\nFAILED:', e.message);
+  } catch (e: unknown) {
+    console.error('\nFAILED:', e instanceof Error ? e.message : String(e));
   } finally {
     snoopSub.stop();
     // Wait a sec for final logs

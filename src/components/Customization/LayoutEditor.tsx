@@ -148,9 +148,9 @@ export const LayoutEditor = () => {
 
       setCode((prev) => prev + bgCss);
       setUploading(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setStatus(`Upload failed: ${err.message}`);
+      setStatus(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
       setUploading(false);
     }
   };
@@ -184,9 +184,9 @@ export const LayoutEditor = () => {
 
       await event.publish();
       setStatus('Layout saved successfully! Go check your profile.');
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      setStatus(`Error: ${e.message}`);
+      setStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 

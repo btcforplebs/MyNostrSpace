@@ -65,10 +65,10 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const connect = async () => {
       try {
-        // Wait for connection OR timeout after 5 seconds
+        // Wait for connection OR timeout after 1 second (perceived speed)
         await Promise.race([
-          ndk.connect(5000),
-          new Promise((resolve) => setTimeout(resolve, 5000)),
+          ndk.connect(1000),
+          new Promise((resolve) => setTimeout(resolve, 1000)),
         ]);
       } catch (e) {
         console.warn('NDK connection warning:', e);
@@ -141,7 +141,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
 
       // Ensure NDK is connected
       console.log('Connecting to NDK relays...');
-      await ndk.connect(5000).catch((e) => console.warn('NDK connect:', e));
+      await ndk.connect(2000).catch((e) => console.warn('NDK connect:', e));
 
       // Create NIP46 client and connect
       console.log('Creating NIP46Client...');

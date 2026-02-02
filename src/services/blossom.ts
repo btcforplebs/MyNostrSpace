@@ -12,7 +12,7 @@ export const uploadToBlossom = async (
   ndk: NDK,
   file: File,
   serverUrl: string = 'https://nostr.build'
-): Promise<{ url: string; [key: string]: any }> => {
+): Promise<{ url: string; [key: string]: unknown }> => {
   if (!ndk.signer) {
     throw new Error('NDK signer is required for NIP-98 upload');
   }

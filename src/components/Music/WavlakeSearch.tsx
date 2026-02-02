@@ -9,7 +9,18 @@ interface WavlakeTrack {
 }
 
 interface WavlakeSearchProps {
-  onSelect: (track: { title: string; url: string }) => void;
+  onSelect: (track: { title: string; url: string; link?: string }) => void;
+}
+
+interface WavlakeRawTrack {
+  id: string;
+  type?: string;
+  title: string;
+  artist?: string;
+  artworkUrl?: string;
+  albumArtUrl?: string;
+  mediaUrl: string;
+  slug?: string;
 }
 
 export const WavlakeSearch = ({ onSelect }: WavlakeSearchProps) => {
@@ -30,16 +41,17 @@ export const WavlakeSearch = ({ onSelect }: WavlakeSearchProps) => {
       // Wavlake API returns an array directly
       const rawData = data.data || data;
       const tracks = Array.isArray(rawData)
-        ? rawData.filter((item: any) => item.type === 'track' || (item.title && item.mediaUrl))
+        ? (rawData as WavlakeRawTrack[]).filter(
+            (item) => item.type === 'track' || (item.title && item.mediaUrl)
+          )
         : [];
 
-      const mapped = tracks.map((t: any) => ({
+      const mapped = tracks.map((t) => ({
         id: t.id,
         title: t.title,
         artist: t.artist || 'Unknown',
         artwork: t.artworkUrl || t.albumArtUrl || '',
         mediaUrl: t.mediaUrl,
-        slug: t.slug, // Assuming slug exists or we use ID for link
       }));
       setResults(mapped);
     } catch (e) {
@@ -82,20 +94,8 @@ export const WavlakeSearch = ({ onSelect }: WavlakeSearchProps) => {
               onSelect({
                 title: `${track.artist} - ${track.title}`,
                 url: track.mediaUrl, // DIRECT MP3 for new player
-                // We attach extra metadata for the player to use if it can,
-                // but our interface in EditProfilePage currently only expects title/url to be saved.
-                // To actually save the external link, we need to hack it into the 'url' or 'title',
-                // OR we assume the player can't link back unless we store more data.
-                // Strategy: We will store the Wavlake Link as part of a composite object if possible,
-                // but since the schema is {title, url}, we might have to rely on just the MP3.
-                // WAIT: The user wants a link to the artist song.
-                // I should update ExtendedProfileData schema to allow optional 'link' field?
-                // Or just pass it here and let EditProfilePage decide.
-                // Let's add 'link' property to the object passed to onSelect.
-                // We'll update EditProfilePage to save it.
-                // Actually, let's keep it simple: `url` is MP3. We'll add a `link` property to the saved object.
                 link: `https://wavlake.com/track/${track.id}`,
-              } as any)
+              })
             }
           >
             {track.artwork && <img src={track.artwork} alt="art" />}

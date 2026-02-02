@@ -166,7 +166,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
       console.error('NIP-46 Login failed:', error);
       alert(
         'Failed to connect to remote signer: ' +
-          (error instanceof Error ? error.message : String(error))
+        (error instanceof Error ? error.message : String(error))
       );
       throw error;
     }
@@ -178,7 +178,6 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('mynostrspace_pubkey');
     localStorage.removeItem('mynostrspace_semiconnected_bunker');
     localStorage.removeItem('mynostrspace_local_key');
-    localStorage.removeItem('mynostrspace_nip46_client_key');
   };
 
   // Auto-login if previously logged in

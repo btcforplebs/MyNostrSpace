@@ -70,7 +70,7 @@ export class NIP46Client {
       this.clientSecretKey = generateSecretKey();
       this.clientPubkey = getPublicKey(this.clientSecretKey);
       localStorage.setItem('mynostrspace_nip46_client_key', bytesToHex(this.clientSecretKey));
-      console.log('🔑 NIP46Client generated new key:', this.clientPubkey);
+      console.log('🔑 NIP46Client generated NEW key (saved to storage):', this.clientPubkey);
     }
   }
 

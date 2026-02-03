@@ -13,9 +13,15 @@ interface WavlakePlayerProps {
   tracks?: WavlakeTrack[]; // New Playlist support
   trackId?: string; // Legacy ID (unused mostly now)
   hideHeader?: boolean;
+  autoplay?: boolean;
 }
 
-export const WavlakePlayer = ({ trackUrl, tracks, hideHeader }: WavlakePlayerProps) => {
+export const WavlakePlayer = ({
+  trackUrl,
+  tracks,
+  hideHeader,
+  autoplay = false,
+}: WavlakePlayerProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   // State for the "current" track when in playlist mode
@@ -89,8 +95,8 @@ export const WavlakePlayer = ({ trackUrl, tracks, hideHeader }: WavlakePlayerPro
             <iframe
               key={playbackUrl}
               src={
-                playbackUrl && !playbackUrl.includes('autoplay=true')
-                  ? `${playbackUrl}${playbackUrl.includes('?') ? '&' : '?'}autoplay=true`
+                playbackUrl && !playbackUrl.includes('autoplay=')
+                  ? `${playbackUrl}${playbackUrl.includes('?') ? '&' : '?'}autoplay=${autoplay}`
                   : playbackUrl
               }
               width="100%"
@@ -204,7 +210,7 @@ export const WavlakePlayer = ({ trackUrl, tracks, hideHeader }: WavlakePlayerPro
               ref={audioRef}
               key={playbackUrl}
               src={playbackUrl}
-              autoPlay
+              autoPlay={autoplay}
               style={{ width: '100%', height: '24px', filter: 'invert(1) hue-rotate(180deg)' }}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}

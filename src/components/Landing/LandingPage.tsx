@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk';
 import { WavlakePlayer } from '../Music/WavlakePlayer';
@@ -300,7 +301,7 @@ export const LandingPage = () => {
                 rel="noreferrer"
                 className="galaxy-item"
               >
-                <img src="https://zap.stream/favicon.ico" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                <img src="https://zap.stream/icons/icon-512x512.png" alt="" onError={(e) => (e.currentTarget.src = 'https://zap.stream/favicon.ico')} />
                 <span>Zap.stream</span>
               </a>
               <a
@@ -327,7 +328,7 @@ export const LandingPage = () => {
                 rel="noreferrer"
                 className="galaxy-item"
               >
-                <img src="https://primal.net/apple-touch-icon.png" alt="" onError={(e) => (e.currentTarget.src = 'https://primal.net/favicon.ico')} />
+                <img src="https://primal.net/assets/icons/logo_white_on_purple.png" alt="" onError={(e) => (e.currentTarget.src = 'https://primal.net/favicon.ico')} />
                 <span>Primal</span>
               </a>
             </div>
@@ -359,15 +360,17 @@ export const LandingPage = () => {
                   .slice(0, 8)
                   .map(([pk, profile]) => (
                     <div key={pk} className="person-item">
-                      <div className="person-name">
-                        {profile.name || profile.display_name || 'Anon'}
-                      </div>
-                      <div className="person-pic">
-                        <img
-                          src={profile.picture || `https://robohash.org/${pk}?set=set4`}
-                          alt=""
-                        />
-                      </div>
+                      <Link to={`/p/${pk}`} className="person-link">
+                        <div className="person-name">
+                          {profile.name || profile.display_name || 'Anon'}
+                        </div>
+                        <div className="person-pic">
+                          <img
+                            src={profile.picture || `https://robohash.org/${pk}?set=set4`}
+                            alt=""
+                          />
+                        </div>
+                      </Link>
                     </div>
                   ))
                 : [...Array(8)].map((_, i) => (

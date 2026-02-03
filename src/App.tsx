@@ -41,23 +41,19 @@ function App() {
     <HelmetProvider>
       <LightboxProvider>
         <div className="app-container">
-          {!user ? (
-            <LandingPage />
-          ) : (
-            <ErrorBoundary>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/p/:pubkey" element={<ProfilePage />} />
-                <Route path="/p/:pubkey/friends" element={<FriendsPage />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/browse" element={<BrowsePage />} />
-                <Route path="/edit-layout" element={<LayoutEditor />} />
-                <Route path="/edit-profile" element={<EditProfilePage />} />
-                <Route path="/settings" element={<RelaySettings />} />
-                <Route path="/thread/:eventId" element={<ThreadPage />} />
-              </Routes>
-            </ErrorBoundary>
-          )}
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={user ? <HomePage /> : <LandingPage />} />
+              <Route path="/p/:pubkey" element={<ProfilePage />} />
+              <Route path="/p/:pubkey/friends" element={<FriendsPage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/browse" element={<BrowsePage />} />
+              <Route path="/edit-layout" element={<LayoutEditor />} />
+              <Route path="/edit-profile" element={<EditProfilePage />} />
+              <Route path="/settings" element={<RelaySettings />} />
+              <Route path="/thread/:eventId" element={<ThreadPage />} />
+            </Routes>
+          </ErrorBoundary>
         </div>
         <Lightbox />
       </LightboxProvider>

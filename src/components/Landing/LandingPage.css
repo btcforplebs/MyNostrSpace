@@ -278,6 +278,18 @@ body {
   min-width: 0;
 }
 
+.person-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.person-link:hover .person-name {
+  text-decoration: underline;
+  color: var(--myspace-blue);
+  cursor: pointer;
+}
+
 .person-pic img {
   width: 80px;
   height: 80px;
@@ -658,44 +670,41 @@ body {
 
 .galaxy-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
   text-decoration: none;
-  gap: 12px;
-  padding: 10px;
+  gap: 8px;
+  padding: 10px 4px;
   border: 1px solid #eee;
-  border-radius: 8px;
+  border-radius: 4px;
   transition: all 0.2s;
-  background: linear-gradient(to bottom, #fff, #f9f9f9);
+  background-color: white;
 }
 
 .galaxy-item:hover {
-  border-color: var(--myspace-blue);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background-color: #f0f0f0;
+  border-color: #ccc;
   transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
 .galaxy-item img {
   width: 48px;
   height: 48px;
   min-width: 48px;
-  /* Critical for flex containers */
   flex-shrink: 0;
-  /* Prevent squishing */
   border-radius: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   background-color: white;
   object-fit: contain;
-  /* Ensure icon doesn't distort */
 }
 
 .galaxy-item span {
-  font-size: 10pt;
+  font-size: 9pt;
   font-weight: bold;
   color: var(--myspace-dark-blue);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-align: center;
+  line-height: 1.2;
 }
 
 /* Bottom Promo Grid (MySpace Style) */

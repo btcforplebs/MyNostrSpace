@@ -77,6 +77,7 @@ export const Navbar = () => {
                 .navbar-container {
                     background-color: #003399; /* The deep blue */
                     padding: 5px 10px;
+                    padding-top: calc(5px + env(safe-area-inset-top));
                     color: white;
                 }
                 .navbar-inner {

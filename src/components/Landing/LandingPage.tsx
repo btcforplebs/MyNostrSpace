@@ -1,145 +1,133 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNostr } from '../../context/NostrContext';
-import { NDKUser, type NDKUserProfile } from '@nostr-dev-kit/ndk';
+import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk';
+import { WavlakePlayer } from '../Music/WavlakePlayer';
 import './LandingPage.css';
 
 export const LandingPage = () => {
   const { login, loginWithNip46, ndk } = useNostr();
-  const [coolPeople, setCoolPeople] = useState<NDKUser[]>(() => {
-    const saved = localStorage.getItem('mynostrspace_cool_people');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Note: ndk might not be fully initialized in the closure if we're not careful,
-        // but in our Provider it's created synchronously.
-        return parsed.map((p: { pubkey: string; profile: NDKUserProfile }) => {
-          const user = new NDKUser({ pubkey: p.pubkey });
-          user.profile = p.profile;
-          return user;
-        });
-      } catch (e) {
-        console.warn('Failed to parse cached cool people', e);
-        return [];
-      }
-    }
-    return [];
-  });
+  const [globalEvents, setGlobalEvents] = useState<NDKEvent[]>([]);
+  const [liveStreams, setLiveStreams] = useState<NDKEvent[]>([]);
+  const [articles, setArticles] = useState<NDKEvent[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [activeProfiles, setActiveProfiles] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [bunkerInput, setBunkerInput] = useState('');
   const [loginMethod, setLoginMethod] = useState<'extension' | 'remote'>('extension');
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [trendingTracks, setTrendingTracks] = useState<
+    { title: string; url: string; link: string }[]
+  >([]);
 
-  const [hasLoaded, setHasLoaded] = useState(coolPeople.length > 0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subRef = useRef<any>(null);
 
   useEffect(() => {
     if (!ndk) return;
 
     let isMounted = true;
-    let retryCount = 0;
-    const maxRetries = 5;
 
-    const fetchCoolPeople = async () => {
-      if (!isMounted) return;
-      setIsRefreshing(true);
-
-      console.log(`fetchCoolPeople session: retryCount=${retryCount}, hasLoaded=${hasLoaded}`);
-      try {
-        // Reduced wait for relays - don't block the UI
-        if (ndk.pool.stats().connected === 0) {
-          console.log(`No relays connected. Attempting quick connection...`);
-          try {
-            await ndk.connect(1000);
-          } catch (e) {
-            console.warn('ndk.connect timeout during fetchCoolPeople', e);
-          }
-        }
-
-        console.log(`Requesting recent activity (retry ${retryCount})...`);
-        // Fetch recent notes to find active users
-        const noteEvents = await Promise.race([
-          ndk.fetchEvents({ kinds: [1], limit: 50 }),
-          new Promise<null>((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout fetching activity')), 15000)
-          ),
-        ]);
-
-        if ((!noteEvents || noteEvents.size === 0) && retryCount < maxRetries) {
-          const delay = Math.min(800 * Math.pow(1.5, retryCount), 4000);
-          console.log(
-            `No activity found or timeout. Retrying in ${delay}ms... (Attempt ${retryCount + 1}/${maxRetries})`
-          );
-          retryCount++;
-          setTimeout(fetchCoolPeople, delay);
-          return;
-        }
-
-        if (!isMounted) return;
-
-        if (noteEvents) {
-          const pubkeys = Array.from(noteEvents).map((e) => e.pubkey);
-          const uniquePubkeys = Array.from(new Set(pubkeys)).slice(0, 15);
-
-          console.log(`Fetching profiles for ${uniquePubkeys.length} active users...`);
-          const profileEvents = await ndk.fetchEvents({
-            kinds: [0],
-            authors: uniquePubkeys,
-          });
-
-          const users = uniquePubkeys.map((pk) => {
-            const u = ndk.getUser({ pubkey: pk });
-            const pEvent = Array.from(profileEvents).find((e) => e.pubkey === pk);
-            if (pEvent) {
-              try {
-                u.profile = JSON.parse(pEvent.content);
-              } catch {
-                /* ignore */
-              }
-            }
-            return u;
-          });
-
-          // Deduplicate by pubkey
-          const uniqueUsers = Array.from(new Map(users.map((u) => [u.pubkey, u])).values()).slice(
-            0,
-            8
-          );
-          setCoolPeople(uniqueUsers);
-
-          // Update cache
-          localStorage.setItem(
-            'mynostrspace_cool_people',
-            JSON.stringify(
-              uniqueUsers.map((u) => ({
-                pubkey: u.pubkey,
-                profile: u.profile,
-              }))
-            )
-          );
-        }
-
-        setHasLoaded(true);
-        setIsRefreshing(false);
-      } catch (err) {
-        console.error('Failed to fetch cool people', err);
-        setIsRefreshing(false);
-        if (isMounted) {
-          if (retryCount < maxRetries) {
-            retryCount++;
-            setTimeout(fetchCoolPeople, 1000);
-          } else {
-            setHasLoaded(true); // Finally stop loading
-          }
+    const startSubscription = async () => {
+      // Connect if not connected
+      if (ndk.pool.stats().connected === 0) {
+        try {
+          // Add specialized relays for better content density
+          ndk.addExplicitRelay('wss://relay.zap.stream', undefined);
+          ndk.addExplicitRelay('wss://nos.lol', undefined);
+          ndk.addExplicitRelay('wss://relay.damus.io', undefined);
+          await ndk.connect(2500);
+        } catch {
+          console.warn('NDK connection timeout on landing');
         }
       }
+
+      if (!isMounted) return;
+
+      // Subscribe to recent notes
+      // Subscribe to recent notes and live events
+      const sub = ndk.subscribe(
+        { kinds: [NDKKind.Text, 30311 as NDKKind, 30023 as NDKKind], limit: 100 },
+        { closeOnEose: false }
+      );
+
+      sub.on('event', async (event: NDKEvent) => {
+        if (!isMounted) return;
+
+        if (event.kind === NDKKind.Text) {
+          setGlobalEvents((prev) => {
+            if (prev.find((e) => e.id === event.id)) return prev;
+            const newList = [event, ...prev];
+            return newList.slice(0, 10);
+          });
+        } else if (event.kind === (30311 as NDKKind)) {
+          // Only keep 'live' streams
+          const status = event.getMatchingTags('status')[0]?.[1];
+          if (status === 'live') {
+            setLiveStreams((prev) => {
+              if (prev.find((e) => e.id === event.id)) return prev;
+              const newList = [event, ...prev];
+              return newList.slice(0, 10);
+            });
+          }
+        } else if (event.kind === (30023 as NDKKind)) {
+          setArticles((prev) => {
+            if (prev.find((e) => e.id === event.id)) return prev;
+            const newList = [event, ...prev];
+            return newList.slice(0, 5);
+          });
+        }
+
+        // Fetch profile if not already known
+        setActiveProfiles((prev) => {
+          if (prev[event.pubkey]) return prev;
+
+          // Trigger fetch in background
+          const user = ndk.getUser({ pubkey: event.pubkey });
+          user
+            .fetchProfile()
+            .then((profile) => {
+              if (profile && isMounted) {
+                setActiveProfiles((current) => ({
+                  ...current,
+                  [event.pubkey]: profile,
+                }));
+              }
+            })
+            .catch(() => { });
+
+          return prev;
+        });
+
+        setHasLoaded(true);
+      });
+
+      subRef.current = sub;
     };
 
-    fetchCoolPeople();
+    startSubscription();
 
     return () => {
       isMounted = false;
+      if (subRef.current) subRef.current.stop();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ndk]);
+
+  useEffect(() => {
+    fetch('https://wavlake.com/api/v1/content/rankings?sort=sats&days=7')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const formatted = data.slice(0, 10).map((item: any) => ({
+            title: `${item.artist} - ${item.title}`,
+            url: item.mediaUrl,
+            link: item.url,
+          }));
+          setTrendingTracks(formatted);
+        }
+      })
+      .catch((err) => console.error('Failed to fetch Wavlake trending', err));
+  }, []);
 
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -152,7 +140,6 @@ export const LandingPage = () => {
       }
     } catch (err) {
       console.error('Login failed', err);
-      // Optionally set an error state here to show in UI
     } finally {
       setLoading(false);
     }
@@ -163,7 +150,10 @@ export const LandingPage = () => {
       {/* Header Area */}
       <header className="landing-header">
         <div className="logo-area">
-          <h1>mynostrspace</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src="/mynostrspace_logo.png" alt="MyNostrSpace" className="landing-logo" />
+            <h1>MyNostrSpace</h1>
+          </div>
           <span className="slogan">a place for friends</span>
         </div>
 
@@ -193,77 +183,8 @@ export const LandingPage = () => {
       </nav>
 
       <div className="landing-body">
-        {/* Left Column */}
-        <div className="landing-left">
-          <section className="marketing-box">
-            <h2>
-              mynostrspace.com is an online community that lets you meet your friends' friends.
-            </h2>
-            <p>
-              Create a private community on mynostrspace.com to share photos, journals and interests
-              with your growing network of mutual friends!
-            </p>
-            <p>
-              See who knows who, or how you are connected. View your friends' friends, and see how
-              you fit into the picture!
-            </p>
-            <div style={{ marginTop: '20px' }}>
-              <button className="signup-large-btn" onClick={() => handleLogin()}>
-                Get Started!
-              </button>
-            </div>
-          </section>
-
-          <div className="content-box">
-            <div className="content-box-header">
-              Cool New People {isRefreshing && <span className="refreshing-indicator">...</span>}
-            </div>
-            <div className="people-grid">
-              {coolPeople.length > 0 ? (
-                coolPeople.map((person) => (
-                  <div key={person.pubkey} className="person-item">
-                    <div className="person-name">
-                      {person.profile?.name || person.profile?.display_name || 'Anonymous'}
-                    </div>
-                    <div className="person-pic">
-                      <img
-                        src={
-                          person.profile?.picture ||
-                          `https://robohash.org/${person.pubkey}?set=set4`
-                        }
-                        alt="User"
-                      />
-                    </div>
-                  </div>
-                ))
-              ) : hasLoaded ? (
-                <div
-                  style={{
-                    gridColumn: '1/-1',
-                    textAlign: 'center',
-                    padding: '20px',
-                    color: '#666',
-                    fontSize: '0.9em',
-                  }}
-                >
-                  No new people found right now.
-                </div>
-              ) : (
-                [...Array(8)].map((_, i) => (
-                  <div key={i} className="person-item">
-                    <div className="person-name">Loading...</div>
-                    <div className="person-pic">
-                      <div style={{ width: '90px', height: '90px', backgroundColor: '#eee' }}></div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column (Member Login) */}
-        <div className="landing-right">
+        {/* Left Column (Stats & Login) */}
+        <div className="landing-sidebar">
           <div className="content-box">
             <div className="content-box-header">Member Login</div>
             <div className="login-box">
@@ -278,86 +199,322 @@ export const LandingPage = () => {
                   className={`login-tab-btn ${loginMethod === 'remote' ? 'active' : ''}`}
                   onClick={() => setLoginMethod('remote')}
                 >
-                  Remote (NIP-46)
+                  Remote
                 </button>
               </div>
 
               <form className="login-form" onSubmit={handleLogin}>
                 {loginMethod === 'extension' ? (
-                  <>
-                    <div className="form-row">
-                      <p style={{ fontSize: '0.9em', color: '#666', marginBottom: '10px' }}>
-                        Login using a browser extension like Alby or nos2x.
-                      </p>
-                    </div>
-                    <div className="login-actions">
-                      <button
-                        type="submit"
-                        className="login-submit-btn btn-extension"
-                        disabled={loading}
-                        style={{ width: '100%' }}
-                      >
-                        {loading ? 'Connecting...' : 'Login with Extension'}
-                      </button>
-                    </div>
-                  </>
+                  <button
+                    type="submit"
+                    className="login-submit-btn btn-extension"
+                    disabled={loading}
+                    style={{ width: '100%' }}
+                  >
+                    {loading ? 'Connecting...' : 'Login with Extension'}
+                  </button>
                 ) : (
                   <>
-                    <div className="form-row">
-                      <label>Bunker URL:</label>
-                      <input
-                        type="text"
-                        placeholder="bunker://..."
-                        value={bunkerInput}
-                        onChange={(e) => setBunkerInput(e.target.value)}
-                        style={{ width: '100%' }}
-                      />
-                      <p style={{ fontSize: '0.8em', color: '#888', marginTop: '5px' }}>
-                        Paste your NIP-46 connection string here.
-                      </p>
-                    </div>
-                    <div className="login-actions">
-                      <button
-                        type="submit"
-                        className="login-submit-btn btn-remote"
-                        disabled={loading}
-                        style={{ width: '100%' }}
-                      >
-                        {loading ? 'Connecting...' : 'Connect to Remote Signer'}
-                      </button>
-                    </div>
+                    <input
+                      type="text"
+                      placeholder="bunker://..."
+                      value={bunkerInput}
+                      onChange={(e) => setBunkerInput(e.target.value)}
+                      style={{ width: '100%', marginBottom: '10px' }}
+                    />
+                    <button
+                      type="submit"
+                      className="login-submit-btn btn-remote"
+                      disabled={loading}
+                      style={{ width: '100%' }}
+                    >
+                      {loading ? 'Connecting...' : 'Connect Bunker'}
+                    </button>
                   </>
                 )}
+              </form>
+            </div>
+          </div>
 
-                <div
-                  className="login-footer-links"
-                  style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '10px' }}
-                >
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                    }}
-                  >
-                    Forgot Password?
-                  </a>{' '}
-                  <br />
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                    }}
-                  >
-                    Sign Up
+          <div className="content-box">
+            <div className="content-box-header">Trending Songs</div>
+            <div className="retro-player-container">
+              <WavlakePlayer
+                tracks={trendingTracks}
+                trackUrl={
+                  trendingTracks.length === 0
+                    ? 'https://embed.wavlake.com/track/6290884d-ca9d-487e-97ca-e48359b3781b'
+                    : undefined
+                }
+                hideHeader={true}
+              />
+            </div>
+          </div>
+
+          <div className="content-box">
+            <div className="content-box-header">The Nostr Galaxy</div>
+            <div className="galaxy-grid">
+              <a
+                href="https://nosotros.app"
+                target="_blank"
+                rel="noreferrer"
+                className="galaxy-item"
+              >
+                <img
+                  src="https://raw.githubusercontent.com/KoalaSat/nostros/master/metadata/en-US/images/icon.png"
+                  alt=""
+                  onError={(e) => (e.currentTarget.src = 'https://nosotros.app/favicon.ico')}
+                />
+                <span>Nosotros</span>
+              </a>
+              <a
+                href="https://jumble.social"
+                target="_blank"
+                rel="noreferrer"
+                className="galaxy-item"
+              >
+                <img src="https://jumble.social/favicon.ico" alt="" />
+                <span>Jumble</span>
+              </a>
+              <a
+                href="https://nostrudel.ninja"
+                target="_blank"
+                rel="noreferrer"
+                className="galaxy-item"
+              >
+                <img src="https://nostrudel.ninja/favicon.ico" alt="" />
+                <span>Nostrudel</span>
+              </a>
+              <a
+                href="https://fevela.me"
+                target="_blank"
+                rel="noreferrer"
+                className="galaxy-item"
+              >
+                <img src="https://fevela.me/favicon.ico" alt="" />
+                <span>Fevela</span>
+              </a>
+              <a
+                href="https://zap.stream"
+                target="_blank"
+                rel="noreferrer"
+                className="galaxy-item"
+              >
+                <img src="https://zap.stream/favicon.ico" alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                <span>Zap.stream</span>
+              </a>
+              <a
+                href="https://wavlake.com"
+                target="_blank"
+                rel="noreferrer"
+                className="galaxy-item"
+              >
+                <img src="https://wavlake.com/favicon.ico" alt="" />
+                <span>Wavlake</span>
+              </a>
+              <a
+                href="https://damus.io"
+                target="_blank"
+                rel="noreferrer"
+                className="galaxy-item"
+              >
+                <img src="https://damus.io/favicon.ico" alt="" />
+                <span>Damus</span>
+              </a>
+              <a
+                href="https://primal.net"
+                target="_blank"
+                rel="noreferrer"
+                className="galaxy-item"
+              >
+                <img src="https://primal.net/apple-touch-icon.png" alt="" onError={(e) => (e.currentTarget.src = 'https://primal.net/favicon.ico')} />
+                <span>Primal</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column (Marketing & Feed) */}
+        <div className="landing-main">
+          <section className="marketing-box">
+            <h2>
+              mynostrspace.com is an online community that lets you meet your friends' friends.
+            </h2>
+            <p>
+              Share photos, journals and interests with your growing network of mutual friends on
+              Nostr!
+            </p>
+            <div style={{ marginTop: '10px' }}>
+              <button className="signup-large-btn" onClick={() => handleLogin()}>
+                Get Started!
+              </button>
+            </div>
+          </section>
+
+          <div className="content-box">
+            <div className="content-box-header">Cool New People [active now]</div>
+            <div className="people-grid">
+              {Object.keys(activeProfiles).length > 0
+                ? Object.entries(activeProfiles)
+                  .slice(0, 8)
+                  .map(([pk, profile]) => (
+                    <div key={pk} className="person-item">
+                      <div className="person-name">
+                        {profile.name || profile.display_name || 'Anon'}
+                      </div>
+                      <div className="person-pic">
+                        <img
+                          src={profile.picture || `https://robohash.org/${pk}?set=set4`}
+                          alt=""
+                        />
+                      </div>
+                    </div>
+                  ))
+                : [...Array(8)].map((_, i) => (
+                  <div key={i} className="person-item">
+                    <div className="person-name">...</div>
+                    <div className="person-pic">
+                      <div
+                        style={{ width: '80px', height: '80px', backgroundColor: '#eee' }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          <div className="content-box">
+            <div className="content-box-header">Nostr Global Stream [live]</div>
+            <div className="global-feed-list">
+              {globalEvents.map((event) => (
+                <div key={event.id} className="feed-item">
+                  <span className="feed-time">
+                    {new Date(event.created_at! * 1000).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                  <span className="feed-author">
+                    {activeProfiles[event.pubkey]?.name || event.pubkey.slice(0, 8)}:
+                  </span>
+                  <span className="feed-content">{event.content.slice(0, 70)}...</span>
+                </div>
+              ))}
+              {!hasLoaded && <div style={{ padding: '10px' }}>Connecting to relays...</div>}
+            </div>
+          </div>
+
+          <div className="content-box">
+            <div className="content-box-header">Livestreams Happening Now [live]</div>
+            <div className="live-streams-list">
+              {liveStreams.length > 0 ? (
+                liveStreams.map((stream) => {
+                  const title = stream.getMatchingTags('title')[0]?.[1] || 'Untitled Stream';
+                  const image = stream.getMatchingTags('image')[0]?.[1];
+                  const dTag = stream.getMatchingTags('d')[0]?.[1];
+                  const url = `https://zap.stream/${stream.pubkey}/${dTag}`;
+
+                  return (
+                    <a
+                      key={stream.id}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="stream-item"
+                    >
+                      <div className="stream-thumb">
+                        {image ? (
+                          <img src={image} alt="" />
+                        ) : (
+                          <div className="stream-no-image">LIVE</div>
+                        )}
+                      </div>
+                      <div className="stream-info">
+                        <div className="stream-title">{title}</div>
+                        <div className="stream-host">
+                          {activeProfiles[stream.pubkey]?.name || stream.pubkey.slice(0, 8)}
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })
+              ) : (
+                <div className="zap-stream-promo">
+                  <a href="https://zap.stream" target="_blank" rel="noreferrer">
+                    <span className="zap-brand">Watch on zap.stream</span>
                   </a>
                 </div>
-              </form>
+              )}
+            </div>
+          </div>
+
+          <div className="content-box">
+            <div className="content-box-header">Recent Articles [read]</div>
+            <div className="article-list">
+              {articles.map((article) => {
+                const title = article.getMatchingTags('title')[0]?.[1] || 'Untitled Article';
+                const dTag = article.getMatchingTags('d')[0]?.[1] || '';
+                // Using speaks.news as a solid long-form reader
+                const url = `https://speaks.news/${article.pubkey}/${dTag}`;
+
+                return (
+                  <a
+                    key={article.id}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="article-item"
+                  >
+                    <div className="article-title">{title}</div>
+                    <div className="article-meta">
+                      by {activeProfiles[article.pubkey]?.name || article.pubkey.slice(0, 8)}
+                    </div>
+                  </a>
+                );
+              })}
+              {articles.length === 0 && <div className="loading-text">Loading articles...</div>}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Footer */}
+      <div className="bottom-promo-grid">
+        <div className="promo-item">
+          <h3>Get Started!</h3>
+          <p>Join for free, view profiles, connect with others, blog, and more!</p>
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}
+          >
+            Learn More
+          </a>
+        </div>
+        <div className="promo-item">
+          <h3>Web Extension</h3>
+          <p>Use Alby or nos2x to securely manage your keys in your browser.</p>
+          <a href="https://getalby.com" target="_blank" rel="noreferrer">
+            Get Alby
+          </a>
+        </div>
+        <div className="promo-item">
+          <h3>Blossom</h3>
+          <p>Host your files on Blossom servers. Faster, cheaper, and censorship resistant.</p>
+          <a href="https://blossom.watch" target="_blank" rel="noreferrer">
+            Learn More
+          </a>
+        </div>
+        <div className="promo-item">
+          <h3>Host Your Media</h3>
+          <p>Upload photos and videos to the most popular Nostr image host.</p>
+          <a href="https://nostr.build" target="_blank" rel="noreferrer">
+            nostr.build
+          </a>
+        </div>
+      </div>
+
       <footer className="landing-footer">
         <div className="footer-links">
           <a href="#">About</a> | <a href="#">FAQ</a> | <a href="#">Terms</a> |{' '}
@@ -365,7 +522,7 @@ export const LandingPage = () => {
           <a href="#">Contact MyNostrSpace</a> | <a href="#">Report Inappropriate Content</a> |{' '}
           <a href="#">Promote!</a> | <a href="#">Advertise</a>
         </div>
-        <div>© 2003-2025 mynostrspace.com. All Rights Reserved.</div>
+        <div>© 2003-2026 mynostrspace.com. All Rights Reserved.</div>
       </footer>
     </div>
   );

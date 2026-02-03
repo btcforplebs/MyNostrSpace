@@ -2,12 +2,162 @@
   margin-top: 20px;
 }
 
-.wavlake-player h3 {
-  margin-bottom: 2px;
+.wavlake-player .section-header {
+  background-color: var(--myspace-blue);
+  color: white;
+  padding: 4px 10px;
+  font-weight: bold;
+  font-size: 10pt;
 }
 
-.player-embed {
-  border: 1px solid var(--myspace-blue);
-  background: black;
-  padding: 2px;
+/* Retro Player (Winamp Style) */
+.retro-player-box {
+  background-color: #000;
+  border: 2px solid #555;
+  padding: 6px;
+  color: #0f0;
+  font-family: 'Courier New', Courier, monospace;
+  box-shadow: inset 1px 1px 3px rgba(255, 255, 255, 0.2);
+}
+
+.player-top {
+  display: flex;
+  justify-content: space-between;
+  background-color: #222;
+  padding: 2px 5px;
+  font-size: 7.5pt;
+  border: 1px solid #444;
+  margin-bottom: 6px;
+}
+
+.player-brand {
+  color: #ccc;
+  font-weight: bold;
+}
+
+.player-controls-dots span {
+  margin-left: 5px;
+  color: #888;
+  cursor: pointer;
+}
+
+.player-main-area {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  background-color: #000;
+  padding: 5px;
+  border: 1px solid #333;
+}
+
+.player-vis {
+  width: 60px;
+  height: 40px;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.vis-bar {
+  flex: 1;
+  background-color: #0f0;
+  animation: vis-equalize-music 0.5s infinite alternate;
+}
+
+@keyframes vis-equalize-music {
+  from {
+    opacity: 0.3;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.player-display-window {
+  flex: 1;
+  min-width: 0;
+  background-color: #111;
+  border: 1px solid #333;
+  padding: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.song-info-line {
+  font-size: 8pt;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+
+.track-time-display {
+  font-size: 7pt;
+  color: #0a0;
+  text-align: right;
+}
+
+.player-buttons-row {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.p-btn-legacy {
+  background: linear-gradient(to bottom, #444, #111);
+  border: 1px solid #666;
+  color: #ccc;
+  font-size: 8pt;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.p-btn-legacy.play {
+  color: #0f0;
+}
+
+.wavlake-link-under {
+  display: block;
+  text-align: center;
+  font-size: 7.5pt;
+  color: #888;
+  text-decoration: none;
+  padding: 4px;
+  border-top: 1px solid #222;
+}
+
+.wavlake-link-under:hover {
+  color: #fff;
+  background-color: #222;
+}
+
+.marquee-container-classic {
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+}
+
+.marquee-text-classic {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: marquee-scroll 15s linear infinite;
+  /* Prevent influencing parent width calculation */
+  width: max-content;
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translate(0, 0);
+  }
+
+  100% {
+    transform: translate(-100%, 0);
+  }
+}
+
+.playlist-container .myspace-table th {
+  background-color: var(--myspace-blue);
+  color: white;
 }

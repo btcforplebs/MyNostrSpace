@@ -1,3 +1,7 @@
+* {
+  box-sizing: border-box;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -27,6 +31,28 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
+  /* Fix Safari -webkit-appearance for forms */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input,
+textarea,
+select,
+button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+@media (max-width: 768px) {
+
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+    /* Prevents mobile Safari auto-zoom */
+  }
 }
 
 h1 {
@@ -74,7 +100,9 @@ button:focus-visible {
 .loading-screen {
   background-color: #e5e5e5;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
+  width: 100dvw;
   display: flex;
   align-items: center;
   justify-content: center;

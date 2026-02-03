@@ -1,8 +1,3 @@
-/* Global Box Model Fix */
-* {
-  box-sizing: border-box;
-}
-
 :root {
   --myspace-blue: #6699cc;
   --myspace-orange: #ff9933;
@@ -29,6 +24,7 @@ body {
   font-family: verdana, arial, sans-serif, helvetica;
   font-size: 10pt;
   padding-bottom: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
 }
 
 a {

@@ -14,6 +14,8 @@ import { LandingPage } from './components/Landing/LandingPage';
 import HomePage from './components/Home/HomePage';
 import { RelaySettings } from './components/Settings/RelaySettings';
 import { ThreadPage } from './components/Thread/ThreadPage';
+import { BlogPage } from './components/Blog/BlogPage';
+import { LiveStreamPage } from './components/Live/LiveStreamPage';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 
 function App() {
@@ -52,6 +54,8 @@ function App() {
               <Route path="/edit-profile" element={<EditProfilePage />} />
               <Route path="/settings" element={<RelaySettings />} />
               <Route path="/thread/:eventId" element={<ThreadPage />} />
+              <Route path="/blog/:pubkey/:identifier" element={<BlogPage />} />
+              <Route path="/live/:pubkey/:identifier" element={<LiveStreamPage />} />
             </Routes>
           </ErrorBoundary>
         </div>

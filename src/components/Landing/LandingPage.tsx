@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
-import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk';
+import { NDKEvent, NDKKind, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { WavlakePlayer } from '../Music/WavlakePlayer';
 import './LandingPage.css';
 
@@ -14,6 +14,7 @@ export const LandingPage = () => {
   const [activeProfiles, setActiveProfiles] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [bunkerInput, setBunkerInput] = useState('');
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
   const [loginMethod, setLoginMethod] = useState<'extension' | 'remote'>('extension');
   const [hasLoaded, setHasLoaded] = useState(false);
   const [trendingTracks, setTrendingTracks] = useState<
@@ -36,7 +37,13 @@ export const LandingPage = () => {
           ndk.addExplicitRelay('wss://relay.zap.stream', undefined);
           ndk.addExplicitRelay('wss://nos.lol', undefined);
           ndk.addExplicitRelay('wss://relay.damus.io', undefined);
-          await ndk.connect(2500);
+          ndk.addExplicitRelay('wss://purplepag.es', undefined);
+          ndk.addExplicitRelay('wss://relay.nostr.band', undefined);
+          ndk.addExplicitRelay('wss://relay.snort.social', undefined);
+          ndk.addExplicitRelay('wss://relay.highlighter.com', undefined);
+          ndk.addExplicitRelay('wss://relay.primal.net', undefined);
+          ndk.addExplicitRelay('wss://relay.current.fyi', undefined);
+          await ndk.connect(5000);
         } catch {
           console.warn('NDK connection timeout on landing');
         }
@@ -44,14 +51,33 @@ export const LandingPage = () => {
 
       if (!isMounted) return;
 
-      // Subscribe to recent notes
-      // Subscribe to recent notes and live events
-      const sub = ndk.subscribe(
-        { kinds: [NDKKind.Text, 30311 as NDKKind, 30023 as NDKKind], limit: 100 },
+      // Subscribe to recent notes (Kind 1)
+      const mainSub = ndk.subscribe(
+        { kinds: [NDKKind.Text], limit: 100 },
         { closeOnEose: false }
       );
 
-      sub.on('event', async (event: NDKEvent) => {
+      // Separate subscription for livestreams to ensure we get them
+      // We removed strict 'status: live' filter to debug, then check explicitly in callback
+      const liveStreamSub = ndk.subscribe(
+        [
+          { kinds: [30311 as NDKKind], limit: 100 },
+          {
+            kinds: [30311 as NDKKind],
+            authors: ['cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5'],
+            '#d': ['537a365c-f1ec-44ac-af10-22d14a7319fb']
+          }
+        ],
+        { closeOnEose: false }
+      );
+
+      // Separate subscription for articles mainly from Highlighter to avoid spam
+      const articleSub = ndk.subscribe(
+        { kinds: [30023 as NDKKind], limit: 20 },
+        { closeOnEose: false, pool: ndk.outboxPool || undefined },
+      );
+
+      mainSub.on('event', async (event: NDKEvent) => {
         if (!isMounted) return;
 
         if (event.kind === NDKKind.Text) {
@@ -60,49 +86,125 @@ export const LandingPage = () => {
             const newList = [event, ...prev];
             return newList.slice(0, 10);
           });
-        } else if (event.kind === (30311 as NDKKind)) {
-          // Only keep 'live' streams
-          const status = event.getMatchingTags('status')[0]?.[1];
-          if (status === 'live') {
-            setLiveStreams((prev) => {
-              if (prev.find((e) => e.id === event.id)) return prev;
-              const newList = [event, ...prev];
-              return newList.slice(0, 10);
-            });
-          }
-        } else if (event.kind === (30023 as NDKKind)) {
-          setArticles((prev) => {
-            if (prev.find((e) => e.id === event.id)) return prev;
-            const newList = [event, ...prev];
-            return newList.slice(0, 5);
-          });
         }
 
         // Fetch profile if not already known
-        setActiveProfiles((prev) => {
-          if (prev[event.pubkey]) return prev;
-
-          // Trigger fetch in background
-          const user = ndk.getUser({ pubkey: event.pubkey });
-          user
-            .fetchProfile()
-            .then((profile) => {
-              if (profile && isMounted) {
-                setActiveProfiles((current) => ({
-                  ...current,
-                  [event.pubkey]: profile,
-                }));
-              }
-            })
-            .catch(() => { });
-
-          return prev;
-        });
+        if (event.author) {
+          if (event.author.profile) {
+            setActiveProfiles((current) => ({
+              ...current,
+              [event.pubkey]: event.author.profile,
+            }));
+          }
+          event.author.fetchProfile().then((profile) => {
+            if (profile && isMounted) {
+              setActiveProfiles((current) => ({
+                ...current,
+                [event.pubkey]: profile,
+              }));
+            }
+          }).catch(() => { });
+        }
 
         setHasLoaded(true);
       });
 
-      subRef.current = sub;
+      liveStreamSub.on('event', async (event: NDKEvent) => {
+        if (!isMounted) return;
+
+        const statusTag = event.getMatchingTags('status')[0];
+        const status = statusTag ? statusTag[1] : undefined;
+
+        // console.log('Stream found:', event.id, status, event.rawEvent());
+
+        // Allow 'live' or if status is missing/undefined check start time? 
+        // For now, keep it somewhat strict but log everything.
+        // Some clients capitalization?
+        const PINNED_D_TAG = '537a365c-f1ec-44ac-af10-22d14a7319fb';
+        const PINNED_PUBKEY = 'cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5';
+
+        const dTag = event.getMatchingTags('d')[0]?.[1];
+        const isPinned = event.pubkey === PINNED_PUBKEY && dTag === PINNED_D_TAG;
+
+        if (status === 'live' || status === 'broadcasting' || isPinned) {
+          setLiveStreams((prev) => {
+            const newEvent = event;
+
+            // 1. Combine previous and new
+            const allEvents = [...prev, newEvent];
+
+            // 2. Sort: Pinned first, then by created_at descending
+            allEvents.sort((a, b) => {
+              const PINNED_D_TAG = '537a365c-f1ec-44ac-af10-22d14a7319fb';
+              const PINNED_PUBKEY = 'cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5';
+
+              const aD = a.getMatchingTags('d')[0]?.[1];
+              const bD = b.getMatchingTags('d')[0]?.[1];
+
+              const aIsPinned = a.pubkey === PINNED_PUBKEY && aD === PINNED_D_TAG;
+              const bIsPinned = b.pubkey === PINNED_PUBKEY && bD === PINNED_D_TAG;
+
+              if (aIsPinned && !bIsPinned) return -1;
+              if (!aIsPinned && bIsPinned) return 1;
+
+              return (b.created_at || 0) - (a.created_at || 0);
+            });
+
+            // 3. Deduplicate by pubkey (keep the first one found)
+            const uniqueEvents: NDKEvent[] = [];
+            const seenPubkeys = new Set<string>();
+
+            for (const e of allEvents) {
+              if (!seenPubkeys.has(e.pubkey)) {
+                uniqueEvents.push(e);
+                seenPubkeys.add(e.pubkey);
+              }
+            }
+
+            return uniqueEvents.slice(0, 100);
+          });
+
+          // Fetch profile for stream host
+          const hostPubkey = event.getMatchingTags('p')[0]?.[1] || event.pubkey;
+          if (hostPubkey) {
+            const user = ndk.getUser({ pubkey: hostPubkey });
+            user.fetchProfile().then((profile) => {
+              if (profile && isMounted) {
+                setActiveProfiles((current) => ({
+                  ...current,
+                  [hostPubkey]: profile,
+                }));
+              }
+            }).catch(() => { });
+          }
+        }
+      });
+
+      articleSub.on('event', async (event: NDKEvent) => {
+        if (!isMounted) return;
+        setArticles((prev) => {
+          if (prev.find((e) => e.id === event.id)) return prev;
+          // Filter out potential spam/anon if needed validation here
+          const newList = [...prev, event].sort(
+            (a, b) => (b.created_at || 0) - (a.created_at || 0)
+          );
+          return newList.slice(0, 10); // increased limit slightly
+        });
+
+        // Fetch profile for articles
+        if (event.author) {
+          event.author.fetchProfile().then((profile) => {
+            if (profile && isMounted) {
+              setActiveProfiles((current) => ({
+                ...current,
+                [event.pubkey]: profile,
+              }));
+            }
+          }).catch(() => { });
+        }
+      });
+
+      subRef.current = { stop: () => { mainSub.stop(); liveStreamSub.stop(); articleSub.stop(); } };
     };
 
     startSubscription();
@@ -112,6 +214,49 @@ export const LandingPage = () => {
       if (subRef.current) subRef.current.stop();
     };
   }, [ndk]);
+
+  // Proactively fetch profiles for visible articles and people
+  useEffect(() => {
+    if (!ndk) return;
+
+    const pubkeysToFetch = new Set<string>();
+    articles.forEach((a) => {
+      if (!activeProfiles[a.pubkey]) pubkeysToFetch.add(a.pubkey);
+    });
+    globalEvents.forEach((e) => {
+      if (!activeProfiles[e.pubkey]) pubkeysToFetch.add(e.pubkey);
+    });
+
+    if (pubkeysToFetch.size === 0) return;
+
+    const fetchProfiles = async () => {
+      const pks = Array.from(pubkeysToFetch);
+      // Fetch in chunks to avoid overloading
+      for (let i = 0; i < pks.length; i += 10) {
+        const chunk = pks.slice(i, i + 10);
+        const filter: NDKFilter = { kinds: [0], authors: chunk };
+        try {
+          const profileEvents = await ndk.fetchEvents(filter);
+          profileEvents.forEach((event) => {
+            try {
+              const profile = JSON.parse(event.content);
+              setActiveProfiles((prev) => ({
+                ...prev,
+                [event.pubkey]: profile,
+              }));
+            } catch (e) {
+              console.warn('Failed to parse profile content', e);
+            }
+          });
+        } catch (err) {
+          console.warn('Failed to fetch batch profiles', err);
+        }
+      }
+    };
+
+    const timeout = setTimeout(fetchProfiles, 500);
+    return () => clearTimeout(timeout);
+  }, [ndk, articles.length, globalEvents.length]);
 
   useEffect(() => {
     fetch('https://wavlake.com/api/v1/content/rankings?sort=sats&days=7')
@@ -296,13 +441,13 @@ export const LandingPage = () => {
                 <span>Fevela</span>
               </a>
               <a
-                href="https://zap.stream"
+                href="https://shosho.live"
                 target="_blank"
                 rel="noreferrer"
                 className="galaxy-item"
               >
-                <img src="https://zap.stream/icons/icon-512x512.png" alt="" onError={(e) => (e.currentTarget.src = 'https://zap.stream/favicon.ico')} />
-                <span>Zap.stream</span>
+                <img src="https://shosho.live/favicon.ico" alt="" />
+                <span>Shosho</span>
               </a>
               <a
                 href="https://wavlake.com"
@@ -328,7 +473,7 @@ export const LandingPage = () => {
                 rel="noreferrer"
                 className="galaxy-item"
               >
-                <img src="https://primal.net/assets/icons/logo_white_on_purple.png" alt="" onError={(e) => (e.currentTarget.src = 'https://primal.net/favicon.ico')} />
+                <img src="https://primal.net/public/primal-logo-large.png" alt="" style={{ objectFit: 'contain', background: 'white', borderRadius: '4px' }} onError={(e) => (e.currentTarget.src = 'https://primal.net/favicon.ico')} />
                 <span>Primal</span>
               </a>
             </div>
@@ -375,11 +520,9 @@ export const LandingPage = () => {
                   ))
                 : [...Array(8)].map((_, i) => (
                   <div key={i} className="person-item">
-                    <div className="person-name">...</div>
+                    <div className="person-name skeleton skeleton-name"></div>
                     <div className="person-pic">
-                      <div
-                        style={{ width: '80px', height: '80px', backgroundColor: '#eee' }}
-                      ></div>
+                      <div className="skeleton skeleton-pic"></div>
                     </div>
                   </div>
                 ))}
@@ -403,51 +546,103 @@ export const LandingPage = () => {
                   <span className="feed-content">{event.content.slice(0, 70)}...</span>
                 </div>
               ))}
-              {!hasLoaded && <div style={{ padding: '10px' }}>Connecting to relays...</div>}
+              {!hasLoaded && (
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="feed-item">
+                      <div className="skeleton skeleton-list-item"></div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </div>
 
           <div className="content-box">
             <div className="content-box-header">Livestreams Happening Now [live]</div>
             <div className="live-streams-list">
-              {liveStreams.length > 0 ? (
-                liveStreams.map((stream) => {
-                  const title = stream.getMatchingTags('title')[0]?.[1] || 'Untitled Stream';
-                  const image = stream.getMatchingTags('image')[0]?.[1];
-                  const dTag = stream.getMatchingTags('d')[0]?.[1];
-                  const url = `https://zap.stream/${stream.pubkey}/${dTag}`;
+              <div className="live-streams-list">
+                {(() => {
+                  const PINNED_D_TAG = '537a365c-f1ec-44ac-af10-22d14a7319fb';
+                  const PINNED_PUBKEY = 'cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5';
 
-                  return (
-                    <a
-                      key={stream.id}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="stream-item"
-                    >
-                      <div className="stream-thumb">
-                        {image ? (
-                          <img src={image} alt="" />
-                        ) : (
-                          <div className="stream-no-image">LIVE</div>
-                        )}
-                      </div>
-                      <div className="stream-info">
-                        <div className="stream-title">{title}</div>
-                        <div className="stream-host">
-                          {activeProfiles[stream.pubkey]?.name || stream.pubkey.slice(0, 8)}
+                  const sortedStreams = [...liveStreams].sort((a, b) => {
+                    const aDTag = a.getMatchingTags('d')[0]?.[1];
+                    const bDTag = b.getMatchingTags('d')[0]?.[1];
+
+                    const aIsPinned = a.pubkey === PINNED_PUBKEY && aDTag === PINNED_D_TAG;
+                    const bIsPinned = b.pubkey === PINNED_PUBKEY && bDTag === PINNED_D_TAG;
+
+                    if (aIsPinned && !bIsPinned) return -1;
+                    if (!aIsPinned && bIsPinned) return 1;
+
+                    const aImage = a.getMatchingTags('image')[0]?.[1];
+                    const bImage = b.getMatchingTags('image')[0]?.[1];
+                    const aBroken = !aImage || brokenImages.has(a.id);
+                    const bBroken = !bImage || brokenImages.has(b.id);
+
+                    if (!aBroken && bBroken) return -1;
+                    if (aBroken && !bBroken) return 1;
+
+                    return (b.created_at || 0) - (a.created_at || 0);
+                  });
+
+                  if (sortedStreams.length === 0) {
+                    // Wireframe placeholder state
+                    return [...Array(3)].map((_, i) => (
+                      <div key={i} className="stream-item" style={{ pointerEvents: 'none' }}>
+                        <div className="stream-thumb">
+                          <div className="skeleton" style={{ width: '100%', height: '100%' }}></div>
+                        </div>
+                        <div className="stream-info">
+                          <div className="skeleton" style={{ height: '14px', width: '80%', marginBottom: '4px' }}></div>
+                          <div className="skeleton" style={{ height: '12px', width: '50%' }}></div>
                         </div>
                       </div>
-                    </a>
-                  );
-                })
-              ) : (
-                <div className="zap-stream-promo">
-                  <a href="https://zap.stream" target="_blank" rel="noreferrer">
-                    <span className="zap-brand">Watch on zap.stream</span>
-                  </a>
-                </div>
-              )}
+                    ));
+                  }
+
+                  return sortedStreams.map((stream) => {
+                    const title = stream.getMatchingTags('title')[0]?.[1] || 'Untitled Stream';
+                    const image = stream.getMatchingTags('image')[0]?.[1];
+                    const dTag = stream.getMatchingTags('d')[0]?.[1];
+                    const hostPubkey = stream.getMatchingTags('p')[0]?.[1] || stream.pubkey;
+                    const url = `/live/${hostPubkey}/${dTag}`;
+
+                    return (
+                      <Link
+                        key={stream.id}
+                        to={url}
+                        className="stream-item"
+                      >
+                        <div className="stream-thumb">
+                          {image && !brokenImages.has(stream.id) ? (
+                            <img
+                              src={image}
+                              alt=""
+                              onError={() => {
+                                setBrokenImages(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.add(stream.id);
+                                  return newSet;
+                                });
+                              }}
+                            />
+                          ) : (
+                            <div className="stream-no-image">LIVE</div>
+                          )}
+                        </div>
+                        <div className="stream-info">
+                          <div className="stream-title">{title}</div>
+                          <div className="stream-host">
+                            {activeProfiles[hostPubkey]?.name || activeProfiles[hostPubkey]?.display_name || hostPubkey.slice(0, 8)}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  });
+                })()}
+              </div>
             </div>
           </div>
 
@@ -457,25 +652,29 @@ export const LandingPage = () => {
               {articles.map((article) => {
                 const title = article.getMatchingTags('title')[0]?.[1] || 'Untitled Article';
                 const dTag = article.getMatchingTags('d')[0]?.[1] || '';
-                // Using speaks.news as a solid long-form reader
-                const url = `https://speaks.news/${article.pubkey}/${dTag}`;
+                const url = `/blog/${article.pubkey}/${dTag}`;
+                const authorProfile = activeProfiles[article.pubkey];
 
                 return (
-                  <a
+                  <Link
                     key={article.id}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
+                    to={url}
                     className="article-item"
                   >
                     <div className="article-title">{title}</div>
                     <div className="article-meta">
-                      by {activeProfiles[article.pubkey]?.name || article.pubkey.slice(0, 8)}
+                      by <span className="article-author-name">{authorProfile?.name || authorProfile?.displayName || authorProfile?.display_name || authorProfile?.nip05 || article.pubkey.slice(0, 8)}</span>
                     </div>
-                  </a>
+                  </Link>
                 );
               })}
-              {articles.length === 0 && <div className="loading-text">Loading articles...</div>}
+              {articles.length === 0 && (
+                <>
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="skeleton skeleton-article"></div>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </div>

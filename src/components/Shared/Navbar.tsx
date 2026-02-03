@@ -67,8 +67,8 @@ export const Navbar = () => {
       <style>{`
                 .navbar-wrapper {
                     font-family: Arial, Helvetica, sans-serif;
-                    width: 100%;
-                    max-width: 800px; /* Or 100% depending on layout preference, sticking to container width usually */
+                    width: 95%;
+                    max-width: 1280px; 
                     margin: 0 auto;
                     background: white;
                 }

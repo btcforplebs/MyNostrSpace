@@ -123,7 +123,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event }) => {
             to={`/p/${event.author.profile?.nip05 || event.author.profile?.name || event.pubkey}`}
             className="feed-user-name"
           >
-            {event.author.profile?.name || event.pubkey.slice(0, 8)}
+            {event.author.profile?.name || event.author.profile?.displayName || event.author.profile?.display_name || event.pubkey.slice(0, 8)}
           </Link>
           {displayMood && (
             <span className="feed-mood">
@@ -187,7 +187,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event }) => {
                         to={`/p/${c.author.profile?.nip05 || c.author.profile?.name || c.pubkey}`}
                         style={{ color: '#003399', textDecoration: 'none' }}
                       >
-                        {c.author.profile?.name || c.pubkey.slice(0, 8)}
+                        {c.author.profile?.name || c.author.profile?.displayName || c.author.profile?.display_name || c.pubkey.slice(0, 8)}
                       </Link>
                     </div>
                     <div style={{ color: '#333' }}>

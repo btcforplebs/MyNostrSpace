@@ -13,11 +13,13 @@
   },
   "dependencies": {
     "@nostr-dev-kit/ndk": "^2.18.1",
+    "hls.js": "^1.6.15",
     "lucide-react": "^0.563.0",
     "nostr-tools": "^2.22.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-helmet-async": "^2.0.5",
+    "react-player": "^3.4.0",
     "react-router-dom": "^7.13.0"
   },
   "devDependencies": {

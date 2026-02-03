@@ -14,6 +14,10 @@ interface WavlakePlayerProps {
   trackId?: string; // Legacy ID (unused mostly now)
   hideHeader?: boolean;
   autoplay?: boolean;
+  // Controlled props
+  currentTrackIndex?: number;
+  onTrackSelect?: (index: number) => void;
+  hidePlaylist?: boolean;
 }
 
 export const WavlakePlayer = ({
@@ -21,11 +25,25 @@ export const WavlakePlayer = ({
   tracks,
   hideHeader,
   autoplay = false,
+  currentTrackIndex: controlledIndex,
+  onTrackSelect,
+  hidePlaylist = false,
 }: WavlakePlayerProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   // State for the "current" track when in playlist mode
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [internalCurrentIndex, setInternalCurrentIndex] = useState(0);
+
+  // Use controlled index if available, otherwise internal
+  const currentIndex = controlledIndex ?? internalCurrentIndex;
+
+  const handleTrackChange = (newIndex: number) => {
+    if (onTrackSelect) {
+      onTrackSelect(newIndex);
+    } else {
+      setInternalCurrentIndex(newIndex);
+    }
+  };
 
   const visHeights = [45, 72, 33, 90, 55, 82, 40, 68, 25, 88, 50, 75];
 
@@ -132,7 +150,7 @@ export const WavlakePlayer = ({
                 className="p-btn-legacy"
                 onClick={() =>
                   activePlaylist &&
-                  setCurrentIndex((prev) => (prev === 0 ? activePlaylist.length - 1 : prev - 1))
+                  handleTrackChange(currentIndex === 0 ? activePlaylist.length - 1 : currentIndex - 1)
                 }
               >
                 ⏴⏴
@@ -170,7 +188,7 @@ export const WavlakePlayer = ({
               <button
                 className="p-btn-legacy"
                 onClick={() =>
-                  activePlaylist && setCurrentIndex((prev) => (prev + 1) % activePlaylist.length)
+                  activePlaylist && handleTrackChange((currentIndex + 1) % activePlaylist.length)
                 }
               >
                 ⏵⏵
@@ -189,7 +207,7 @@ export const WavlakePlayer = ({
               >
                 <button
                   onClick={() =>
-                    setCurrentIndex((prev) => (prev === 0 ? activePlaylist.length - 1 : prev - 1))
+                    handleTrackChange(currentIndex === 0 ? activePlaylist.length - 1 : currentIndex - 1)
                   }
                   style={{ fontSize: '9pt', fontWeight: 'bold' }}
                 >
@@ -199,7 +217,7 @@ export const WavlakePlayer = ({
                   {currentIndex + 1} / {activePlaylist.length}
                 </span>
                 <button
-                  onClick={() => setCurrentIndex((prev) => (prev + 1) % activePlaylist.length)}
+                  onClick={() => handleTrackChange((currentIndex + 1) % activePlaylist.length)}
                   style={{ fontSize: '9pt', fontWeight: 'bold' }}
                 >
                   Next &gt;|
@@ -216,7 +234,7 @@ export const WavlakePlayer = ({
               onPause={() => setIsPlaying(false)}
               onEnded={() => {
                 if (activePlaylist && activePlaylist.length > 1) {
-                  setCurrentIndex((prev) => (prev + 1) % activePlaylist.length);
+                  handleTrackChange((currentIndex + 1) % activePlaylist.length);
                 } else {
                   setIsPlaying(false);
                 }
@@ -235,8 +253,8 @@ export const WavlakePlayer = ({
         </a>
       </div>
 
-      {/* Playlist Table */}
-      {activePlaylist && (
+      {/* Playlist Table - Conditionally rendered */}
+      {activePlaylist && !hidePlaylist && (
         <div className="playlist-container" style={{ marginTop: '5px', fontSize: '8pt' }}>
           <table className="myspace-table" style={{ width: '100%', marginBottom: 0 }}>
             <thead>
@@ -252,7 +270,7 @@ export const WavlakePlayer = ({
                   <td style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span
-                        onClick={() => setCurrentIndex(i)}
+                        onClick={() => handleTrackChange(i)}
                         style={{
                           cursor: 'pointer',
                           fontWeight: currentIndex === i ? 'bold' : 'normal',

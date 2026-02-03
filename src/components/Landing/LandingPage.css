@@ -55,115 +55,7 @@ body {
   }
 }
 
-/* Header */
-.landing-header {
-  padding: 15px 10px;
-  padding-top: calc(15px + env(safe-area-inset-top));
-  display: flex;
-  flex-direction: column;
-  background-color: white;
-  gap: 15px;
-}
-
-@media (min-width: 768px) {
-  .landing-header {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
-}
-
-.logo-area h1 {
-  font-size: 20pt;
-  margin: 0;
-  color: var(--myspace-dark-blue);
-  font-weight: bold;
-  letter-spacing: -1px;
-}
-
-@media (min-width: 768px) {
-  .logo-area h1 {
-    font-size: 24pt;
-    letter-spacing: -1.5px;
-  }
-
-  .logo-area h1 {
-    font-size: 24pt;
-    letter-spacing: -1.5px;
-  }
-}
-
-.landing-logo {
-  max-width: 100%;
-  height: auto;
-  max-height: 60px;
-  /* Adjust based on preference */
-  display: block;
-}
-
-.slogan {
-  font-size: 8.5pt;
-  color: var(--myspace-dark-blue);
-  font-weight: bold;
-  font-style: italic;
-  display: block;
-}
-
-/* Nav */
-.landing-nav {
-  background-color: var(--myspace-dark-blue);
-  padding: 3px 0;
-  text-align: center;
-  color: white;
-  font-size: 8.5pt;
-  font-weight: bold;
-  width: 100%;
-  white-space: normal;
-  /* Allow wrapping on mobile */
-  line-height: 1.5;
-}
-
-.landing-nav a {
-  color: white;
-  text-decoration: none;
-  margin: 0 3px;
-}
-
-.landing-nav a:hover {
-  text-decoration: underline;
-}
-
-/* Header Search */
-.header-search form {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-}
-
-.header-search input {
-  padding: 3px;
-  font-size: 9pt;
-  border: 1px solid #ccc;
-  border-radius: 0;
-  color: black;
-  /* Force black text */
-  background-color: white;
-  /* Force white bg */
-  -webkit-appearance: none;
-  appearance: none;
-  /* Remove Safari styling */
-}
-
-.header-search button {
-  padding: 3px 8px;
-  font-size: 9pt;
-  background-color: white;
-  border: 1px solid #999;
-  color: black;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-}
+/* Header styles moved to Navbar.css */
 
 /* Body Layout */
 .landing-body {
@@ -1011,6 +903,7 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
 /* Article List Zebra Styling */
 .article-list {
   background-color: white;

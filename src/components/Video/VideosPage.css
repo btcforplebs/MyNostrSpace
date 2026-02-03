@@ -1,0 +1,76 @@
+/* Videos Page Styles */
+
+.videos-page-container {
+    width: 800px;
+    margin: 0 auto;
+    background-color: #ffffff;
+    font-family: verdana, arial, sans-serif, helvetica;
+    font-size: 8pt;
+}
+
+.videos-content {
+    padding: 10px;
+}
+
+.videos-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.video-card {
+    border: 1px solid #000;
+    background-color: #f0f0f0;
+    padding: 5px;
+    text-align: center;
+}
+
+.video-player-container {
+    width: 100%;
+    margin-bottom: 5px;
+    background: #000;
+}
+
+.video-player {
+    width: 100%;
+    height: auto;
+    max-height: 150px;
+    display: block;
+}
+
+.video-info {
+    padding: 5px;
+    text-align: left;
+}
+
+.video-title {
+    font-weight: bold;
+    color: #003399;
+    font-size: 9pt;
+    margin-bottom: 3px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.video-author {
+    color: #666;
+    font-size: 8pt;
+    text-decoration: none;
+}
+
+.video-author:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .videos-page-container {
+        width: 100%;
+    }
+
+    .videos-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

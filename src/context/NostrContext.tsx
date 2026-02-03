@@ -19,7 +19,6 @@ const DEFAULT_RELAYS = [
   'wss://relay.damus.io',
   'wss://relay.primal.net',
   'wss://nos.lol',
-  'wss://relay.nostr.bg',
   'wss://relay.snort.social',
   'wss://purplepag.es',
 ];
@@ -183,7 +182,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
       console.error('NIP-46 Login failed:', error);
       alert(
         'Failed to connect to remote signer: ' +
-          (error instanceof Error ? error.message : String(error))
+        (error instanceof Error ? error.message : String(error))
       );
       throw error;
     }

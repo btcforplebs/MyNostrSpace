@@ -1,0 +1,236 @@
+/* MySpace Film Page Styles */
+
+.film-page-container {
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto;
+    background-color: #ffffff;
+    font-family: verdana, arial, sans-serif, helvetica;
+    font-size: 8pt;
+}
+
+.film-content {
+    padding: 10px;
+}
+
+.section-header {
+    background-color: #ffcc99;
+    /* MySpace Orange */
+    color: #000000;
+    padding: 3px 5px;
+    margin-bottom: 10px;
+    font-size: 9pt;
+    font-weight: bold;
+    border: 1px solid #000000;
+}
+
+.film-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.film-card {
+    text-align: center;
+    border: 1px solid #ccc;
+    padding: 10px;
+    background: #f9f9f9;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.2s;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.film-card:hover {
+    transform: translateY(-2px);
+    border-color: #003399;
+}
+
+.film-poster-wrapper {
+    display: block;
+    margin-bottom: 5px;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 2/3;
+    background-color: #eee;
+    border: 1px solid #000;
+}
+
+.film-poster {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.film-info {
+    margin-top: 5px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.film-title {
+    display: block;
+    font-weight: bold;
+    color: #003399;
+    text-decoration: none;
+    font-size: 8pt;
+    margin: 0 0 3px 0;
+    line-height: 1.2;
+
+    /* Multiline ellipsis for titles */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.film-card:hover .film-title {
+    text-decoration: underline;
+    color: #cc0000;
+}
+
+.film-year {
+    display: block;
+    color: #666;
+    font-size: 8pt;
+}
+
+/* Modal Styles */
+.film-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.film-modal-content {
+    background: #ffffff;
+    width: 90%;
+    max-width: 800px;
+    border: 2px solid #000;
+    position: relative;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.film-modal-header {
+    background-color: #ffcc99;
+    padding: 5px 10px;
+    border-bottom: 1px solid #000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.film-modal-header h3 {
+    margin: 0;
+    font-size: 10pt;
+    font-weight: bold;
+    color: #000;
+}
+
+.close-modal-btn {
+    background: none;
+    border: none;
+    font-size: 14pt;
+    font-weight: bold;
+    cursor: pointer;
+    color: #000;
+    line-height: 1;
+}
+
+.close-modal-btn:hover {
+    color: #cc0000;
+}
+
+.film-player-wrapper {
+    position: relative;
+    padding-top: 56.25%;
+    /* 16:9 Aspect Ratio */
+    background: black;
+}
+
+.film-player {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.film-details {
+    padding: 10px;
+    background: #f9f9f9;
+    border-top: 1px solid #ccc;
+    font-size: 8pt;
+}
+
+.film-meta {
+    margin: 0;
+    color: #666;
+}
+
+.loading-spiral {
+    text-align: center;
+    padding: 50px;
+    font-size: 8pt;
+    color: #333;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .film-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+}
+
+@media (max-width: 600px) {
+    .film-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px;
+    }
+
+    .film-card {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: flex-start !important;
+        text-align: left !important;
+        padding: 5px;
+        height: auto;
+    }
+
+    .film-poster-wrapper {
+        margin-bottom: 0 !important;
+        margin-right: 10px !important;
+        flex-shrink: 0;
+        width: 60px !important;
+        height: auto !important;
+        aspect-ratio: 2/3;
+    }
+
+    .film-info {
+        margin-top: 0 !important;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .film-title {
+        font-size: 9pt;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+    }
+}

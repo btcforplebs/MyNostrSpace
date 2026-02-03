@@ -16,6 +16,11 @@ import { RelaySettings } from './components/Settings/RelaySettings';
 import { ThreadPage } from './components/Thread/ThreadPage';
 import { BlogPage } from './components/Blog/BlogPage';
 import { LiveStreamPage } from './components/Live/LiveStreamPage';
+import { LivestreamsPage } from './components/Live/LivestreamsPage';
+import { MusicPage } from './components/Music/MusicPage';
+import { FilmPage } from './components/Film/FilmPage';
+import { BlogsPage } from './components/Blog/BlogsPage';
+import { VideosPage } from './components/Video/VideosPage';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 
 function App() {
@@ -56,6 +61,11 @@ function App() {
               <Route path="/thread/:eventId" element={<ThreadPage />} />
               <Route path="/blog/:pubkey/:identifier" element={<BlogPage />} />
               <Route path="/live/:pubkey/:identifier" element={<LiveStreamPage />} />
+              <Route path="/livestreams" element={<LivestreamsPage />} />
+              <Route path="/blogs" element={<BlogsPage />} />
+              <Route path="/videos" element={<VideosPage />} />
+              <Route path="/music" element={<MusicPage />} />
+              <Route path="/film" element={<FilmPage />} />
             </Routes>
           </ErrorBoundary>
         </div>

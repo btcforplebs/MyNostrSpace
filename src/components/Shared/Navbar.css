@@ -1,0 +1,183 @@
+/* Navbar.css */
+:root {
+    --myspace-blue: #6699cc;
+    --myspace-dark-blue: #003399;
+    --myspace-orange: #ff9933;
+    --bg-gray: #e5e5e5;
+    --link-blue: #003399;
+    --myspace-light-blue: #d5e5f5;
+    --input-bg: #ffffff;
+}
+
+/* Wrapper to contain the full header + nav */
+.navbar-wrapper {
+    width: 100%;
+    background-color: white;
+}
+
+/* --- Header Section (Logo, Title, Search) --- */
+.navbar-header {
+    padding: 15px 10px;
+    /* padding-top: calc(15px + env(safe-area-inset-top)); */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background-color: white;
+    gap: 15px;
+    max-width: 992px;
+    margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+    .navbar-header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start;
+        text-align: left;
+    }
+}
+
+.logo-area {
+    display: flex;
+    flex-direction: column;
+}
+
+.logo-area h1 {
+    font-size: 20pt;
+    margin: 0;
+    color: var(--myspace-dark-blue);
+    font-weight: bold;
+    letter-spacing: -1px;
+}
+
+@media (min-width: 768px) {
+    .logo-area h1 {
+        font-size: 24pt;
+        letter-spacing: -1.5px;
+    }
+}
+
+.landing-logo {
+    max-width: 100%;
+    height: auto;
+    max-height: 60px;
+    display: block;
+}
+
+.slogan {
+    font-size: 8.5pt;
+    color: var(--myspace-dark-blue);
+    font-weight: bold;
+    font-style: italic;
+    display: block;
+    margin-top: 5px;
+}
+
+.header-right {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+@media (min-width: 768px) {
+    .header-right {
+        align-items: flex-end;
+    }
+}
+
+.header-links {
+    font-size: 8.5pt;
+    color: #333;
+}
+
+.header-links a {
+    color: var(--myspace-dark-blue);
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.header-links a:hover {
+    text-decoration: underline;
+}
+
+/* Header Search */
+.header-search {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.header-search form {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.header-search input {
+    padding: 3px;
+    font-size: 9pt;
+    border: 1px solid #ccc;
+    border-radius: 0;
+    color: black;
+    background-color: white;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.header-search button {
+    padding: 3px 8px;
+    font-size: 9pt;
+    background-color: white;
+    border: 1px solid #999;
+    color: black;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.powered-by {
+    font-size: 7pt;
+    color: #999;
+    margin-top: 2px;
+    text-align: right;
+}
+
+.powered-by span {
+    font-weight: bold;
+    color: #660099;
+    /* Nostr purple-ish */
+}
+
+
+/* --- Blue Navigation Bar --- */
+.navbar-container {
+    background-color: #003399;
+    /* myspace-dark-blue */
+    padding: 3px 0;
+    text-align: center;
+    color: white;
+    font-size: 8.5pt;
+    font-weight: bold;
+    width: 100%;
+    white-space: normal;
+    line-height: 1.5;
+    font-family: verdana, arial, sans-serif, helvetica;
+}
+
+.navbar-container-inner {
+    max-width: 992px;
+    margin: 0 auto;
+    padding: 0 10px;
+}
+
+.navbar-container a {
+    color: white;
+    text-decoration: none;
+    margin: 0 3px;
+}
+
+.navbar-container a:hover {
+    text-decoration: underline;
+}

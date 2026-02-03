@@ -14,15 +14,17 @@
   min-height: 100vh;
   font-family: verdana, arial, sans-serif, helvetica;
   color: var(--myspace-text);
-  padding: 10px 0;
+  padding: 0;
 }
 
 .home-content {
-  max-width: 800px;
+  max-width: 992px;
   margin: 0 auto;
   padding: 15px;
   background-color: var(--myspace-container-bg);
   border: 1px solid #ccc;
+  border-top: none;
+  /* Navbar sits on top */
 }
 
 /* Header Area */
@@ -100,9 +102,11 @@
 
 .home-box-header {
   background-color: var(--myspace-orange);
-  color: black;
+  color: white;
+  /* Changed to white */
   padding: 3px 5px;
   font-size: 10pt;
+  /* Ensure 10pt */
   font-weight: bold;
   display: flex;
   justify-content: space-between;
@@ -202,13 +206,16 @@
   width: 100%;
   height: 30px;
   min-height: 30px;
-  background-color: #222;
-  color: white;
+  background-color: white;
+  /* Changed to white */
+  color: black;
+  /* Changed to black */
   padding: 5px;
-  border: 1px solid #000;
+  border: 1px solid #ccc;
   font-size: 9pt;
   box-sizing: border-box;
   margin-bottom: 5px;
+  font-family: inherit;
 }
 
 .status-controls {
@@ -389,19 +396,25 @@
 /* View Mode Tabs */
 .view-mode-tabs {
   display: flex;
-  background: var(--myspace-light-blue);
+  background-color: transparent;
+  padding-top: 5px;
+  padding-left: 5px;
   border-bottom: 1px solid #6699cc;
 }
 
 .view-mode-tabs button {
-  background: none;
-  border: none;
-  border-right: 1px solid #6699cc;
-  padding: 5px 20px;
+  background: #b1d0f0;
+  /* var(--myspace-light-blue) */
+  border: 1px solid #6699cc;
+  border-bottom: none;
+  padding: 3px 10px;
   font-size: 9pt;
   font-weight: bold;
   cursor: pointer;
   color: #003399;
+  margin-right: 2px;
+  position: relative;
+  top: 1px;
 }
 
 .view-mode-tabs button:hover {
@@ -411,6 +424,8 @@
 .view-mode-tabs button.active {
   background: white;
   color: black;
+  border-bottom: 1px solid white;
+  z-index: 1;
 }
 
 /* Media Gallery */

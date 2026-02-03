@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, NDKKind, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { WavlakePlayer } from '../Music/WavlakePlayer';
+import { Navbar } from '../Shared/Navbar';
 import './LandingPage.css';
 
 export const LandingPage = () => {
@@ -294,45 +295,16 @@ export const LandingPage = () => {
   return (
     <div className="landing-container">
       {/* Header Area */}
-      <header className="landing-header">
-        <div className="logo-area">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src="/mynostrspace_logo.png" alt="MyNostrSpace" className="landing-logo" />
-            <h1>MyNostrSpace</h1>
-          </div>
-          <span className="slogan">a place for friends</span>
-        </div>
-
-        <div className="header-right">
-          <div className="header-links">
-            <a href="#">Help</a> | <a href="#">Sign Up</a>
-          </div>
-          <div className="header-search">
-            <form onSubmit={(e) => e.preventDefault()}>
-              <input type="text" placeholder="People" />
-              <button type="submit">Search</button>
-            </form>
-            <div className="powered-by">
-              powered by <span>Nostr</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Blue Nav Bar */}
-      <nav className="landing-nav">
-        <a href="#">Home</a> | <a href="#">Browse</a> | <a href="#">Search</a> |{' '}
-        <a href="#">Invite</a> | <a href="#">Film</a> | <a href="#">Mail</a> | <a href="#">Blog</a>{' '}
-        | <a href="#">Favorites</a> | <a href="#">Forum</a> | <a href="#">Groups</a> |{' '}
-        <a href="#">Events</a> | <a href="#">Videos</a> | <a href="#">Music</a> |{' '}
-        <a href="#">Comedy</a> | <a href="#">Classifieds</a>
-      </nav>
+      <div className="landing-nav-wrapper">
+        <Navbar />
+      </div>
 
       <div className="landing-body">
         {/* Left Column (Stats & Login) */}
         <div className="landing-sidebar">
           <div className="content-box">
-            <div className="content-box-header">Member Login</div>
+            <div className="content-box-header" id="login-section">Member Login</div>
             <div className="login-box">
               <div className="login-tabs">
                 <button

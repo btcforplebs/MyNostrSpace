@@ -1,0 +1,157 @@
+/* MySpace Music Page Styles */
+
+.music-page-container {
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto;
+    background-color: #ffffff;
+    font-family: verdana, arial, sans-serif, helvetica;
+    font-size: 8pt;
+}
+
+.music-content {
+    padding: 10px;
+}
+
+.section-header {
+    background-color: #ffcc99;
+    /* MySpace Orange */
+    color: #000000;
+    padding: 3px 5px;
+    margin-bottom: 10px;
+    font-size: 9pt;
+    font-weight: bold;
+    border: 1px solid #000000;
+}
+
+.sticky-player-container {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: white;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 15px;
+}
+
+.music-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.music-card {
+    text-align: center;
+    border: 1px solid #ccc;
+    padding: 10px;
+    background: #f9f9f9;
+    cursor: pointer;
+    transition: transform 0.1s, border-color 0.2s;
+    min-width: 0;
+}
+
+.music-card:hover {
+    transform: translateY(-2px);
+    border-color: #003399;
+}
+
+.music-card.active-track {
+    border: 2px solid #ffcc99;
+    background-color: #fff8f0;
+    box-shadow: 0 0 5px rgba(255, 204, 153, 0.5);
+}
+
+.album-art-wrapper {
+    display: block;
+    margin-bottom: 5px;
+    position: relative;
+}
+
+.album-art {
+    width: 100%;
+    aspect-ratio: 1/1;
+    object-fit: cover;
+    border: 1px solid #000;
+}
+
+.track-info {
+    margin-top: 5px;
+}
+
+.track-title {
+    display: block;
+    font-weight: bold;
+    color: #003399;
+    text-decoration: none;
+    font-size: 8pt;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-artist {
+    display: block;
+    color: #000;
+    font-size: 8pt;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.track-title:hover {
+    text-decoration: underline;
+    color: #cc0000;
+}
+
+@media (max-width: 768px) {
+    .music-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+}
+
+@media (max-width: 600px) {
+    .music-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px;
+    }
+
+    .music-card {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        text-align: left !important;
+        padding: 5px;
+        height: 60px !important;
+    }
+
+    .album-art-wrapper {
+        margin-bottom: 0 !important;
+        margin-right: 10px !important;
+        flex-shrink: 0;
+        width: 50px !important;
+        height: 50px !important;
+    }
+
+    .album-art {
+        width: 50px !important;
+        height: 50px !important;
+    }
+
+    .track-info {
+        margin-top: 0 !important;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .track-title {
+        font-size: 9pt;
+    }
+
+    .track-artist {
+        font-size: 8pt;
+    }
+}

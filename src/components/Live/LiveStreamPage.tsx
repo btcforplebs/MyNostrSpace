@@ -11,7 +11,7 @@ import './LiveStreamPage.css';
 export const LiveStreamPage = () => {
     const { pubkey, identifier } = useParams();
     const dTag = identifier;
-    const { ndk } = useNostr();
+    const { ndk, isLoading } = useNostr();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [streamerProfile, setStreamerProfile] = useState<any>(null);
     const [streamEvent, setStreamEvent] = useState<NDKEvent | null>(null);
@@ -25,66 +25,69 @@ export const LiveStreamPage = () => {
     const chatBottomRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const hlsRef = useRef<Hls | null>(null);
+    const connectionRef = useRef(false);
+    const [retryCount, setRetryCount] = useState(0);
 
-    // Browser-specific settings detection
-    const getBrowserSettings = () => {
-        const ua = navigator.userAgent.toLowerCase();
-        const isSafari = ua.includes('safari') && !ua.includes('chrome') && !ua.includes('android');
-
-        if (isSafari) {
-            console.log("Browser Detection: Configuring for Safari");
-            return {
-                relays: [
-                    'wss://relay.damus.io',
-                    'wss://relay.primal.net',
-                    'wss://nos.lol',
-                    'wss://relay.snort.social'
-                ],
-                connectDelay: 1200, // Longer delay for Safari WebSocket stability
-                useFetchFirst: false, // Subscriptions are often more reliable in Safari's selective networking
-                timeout: 20000
-            };
-        }
-
-        return {
-            relays: [
-                'wss://relay.damus.io',
-                'wss://relay.primal.net',
-                'wss://nos.lol',
-                'wss://relay.snort.social',
-                'wss://purplepag.es',
-                'wss://relay.nostr.band',
-                'wss://atlas.nostr.land',
-                'wss://relay.nostr.ch'
-            ],
-            connectDelay: 500,
-            useFetchFirst: true,
-            timeout: 15000
-        };
+    const handleRetry = () => {
+        setConnectionStatus("Retrying connection...");
+        connectionRef.current = false;
+        setRetryCount(prev => prev + 1);
     };
 
+    // Unified settings for all browsers
+    const STREAM_RELAYS = [
+        'wss://relay.zap.stream',
+        'wss://relay.highlighter.com',
+        'wss://relay.damus.io',
+        'wss://nos.lol'
+    ];
+    const CONNECTION_TIMEOUT = 10000;
+
     useEffect(() => {
-        if (!ndk || !pubkey || !dTag) return;
+        if (isLoading || !ndk || !pubkey || !dTag) return;
 
         let isMounted = true;
 
         const fetchData = async () => {
-            const settings = getBrowserSettings();
+            // Prevent double-execution in Strict Mode
+            if (connectionRef.current) return;
+            connectionRef.current = true;
+
             const cleanPubkey = pubkey.toLowerCase();
             const cleanDTag = dTag.toLowerCase();
 
             setConnectionStatus("Connecting...");
 
-            console.log("Discovery: Adding explicit relays...", settings.relays);
-            settings.relays.forEach(r => ndk.addExplicitRelay(r, undefined));
+            console.log("Discovery: Ensuring specific relays are connected...", STREAM_RELAYS);
+
+            // Connect to specific relays individually to avoid global connection storms
+            const connectPromises = STREAM_RELAYS.map(async (url) => {
+                try {
+                    // Check if relay already exists in pool
+                    let relay = ndk.pool.relays.get(url);
+
+                    if (!relay) {
+                        relay = ndk.addExplicitRelay(url, undefined);
+                    }
+
+                    if (relay.status !== 1) { // 1 = CONNECTED
+                        await relay.connect();
+                    }
+                    return relay;
+                } catch (e) {
+                    console.warn(`Discovery: Failed to connect to ${url}`, e);
+                    return null;
+                }
+            });
+
+            // Wait for all attempts to finish
+            await Promise.allSettled(connectPromises);
 
             try {
-                // Ensure connection handshake is complete
-                await ndk.connect(2500);
-                // Stabilization delay
-                await new Promise(r => setTimeout(r, settings.connectDelay));
+                // Short wait to ensure socket stability
+                await new Promise(r => setTimeout(r, 1000));
             } catch (e) {
-                console.warn("Discovery: NDK connect timeout", e);
+                console.warn("Discovery: Stabilization wait error", e);
             }
 
             const connectedCount = ndk.pool.connectedRelays().length;
@@ -92,34 +95,17 @@ export const LiveStreamPage = () => {
 
             if (!isMounted) return;
 
-            const streamFilter: NDKFilter = {
-                kinds: [30311 as NDKKind],
-                authors: [cleanPubkey],
-                '#d': [cleanDTag],
-            };
+            // We search for the stream in two ways:
+            // 1. The URL pubkey is the signer (standard)
+            // 2. The URL pubkey is the host (p-tag), which LandingPage prefers
+            const streamFilter: NDKFilter[] = [
+                { kinds: [30311 as NDKKind], authors: [cleanPubkey], '#d': [cleanDTag] },
+                { kinds: [30311 as NDKKind], '#p': [cleanPubkey], '#d': [cleanDTag] }
+            ];
 
             setConnectionStatus("Searching...");
 
-            // 1. Try Fetch First (if configured)
-            if (settings.useFetchFirst) {
-                console.log(`Discovery (Fetch): Searching for ${cleanPubkey} / ${cleanDTag}...`);
-                try {
-                    const subId = `fetch-stream-${Date.now()}`;
-                    const event = await ndk.fetchEvent(streamFilter, { subId });
-                    if (event && isMounted) {
-                        console.log("Discovery: Stream found via fetch!");
-                        handleStreamEvent(event);
-                        return;
-                    }
-                } catch (err) {
-                    console.warn("Discovery: Fetch error", err);
-                }
-            }
-
-            if (!isMounted || streamEvent) return;
-
-            // 2. Subscription/Fallback
-            setConnectionStatus("Searching (sub)...");
+            // Subscription
             console.log(`Discovery (Sub): Starting subscription for ${cleanPubkey} / ${cleanDTag}...`);
 
             const sub = ndk.subscribe(streamFilter, { closeOnEose: false, subId: `sub-stream-${Date.now()}` });
@@ -130,14 +116,14 @@ export const LiveStreamPage = () => {
                 sub.stop();
             });
 
-            // Browser-specific timeout
+            // Timeout
             setTimeout(() => {
                 if (isMounted && !streamEvent) {
                     setConnectionStatus("Nothing found. Check relays or URL?");
                     console.warn("Discovery: Subscription timed out.");
                 }
                 sub.stop();
-            }, settings.timeout);
+            }, CONNECTION_TIMEOUT);
         };
 
         const handleStreamEvent = async (event: NDKEvent) => {
@@ -183,13 +169,18 @@ export const LiveStreamPage = () => {
 
         return () => {
             isMounted = false;
+            // We don't reset connectionRef.current here because we want to prevent re-runs on quick unmount/remount in strict mode
+            // unless the actual dependencies changes (which will recreate the effect entirely?)
+            // Actually, in Strict Mode, the effect runs twice on the SAME component instance.
+            // But if the user navigates away and back, we DO want it to run again.
+            // React handles this: new component instance = new ref. Strict mode double-effect = same ref.
+
             if (subRef.current) subRef.current.stop();
         };
-    }, [ndk, pubkey, dTag]);
 
-    useEffect(() => {
-        chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [chatMessages]);
+    }, [ndk, pubkey, dTag, isLoading, retryCount]);
+
+
 
     // Initialize HLS
     useEffect(() => {
@@ -287,6 +278,20 @@ export const LiveStreamPage = () => {
                 {connectionStatus.includes("Nothing found") && (
                     <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '10px', maxWidth: '300px', textAlign: 'center' }}>
                         Note: If this is your own pubkey, you must publish a kind 30311 event first.
+                        <br />
+                        <button
+                            onClick={handleRetry}
+                            style={{
+                                marginTop: '10px',
+                                padding: '5px 10px',
+                                border: '1px solid #ccc',
+                                borderRadius: '4px',
+                                background: 'white',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Retry Connection
+                        </button>
                     </div>
                 )}
             </div>

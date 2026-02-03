@@ -1,128 +1,78 @@
 import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
+import './Navbar.css';
 
 export const Navbar = () => {
-  const { user, logout } = useNostr();
+  const { user, logout, login } = useNostr();
 
-  // Links trying to mimic the reference image while keeping our functionality
-  const leftLinks = [
-    { label: 'Home', to: '/' },
-    { label: 'Browse', to: '/browse' },
-    { label: 'Profile', to: user ? `/p/${user.pubkey}` : '#' },
-    { label: 'Friends', to: user ? `/p/${user.pubkey}/friends` : '#' },
-  ];
+  const handleLogin = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (window.nostr) {
+      try {
+        await login();
+      } catch (err) {
+        console.error("Navbar login error:", err);
+      }
+    } else {
+      window.location.href = "/#login-section";
+    }
+  };
 
   return (
     <div className="navbar-wrapper">
-      {/* Blue Nav Bar */}
-      <div className="navbar-container">
-        <div className="navbar-inner">
-          <div className="navbar-left-links">
-            {leftLinks.map((link, index) => (
-              <span key={link.label}>
-                {index > 0 && ' | '}
-                {link.to === '#' ? (
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      alert('Coming soon!');
-                    }}
-                  >
-                    {link.label} {index > 0 && index < 3 && '▼'}
-                  </a>
-                ) : (
-                  <Link to={link.to}>
-                    {link.label} {index > 0 && index < 3 && '▼'}
-                  </Link>
-                )}
-              </span>
-            ))}
-          </div>
+      {/* Header Area (Logo, Search, Auth) */}
+      <header className="navbar-header">
+        <div className="logo-area">
+          <Link to="/" style={{ textDecoration: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <img src="/mynostrspace_logo.png" alt="MyNostrSpace" className="landing-logo" />
+              <h1>MyNostrSpace</h1>
+            </div>
+            <span className="slogan">a place for friends</span>
+          </Link>
+        </div>
 
-          <div className="navbar-right">
+        <div className="header-right">
+          <div className="header-links">
+            <Link to="/help">Help</Link> |{' '}
             {user ? (
-              <>
-                <Link to="/edit-profile">Edit Profile</Link> | <Link to="/settings">Settings</Link>{' '}
-                |{' '}
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    logout();
-                  }}
-                >
-                  Sign Out
-                </a>
-              </>
+              <a href="#" onClick={(e) => { e.preventDefault(); logout(); }}>Sign Out</a>
             ) : (
+              // If not logged in, show Sign Up / Login
+              // Clicking "Sign Up" or "Login" simply goes to homepage or triggers login
               <>
-                <a href="#">Login</a> | <a href="#">Sign Up</a>
+                <Link to="/" onClick={handleLogin}>Login</Link> | <Link to="/">Sign Up</Link>
               </>
             )}
           </div>
+          <div className="header-search">
+            <form onSubmit={(e) => e.preventDefault()}>
+              <input type="text" placeholder="People" />
+              <button type="submit">Search</button>
+            </form>
+            <div className="powered-by">
+              powered by <span>Nostr</span>
+            </div>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <style>{`
-                .navbar-wrapper {
-                    font-family: Arial, Helvetica, sans-serif;
-                    width: 95%;
-                    max-width: 1280px; 
-                    margin: 0 auto;
-                    background: white;
-                }
-                
-                /* Blue Navbar */
-                .navbar-container {
-                    background-color: #003399; /* The deep blue */
-                    padding: 5px 10px;
-                    padding-top: calc(5px + env(safe-area-inset-top));
-                    color: white;
-                }
-                .navbar-inner {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    font-size: 10pt;
-                    font-weight: bold;
-                }
-                .navbar-inner a {
-                    color: white;
-                    text-decoration: none;
-                    margin: 0 5px;
-                }
-                .navbar-inner a:hover {
-                    text-decoration: underline;
-                }
-                .navbar-left {
-                    display: flex;
-                    align-items: center;
-                }
-                .navbar-right {
-                    display: flex;
-                    align-items: center;
-                }
+      {/* Blue Nav Bar */}
+      <nav className="navbar-container">
+        <div className="navbar-container-inner">
+          <Link to="/">Home</Link> | <Link to="/browse">Browse</Link> | <Link to="/search">Search</Link> |{' '}
+          <a href="#" onClick={(e) => e.preventDefault()}>Invite</a> | <Link to="/film">Film</Link> | <a href="#" onClick={(e) => e.preventDefault()}>Mail</a> | <Link to="/blogs">Blog</Link>{' '}
+          | <a href="#" onClick={(e) => e.preventDefault()}>Favorites</a> | <a href="#" onClick={(e) => e.preventDefault()}>Forum</a> | <a href="#" onClick={(e) => e.preventDefault()}>Groups</a> |{' '}
+          <a href="#" onClick={(e) => e.preventDefault()}>Events</a> | <Link to="/videos">Videos</Link> | <Link to="/music">Music</Link> |{' '}
+          <a href="#" onClick={(e) => e.preventDefault()}>Comedy</a> | <Link to="/livestreams">Livestreams</Link>
 
-                @media (max-width: 768px) {
-                    .navbar-inner {
-                        flex-direction: column;
-                        align-items: center;
-                        gap: 8px;
-                        text-align: center;
-                    }
-                    .navbar-left-links {
-                        display: flex;
-                        flex-wrap: wrap;
-                        justify-content: center;
-                        gap: 4px;
-                    }
-                    .navbar-right {
-                        justify-content: center;
-                        font-size: 9pt;
-                    }
-                }
-            `}</style>
+          {user && (
+            <>
+              {' '}| <Link to={`/p/${user.pubkey}`}>My Profile</Link>
+            </>
+          )}
+        </div>
+      </nav>
     </div>
   );
 };

@@ -142,3 +142,34 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
+
+@media (max-width: 768px) {
+  .browse-page-container {
+    width: 100%;
+    padding: 0;
+  }
+
+  .browse-layout {
+    flex-direction: column;
+    padding: 5px;
+  }
+
+  .browse-left-column {
+    width: 100%;
+  }
+
+  .browse-right-column {
+    width: 100%;
+  }
+
+  .browse-people-grid {
+    grid-template-columns: repeat(4, 1fr);
+    /* Keep 4 cols or reduce to 3/2 if too small */
+  }
+}
+
+@media (max-width: 480px) {
+  .browse-people-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

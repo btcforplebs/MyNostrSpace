@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { type NDKUserProfile } from '@nostr-dev-kit/ndk';
+import { type NDKUserProfile, NDKSubscriptionCacheUsage, NDKEvent } from '@nostr-dev-kit/ndk';
 import { useNostr } from '../context/NostrContext';
-import { getCachedData, setCachedData } from '../utils/cache';
 
 export interface ExtendedProfile extends NDKUserProfile {
   website?: string;
@@ -18,18 +17,7 @@ export const useProfile = (pubkey?: string) => {
     if (!pubkey || !ndk) return;
 
     const fetchProfile = async () => {
-      // Check cache first
-      const cached = getCachedData<ExtendedProfile>(`profile_${pubkey}`);
-      if (cached) {
-        setProfile(cached);
-        setLoading(false);
-        // We still fetch in background to refresh cache (SWR pattern-ish)
-      }
-
-      setLoading(!cached);
       try {
-        // If it's a nip19 (npub, nprofile), NDK can handle resolving it
-        // We'll create a user instance and get the hex pubkey first
         let user;
         if (pubkey.startsWith('npub') || pubkey.startsWith('nprofile')) {
           user = ndk.getUser({
@@ -39,20 +27,25 @@ export const useProfile = (pubkey?: string) => {
           user = ndk.getUser({ pubkey });
         }
 
-        // Add a timeout to ensure we don't block forever
+        // 1. Try to get from NDK object if already there
+        if (user.profile) {
+          setProfile(user.profile as ExtendedProfile);
+          // Don't stop loading yet if we want a fresh fetch
+        }
+
+        // 2. Fetch from relays/cache
         await Promise.race([
-          user.fetchProfile(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 4000)),
+          user.fetchProfile({ cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000)),
         ]).catch((err) => {
-          console.warn(`Profile fetch timed out for ${pubkey}`, err);
+          console.warn(`Profile fetch for ${pubkey} timed out or failed:`, err);
         });
 
-        setProfile(user.profile as ExtendedProfile);
         if (user.profile) {
-          setCachedData(`profile_${pubkey}`, user.profile);
+          setProfile(user.profile as ExtendedProfile);
         }
       } catch (e) {
-        console.error('Error fetching profile', e);
+        console.error('Error in useProfile hook:', e);
       } finally {
         setLoading(false);
       }
@@ -65,9 +58,11 @@ export const useProfile = (pubkey?: string) => {
     if (!ndk || !pubkey) return;
 
     try {
-      const user = ndk.getUser({ pubkey });
-      user.profile = newProfile;
-      await user.publish();
+      const event = new NDKEvent(ndk);
+      event.kind = 0;
+      event.content = JSON.stringify(newProfile);
+      event.tags = [['client', 'MyNostrSpace']];
+      await event.publish();
       setProfile(newProfile);
       alert('Profile metadata updated!');
     } catch (error) {

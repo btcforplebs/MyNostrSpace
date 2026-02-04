@@ -1,164 +1,192 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
-import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk';
+import { NDKEvent, NDKKind, type NDKUserProfile } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
 import { SEO } from '../Shared/SEO';
 import './LiveStreamPage.css'; // Re-use existing css if appropriate or create new
 
 export const LivestreamsPage = () => {
-    const { ndk } = useNostr();
-    const [liveStreams, setLiveStreams] = useState<NDKEvent[]>([]);
-    const [activeProfiles, setActiveProfiles] = useState<Record<string, any>>({});
-    const [loading, setLoading] = useState(true);
-    const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+  const { ndk } = useNostr();
+  const [liveStreams, setLiveStreams] = useState<NDKEvent[]>([]);
+  const [activeProfiles, setActiveProfiles] = useState<Record<string, NDKUserProfile>>({});
+  const [loading, setLoading] = useState(true);
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const subRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subRef = useRef<any>(null);
 
-    useEffect(() => {
-        if (!ndk) return;
+  // специализированные реле для поиска лайвстримов
+  const DISCOVERY_RELAYS = [
+    'wss://relay.zap.stream',
+    'wss://relay.highlighter.com',
+    'wss://nos.lol',
+    'wss://relay.damus.io',
+    'wss://relay.primal.net',
+    'wss://relay.snort.social',
+    'wss://offchain.pub',
+  ];
 
-        setLoading(true);
+  const PINNED_PUBKEY = 'cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5';
 
-        const startSubscription = async () => {
-            // Ensure we are connected to relevant relays
-            if (ndk.pool.stats().connected === 0) {
-                try {
-                    await ndk.connect(2000);
-                } catch (e) {
-                    console.warn("Connection warning", e);
-                }
-            }
+  useEffect(() => {
+    if (!ndk) return;
 
-            // Subscribe to livestreams (Kind 30311)
-            const liveStreamSub = ndk.subscribe(
-                [
-                    { kinds: [30311 as NDKKind], limit: 50 },
-                    {
-                        kinds: [30311 as NDKKind],
-                        authors: ['cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5'],
-                        '#d': ['537a365c-f1ec-44ac-af10-22d14a7319fb']
-                    }
-                ],
-                { closeOnEose: false }
-            );
+    const startSubscription = async () => {
+      // Add relays but don't wait for them to connect
+      for (const url of DISCOVERY_RELAYS) {
+        if (!ndk.pool.relays.has(url)) {
+          ndk.addExplicitRelay(url);
+        }
+      }
 
-            liveStreamSub.on('event', async (event: NDKEvent) => {
-                const statusTag = event.getMatchingTags('status')[0];
-                const status = statusTag ? statusTag[1] : undefined;
+      // Start subscription immediately (don't wait for connections)
+      const liveStreamSub = ndk.subscribe(
+        [
+          { kinds: [30311 as NDKKind], limit: 100 },
+          { kinds: [30311 as NDKKind], authors: [PINNED_PUBKEY] },
+        ],
+        { closeOnEose: false }
+      );
 
-                const PINNED_D_TAG = '537a365c-f1ec-44ac-af10-22d14a7319fb';
-                const PINNED_PUBKEY = 'cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5';
+      let hasReceivedEose = false;
 
-                const dTag = event.getMatchingTags('d')[0]?.[1];
-                const isPinned = event.pubkey === PINNED_PUBKEY && dTag === PINNED_D_TAG;
+      // Turn off loading when we've received initial data
+      liveStreamSub.on('eose', () => {
+        hasReceivedEose = true;
+        setLoading(false);
+      });
 
-                if (status === 'live' || status === 'broadcasting' || isPinned) {
-                    setLiveStreams((prev) => {
-                        const allEvents = [...prev, event];
+      // Fallback timeout in case EOSE never comes
+      const timeoutId = setTimeout(() => {
+        if (!hasReceivedEose) {
+          setLoading(false);
+        }
+      }, 3000);
 
-                        // Sort: Pinned first, then by created_at descending
-                        allEvents.sort((a, b) => {
-                            const aD = a.getMatchingTags('d')[0]?.[1];
-                            const bD = b.getMatchingTags('d')[0]?.[1];
-                            const aIsPinned = a.pubkey === PINNED_PUBKEY && aD === PINNED_D_TAG;
-                            const bIsPinned = b.pubkey === PINNED_PUBKEY && bD === PINNED_D_TAG;
+      liveStreamSub.on('event', async (event: NDKEvent) => {
+        const statusTag = event.getMatchingTags('status')[0];
+        const status = statusTag ? statusTag[1].toLowerCase() : undefined;
+        const streamingTag = event.getMatchingTags('streaming')[0];
 
-                            if (aIsPinned && !bIsPinned) return -1;
-                            if (!aIsPinned && bIsPinned) return 1;
+        // Simple, clear live check
+        const isLive =
+          status === 'live' ||
+          status === 'broadcasting' ||
+          status === 'active' ||
+          (!status && !!streamingTag); // No status but has streaming URL
 
-                            return (b.created_at || 0) - (a.created_at || 0);
-                        });
+        const isEnded = status === 'ended' || status === 'offline';
 
-                        // Deduplicate
-                        const uniqueEvents: NDKEvent[] = [];
-                        const seenPubkeys = new Set<string>();
-                        for (const e of allEvents) {
-                            if (!seenPubkeys.has(e.pubkey)) {
-                                uniqueEvents.push(e);
-                                seenPubkeys.add(e.pubkey);
-                            }
-                        }
+        if (isEnded) {
+          // Remove this stream
+          setLiveStreams((prev) => prev.filter((e) => e.id !== event.id));
+          return;
+        }
 
-                        return uniqueEvents;
-                    });
+        if (!isLive) {
+          return; // Ignore non-live streams
+        }
 
-                    // Fetch profile for stream host
-                    const hostPubkey = event.getMatchingTags('p')[0]?.[1] || event.pubkey;
-                    if (hostPubkey && !activeProfiles[hostPubkey]) {
-                        event.author.fetchProfile().then((profile) => {
-                            if (profile) {
-                                setActiveProfiles(curr => ({ ...curr, [hostPubkey]: profile }));
-                            }
-                        }).catch(() => { });
-                    }
-                }
-            });
+        // Add or update the stream
+        setLiveStreams((prev) => {
+          // Remove old version if exists
+          const filtered = prev.filter((e) => e.id !== event.id);
+          const updated = [...filtered, event];
 
-            subRef.current = { stop: () => liveStreamSub.stop() };
-            setLoading(false);
-        };
+          // Sort: pinned first, then by time
+          updated.sort((a, b) => {
+            if (a.pubkey === PINNED_PUBKEY && b.pubkey !== PINNED_PUBKEY) return -1;
+            if (a.pubkey !== PINNED_PUBKEY && b.pubkey === PINNED_PUBKEY) return 1;
+            return (b.created_at || 0) - (a.created_at || 0);
+          });
 
-        startSubscription();
+          return updated;
+        });
 
-        return () => {
-            if (subRef.current) subRef.current.stop();
-        };
-    }, [ndk]);
+        // Fetch profile for stream host
+        const hostPubkey = event.getMatchingTags('p')[0]?.[1] || event.pubkey;
+        if (hostPubkey && !activeProfiles[hostPubkey]) {
+          event.author
+            .fetchProfile()
+            .then((profile) => {
+              if (profile) {
+                setActiveProfiles((curr) => ({ ...curr, [hostPubkey]: profile }));
+              }
+            })
+            .catch(() => {});
+        }
+      });
 
-    return (
-        <div className="livestreams-page-container">
-            <SEO title="Livestreams" description="Watch live streams on MyNostrSpace" />
-            <div className="livestreams-header">
-                <Navbar />
+      subRef.current = {
+        stop: () => {
+          liveStreamSub.stop();
+          clearTimeout(timeoutId);
+        },
+      };
+    };
+
+    startSubscription();
+
+    return () => {
+      if (subRef.current) subRef.current.stop();
+    };
+  }, [ndk]);
+
+  return (
+    <div className="livestreams-page-container">
+      <SEO title="Livestreams" description="Watch live streams on MyNostrSpace" />
+      <div className="livestreams-header">
+        <Navbar />
+      </div>
+
+      <div className="livestreams-content">
+        <h2 className="section-header">Live Now</h2>
+
+        {loading && <div style={{ padding: '20px' }}>Loading streams...</div>}
+
+        <div className="streams-grid">
+          {liveStreams.length === 0 && !loading && (
+            <div style={{ padding: '20px' }}>
+              No active livestreams found right now. Check back later!
             </div>
+          )}
 
-            <div className="livestreams-content">
-                <h2 className="section-header">Live Now</h2>
+          {liveStreams.map((stream) => {
+            const title = stream.getMatchingTags('title')[0]?.[1] || 'Untitled Stream';
+            const image = stream.getMatchingTags('image')[0]?.[1];
+            const dTag = stream.getMatchingTags('d')[0]?.[1];
+            const hostPubkey = stream.getMatchingTags('p')[0]?.[1] || stream.pubkey;
+            const url = `/live/${hostPubkey}/${dTag}`;
+            const profile = activeProfiles[hostPubkey];
 
-                {loading && <div style={{ padding: '20px' }}>Loading streams...</div>}
-
-                <div className="streams-grid">
-                    {liveStreams.length === 0 && !loading && (
-                        <div style={{ padding: '20px' }}>No active livestreams found right now. Check back later!</div>
-                    )}
-
-                    {liveStreams.map((stream) => {
-                        const title = stream.getMatchingTags('title')[0]?.[1] || 'Untitled Stream';
-                        const image = stream.getMatchingTags('image')[0]?.[1];
-                        const dTag = stream.getMatchingTags('d')[0]?.[1];
-                        const hostPubkey = stream.getMatchingTags('p')[0]?.[1] || stream.pubkey;
-                        const url = `/live/${hostPubkey}/${dTag}`;
-                        const profile = activeProfiles[hostPubkey];
-
-                        return (
-                            <Link key={stream.id} to={url} className="stream-card">
-                                <div className="stream-card-thumb">
-                                    {image && !brokenImages.has(stream.id) ? (
-                                        <img
-                                            src={image}
-                                            alt={title}
-                                            onError={() => setBrokenImages(prev => new Set(prev).add(stream.id))}
-                                        />
-                                    ) : (
-                                        <div className="stream-no-image">LIVE</div>
-                                    )}
-                                    <div className="live-badge">LIVE</div>
-                                </div>
-                                <div className="stream-card-info">
-                                    <div className="stream-card-title">{title}</div>
-                                    <div className="stream-card-host">
-                                        Host: {profile?.name || profile?.display_name || hostPubkey.slice(0, 8)}
-                                    </div>
-                                </div>
-                            </Link>
-                        );
-                    })}
+            return (
+              <Link key={stream.id} to={url} className="stream-card">
+                <div className="stream-card-thumb">
+                  {image && !brokenImages.has(stream.id) ? (
+                    <img
+                      src={image}
+                      alt={title}
+                      onError={() => setBrokenImages((prev) => new Set(prev).add(stream.id))}
+                    />
+                  ) : (
+                    <div className="stream-no-image">LIVE</div>
+                  )}
+                  <div className="live-badge">LIVE</div>
                 </div>
-            </div>
+                <div className="stream-card-info">
+                  <div className="stream-card-title">{title}</div>
+                  <div className="stream-card-host">
+                    Host: {profile?.name || profile?.display_name || hostPubkey.slice(0, 8)}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
 
-            <style>{`
+      <style>{`
         .livestreams-page-container {
             width: 100%;
             max-width: 992px;
@@ -248,6 +276,6 @@ export const LivestreamsPage = () => {
             }
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };

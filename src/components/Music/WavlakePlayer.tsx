@@ -5,6 +5,7 @@ interface WavlakeTrack {
   title: string;
   url: string;
   link?: string;
+  albumArtUrl?: string; // Added for art support
   // We might parse more from the URL if needed, but for now we trust the stored data
 }
 
@@ -18,6 +19,7 @@ interface WavlakePlayerProps {
   currentTrackIndex?: number;
   onTrackSelect?: (index: number) => void;
   hidePlaylist?: boolean;
+  playlistTitle?: string; // Custom title for playlist section
 }
 
 export const WavlakePlayer = ({
@@ -28,6 +30,7 @@ export const WavlakePlayer = ({
   currentTrackIndex: controlledIndex,
   onTrackSelect,
   hidePlaylist = false,
+  playlistTitle,
 }: WavlakePlayerProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -150,7 +153,9 @@ export const WavlakePlayer = ({
                 className="p-btn-legacy"
                 onClick={() =>
                   activePlaylist &&
-                  handleTrackChange(currentIndex === 0 ? activePlaylist.length - 1 : currentIndex - 1)
+                  handleTrackChange(
+                    currentIndex === 0 ? activePlaylist.length - 1 : currentIndex - 1
+                  )
                 }
               >
                 ⏴⏴
@@ -207,7 +212,9 @@ export const WavlakePlayer = ({
               >
                 <button
                   onClick={() =>
-                    handleTrackChange(currentIndex === 0 ? activePlaylist.length - 1 : currentIndex - 1)
+                    handleTrackChange(
+                      currentIndex === 0 ? activePlaylist.length - 1 : currentIndex - 1
+                    )
                   }
                   style={{ fontSize: '9pt', fontWeight: 'bold' }}
                 >
@@ -257,18 +264,27 @@ export const WavlakePlayer = ({
       {activePlaylist && !hidePlaylist && (
         <div className="playlist-container" style={{ marginTop: '5px', fontSize: '8pt' }}>
           <table className="myspace-table" style={{ width: '100%', marginBottom: 0 }}>
-            <thead>
-              <tr>
-                <th style={{ background: 'var(--myspace-blue)', color: 'white' }}>
-                  Profile Playlist
-                </th>
-              </tr>
-            </thead>
+            {playlistTitle && (
+              <thead>
+                <tr>
+                  <th style={{ background: 'var(--myspace-blue)', color: 'white' }}>
+                    {playlistTitle}
+                  </th>
+                </tr>
+              </thead>
+            )}
             <tbody>
               {activePlaylist.map((track, i) => (
                 <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#f9f9f9' : '#ffffff' }}>
-                  <td style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <td style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {track.albumArtUrl && (
+                      <img
+                        src={track.albumArtUrl}
+                        alt="art"
+                        style={{ width: '25px', height: '25px', objectFit: 'cover' }}
+                      />
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                       <span
                         onClick={() => handleTrackChange(i)}
                         style={{

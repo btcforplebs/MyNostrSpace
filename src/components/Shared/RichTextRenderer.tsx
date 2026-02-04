@@ -3,6 +3,27 @@ import { nip19 } from 'nostr-tools';
 import { Link } from 'react-router-dom';
 import { EmbeddedNote } from './EmbeddedNote';
 import { useLightbox } from '../../context/LightboxContext';
+import { useProfile } from '../../hooks/useProfile';
+
+const InternalMention: React.FC<{ pubkey: string; originalText: string }> = ({
+  pubkey,
+  originalText,
+}) => {
+  const { profile } = useProfile(pubkey);
+  const name =
+    profile?.name ||
+    profile?.displayName ||
+    profile?.display_name ||
+    originalText.replace('nostr:', '').slice(0, 10) + '...';
+  return (
+    <Link
+      to={`/p/${pubkey}`}
+      style={{ color: '#003399', fontWeight: 'bold', textDecoration: 'none' }}
+    >
+      @{name}
+    </Link>
+  );
+};
 
 interface RichTextRendererProps {
   content: string;
@@ -65,6 +86,7 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
                         cursor: 'pointer',
                       }}
                       onClick={() => openLightbox(url)}
+                      loading="lazy"
                     />
                   </div>
                 );
@@ -89,10 +111,10 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
               // YouTube
               if (lowerUrl.includes('youtube.com/watch') || lowerUrl.includes('youtu.be/')) {
                 let videoId = null;
-                if (lowerUrl.includes('v=')) {
-                  videoId = lowerUrl.split('v=')[1]?.split('&')[0];
-                } else if (lowerUrl.includes('youtu.be/')) {
-                  videoId = lowerUrl.split('youtu.be/')[1]?.split('?')[0];
+                if (url.includes('v=')) {
+                  videoId = url.split('v=')[1]?.split('&')[0];
+                } else if (url.includes('youtu.be/')) {
+                  videoId = url.split('youtu.be/')[1]?.split('?')[0];
                 }
 
                 if (videoId) {
@@ -110,6 +132,7 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
                         allowFullScreen
                         title="Embedded Video"
                         style={{ maxWidth: '560px' }}
+                        loading="lazy"
                       ></iframe>
                     </div>
                   );
@@ -131,29 +154,42 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
             }
 
             // Nostr Entity Handling
-            const isNostrMatch = word.match(/^nostr:((npub1|nprofile1|note1|nevent1)[a-z0-9]+)$/i);
+            const isNostrMatch = word.match(
+              /^nostr:((npub1|nprofile1|note1|nevent1|naddr1)[a-z0-9]+)$/i
+            );
             if (isNostrMatch) {
               const entity = isNostrMatch[1];
               try {
-                const { type, data } = nip19.decode(entity);
+                const decoded = nip19.decode(entity);
+                const type = decoded.type;
+                const data = decoded.data;
 
                 if (type === 'npub' || type === 'nprofile') {
                   const pubkey =
                     type === 'npub' ? (data as string) : (data as { pubkey: string }).pubkey;
-                  return (
-                    <Link
-                      key={wordIndex}
-                      to={`/p/${pubkey}`}
-                      style={{ color: '#003399', fontWeight: 'bold' }}
-                    >
-                      {word}
-                    </Link>
-                  );
+                  return <InternalMention key={wordIndex} pubkey={pubkey} originalText={word} />;
                 }
 
                 if (type === 'note' || type === 'nevent') {
                   const id = type === 'note' ? (data as string) : (data as { id: string }).id;
                   return <EmbeddedNote key={wordIndex} id={id} />;
+                }
+
+                if (type === 'naddr') {
+                  const d = data as { kind: number; pubkey: string; identifier: string };
+                  let link = `/p/${d.pubkey}`;
+                  if (d.kind === 30023) link = `/blog/${d.pubkey}/${d.identifier}`;
+                  else if (d.kind === 30311) link = `/live/${d.pubkey}/${d.identifier}`;
+
+                  return (
+                    <Link
+                      key={wordIndex}
+                      to={link}
+                      style={{ color: '#003399', fontWeight: 'bold' }}
+                    >
+                      {word.slice(0, 20)}...
+                    </Link>
+                  );
                 }
               } catch (e) {
                 console.warn('Failed to decode nostr entity', word, e);

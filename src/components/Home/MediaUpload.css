@@ -71,12 +71,15 @@
   font-size: 9pt;
   border: 1px solid #ccc;
   font-family: inherit;
+  background: white;
+  color: black;
 }
 
 .upload-submit-btn {
   width: 100%;
-  background: #eee;
-  border: 1px solid #ccc;
+  background: var(--myspace-blue);
+  color: white;
+  border: none;
   padding: 10px;
   font-weight: bold;
   cursor: pointer;

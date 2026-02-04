@@ -3,6 +3,7 @@ import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { useNostr } from '../../context/NostrContext';
 import { RichTextRenderer } from '../Shared/RichTextRenderer';
 import { InteractionBar } from '../Shared/InteractionBar';
+import { Avatar } from '../Shared/Avatar';
 import './CommentWall.css';
 
 interface CommentWallProps {
@@ -22,12 +23,18 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
     if (!ndk || !pubkey) return;
     setLoading(true);
     try {
-      // Fetch top-level comments (events tagging this profile with p-tag)
-      const filter: NDKFilter = { kinds: [1], '#p': [pubkey], limit: 40 };
-      const events = await ndk.fetchEvents(filter);
-      const eventsArray = Array.from(events);
+      // 1. Fetch mentions/comments (tagged with p: [pubkey])
+      const mentionFilter: NDKFilter = { kinds: [1], '#p': [pubkey], limit: 40 };
+      const mentions = await ndk.fetchEvents(mentionFilter);
 
-      // Fetch replies to these comments (e-tags)
+      // 2. Fetch personal posts (authored by [pubkey])
+      const authorFilter: NDKFilter = { kinds: [1], authors: [pubkey], limit: 40 };
+      const posts = await ndk.fetchEvents(authorFilter);
+
+      // Combine arrays
+      const eventsArray = [...Array.from(mentions), ...Array.from(posts)];
+
+      // 3. Fetch replies to these events (e-tags)
       if (eventsArray.length > 0) {
         const eventIds = eventsArray.map((e) => e.id);
         const replyFilter: NDKFilter = { kinds: [1], '#e': eventIds };
@@ -35,7 +42,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
         eventsArray.push(...Array.from(replies));
       }
 
-      // De-duplicate and sort
+      // De-duplicate and sort (newest first)
       const uniqueEvents = Array.from(new Map(eventsArray.map((e) => [e.id, e])).values()).sort(
         (a, b) => (b.created_at || 0) - (a.created_at || 0)
       );
@@ -75,7 +82,10 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
     const event = new NDKEvent(ndk);
     event.kind = 1;
     event.content = newComment;
-    event.tags = [['p', pubkey]];
+    event.tags = [
+      ['p', pubkey],
+      ['client', 'MyNostrSpace'],
+    ];
 
     try {
       await event.publish();
@@ -111,6 +121,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
         ['e', parentEvent.id, '', 'reply'],
         ['p', parentEvent.pubkey],
         ['p', pubkey], // Ensure owner still gets notified
+        ['client', 'MyNostrSpace'],
       ];
 
       await reply.publish();
@@ -143,15 +154,12 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
           {comment.author?.profile?.name || comment.pubkey.slice(0, 8)}
         </a>
         <br />
-        <img
-          src={comment.author?.profile?.image || 'https://via.placeholder.com/50'}
-          alt="User"
-          style={{
-            width: isReply ? '30px' : '50px',
-            height: isReply ? '30px' : '50px',
-            objectFit: 'cover',
-            marginTop: '5px',
-          }}
+        <Avatar
+          pubkey={comment.pubkey}
+          src={comment.author?.profile?.image}
+          size={isReply ? 30 : 50}
+          className="comment-user-pic"
+          style={{ marginTop: '5px' }}
         />
       </td>
       <td className="comment-content-col">
@@ -170,10 +178,10 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
         {activeReplyId === comment.id && (
           <div className="reply-form">
             <textarea
+              className="nostr-input"
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
               placeholder={`Reply to ${comment.author?.profile?.name || 'user'}...`}
-              style={{ width: '100%', height: '40px', fontSize: '9pt' }}
             />
             <div style={{ textAlign: 'right', marginTop: '5px' }}>
               <button
@@ -211,7 +219,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
         }}
       >
         <h3 className="section-header" style={{ flexGrow: 1, margin: 0 }}>
-          {comments.length} Comments
+          Comments & Activity
         </h3>
       </div>
 
@@ -219,6 +227,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
         {user ? (
           <>
             <textarea
+              className="nostr-input"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Leave a comment..."

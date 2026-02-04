@@ -9,6 +9,7 @@ interface MediaUploadProps {
   onClose: () => void;
   onUploadComplete: () => void;
   type: 'photo' | 'video';
+  mood?: string;
 }
 
 export const MediaUpload: React.FC<MediaUploadProps> = ({
@@ -16,6 +17,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
   onClose,
   onUploadComplete,
   type,
+  mood = 'None',
 }) => {
   const { ndk, user } = useNostr();
   const [file, setFile] = useState<File | null>(null);
@@ -67,6 +69,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
               ? 'A photo shared on MyNostrSpace'
               : 'A video shared on MyNostrSpace'),
         ],
+        ['client', 'MyNostrSpace'],
       ];
 
       // If it's a photo, maybe add dimensions (kind of hard without loading the image first)
@@ -75,7 +78,31 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
       console.log('Publishing Kind 1063 event...');
       await event.publish();
 
-      alert(`${type === 'photo' ? 'Photo' : 'Video'} uploaded successfully!`);
+      // 4. Create Kind 1 (Text Note) event so it appears in the feed
+      console.log('Publishing Kind 1 note...');
+      const noteEvent = new NDKEvent(ndk);
+      noteEvent.kind = 1;
+
+      let noteContent = description;
+      if (mood && mood !== 'None') {
+        noteContent = `Mood: ${mood}\n\n${noteContent}`;
+        noteEvent.tags.push(['mood', mood]);
+      }
+
+      // Append URL to content for visualization in other clients
+      noteEvent.content = noteContent ? `${noteContent}\n\n${url}` : url;
+      noteEvent.tags.push(['client', 'MyNostrSpace']);
+
+      // Link to the media event - REMOVED because it causes the homepage feed to filter it out as a "reply"
+      // noteEvent.tags.push(['e', event.id]);
+
+      console.log('Publishing Kind 1 note to relays...', noteEvent.toNostrEvent());
+      await noteEvent.publish();
+
+      // We can wait for at least one success but publish() already waits for that by default with NDK
+      console.log('Post published successfully!', noteEvent.id);
+
+      alert(`${type === 'photo' ? 'Photo' : 'Video'} uploaded and posted successfully!`);
       onUploadComplete();
       onClose();
       setFile(null);
@@ -117,7 +144,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
           </div>
 
           <textarea
-            className="media-description"
+            className="media-description nostr-input"
             placeholder="Add a description (optional)..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}

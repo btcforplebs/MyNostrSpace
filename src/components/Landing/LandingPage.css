@@ -61,8 +61,8 @@ body {
 .landing-body {
   display: grid;
   grid-template-areas:
-    "main"
-    "sidebar";
+    'main'
+    'sidebar';
   padding: 10px;
   gap: 20px;
   max-width: 992px;
@@ -71,7 +71,7 @@ body {
 
 @media (min-width: 768px) {
   .landing-body {
-    grid-template-areas: "sidebar main";
+    grid-template-areas: 'sidebar main';
     grid-template-columns: 280px 1fr;
     align-items: start;
     padding: 15px 10px;
@@ -207,10 +207,7 @@ body {
 
 /* Skeleton Loaders */
 .skeleton {
-  background: linear-gradient(90deg,
-      #f0f0f0 25%,
-      #e0e0e0 50%,
-      #f0f0f0 75%);
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;
   animation: skeleton-pulse 1.5s ease-in-out infinite;
   border-radius: 2px;
@@ -287,6 +284,11 @@ body {
   color: var(--myspace-dark-blue);
   font-weight: bold;
   white-space: nowrap;
+  text-decoration: none;
+}
+
+.feed-author:hover {
+  text-decoration: underline;
 }
 
 .feed-content {

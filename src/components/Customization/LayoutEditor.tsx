@@ -139,7 +139,7 @@ export const LayoutEditor = () => {
       // Determine best server. Defaulting to one for now.
       // Ideally we check NIP-65 or use a discovered one.
       const server = 'https://nostr.build';
-      const result = await uploadToBlossom(ndk, file, server);
+      const result = await uploadToBlossom(ndk, file, [server]);
 
       setStatus('Image uploaded! Appending CSS.');
 
@@ -180,6 +180,7 @@ export const LayoutEditor = () => {
         ['d', 'mynostrspace_layout'],
         ['t', 'css'],
         ['alt', 'MyNostrSpace Custom Layout'],
+        ['client', 'MyNostrSpace'],
       ];
 
       await event.publish();

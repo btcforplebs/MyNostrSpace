@@ -7,26 +7,26 @@ const { data: pubkey } = nip19.decode(npub);
 const relays = ['wss://relay.nostr.band', 'wss://relay.damus.io'];
 
 async function main() {
-    const pool = new SimplePool();
+  const pool = new SimplePool();
 
-    console.log(`Fetching events for pubkey: ${pubkey}`);
+  console.log(`Fetching events for pubkey: ${pubkey}`);
 
-    const events = await pool.querySync(relays, {
-        authors: [pubkey as string],
-        kinds: [1, 1063, 30023],
-        limit: 50
-    });
+  const events = await pool.querySync(relays, {
+    authors: [pubkey as string],
+    kinds: [1, 1063, 30023],
+    limit: 50,
+  });
 
-    console.log(`Found ${events.length} events.`);
+  console.log(`Found ${events.length} events.`);
 
-    events.forEach(e => {
-        console.log(`\n[Kind ${e.kind}]`);
-        console.log(`Content: ${e.content.substring(0, 100)}...`);
-        console.log(`Tags:`, e.tags);
-    });
+  events.forEach((e) => {
+    console.log(`\n[Kind ${e.kind}]`);
+    console.log(`Content: ${e.content.substring(0, 100)}...`);
+    console.log(`Tags:`, e.tags);
+  });
 
-    pool.close(relays);
-    process.exit(0);
+  pool.close(relays);
+  process.exit(0);
 }
 
 main().catch(console.error);

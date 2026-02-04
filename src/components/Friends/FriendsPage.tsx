@@ -5,6 +5,7 @@ import { Navbar } from '../Shared/Navbar';
 import { useEffect, useState } from 'react';
 import { NDKUser } from '@nostr-dev-kit/ndk';
 import { useResolvedPubkey } from '../../hooks/useResolvedPubkey';
+import { Avatar } from '../Shared/Avatar';
 
 const PAGE_SIZE = 100;
 
@@ -111,10 +112,11 @@ const FriendsPage = () => {
                   </Link>
                 </div>
                 <Link to={`/p/${friend.profile?.nip05 || friend.profile?.name || friend.pubkey}`}>
-                  <img
-                    src={friend.profile?.image || 'https://via.placeholder.com/80'}
-                    alt="Friend"
-                    style={{ width: 80, height: 80, objectFit: 'cover', border: '1px solid #ccc' }}
+                  <Avatar
+                    pubkey={friend.pubkey}
+                    src={friend.profile?.image}
+                    size={80}
+                    style={{ border: '1px solid #ccc' }}
                   />
                 </Link>
               </div>

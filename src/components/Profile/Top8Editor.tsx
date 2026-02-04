@@ -3,6 +3,7 @@ import { useFriends } from '../../hooks/useFriends';
 import { useTop8 } from '../../hooks/useTop8';
 import { useNostr } from '../../context/NostrContext';
 import { NDKUser } from '@nostr-dev-kit/ndk';
+import { Avatar } from '../Shared/Avatar';
 
 export const Top8Editor = () => {
   const { user } = useNostr();
@@ -75,7 +76,7 @@ export const Top8Editor = () => {
         {currentTop8.map((friend, idx) => (
           <div key={friend.pubkey} className="top8-slot-editor">
             <span className="slot-number">{idx + 1}</span>
-            <img src={friend.profile?.image || 'https://via.placeholder.com/50'} alt="friend" />
+            <Avatar pubkey={friend.pubkey} src={friend.profile?.image} size={50} />
             <div className="name">{friend.profile?.name || 'Unknown'}</div>
             <button className="remove-btn" onClick={() => removeFromTop8(friend.pubkey)}>
               x
@@ -121,7 +122,7 @@ export const Top8Editor = () => {
                 className="friend-select-item"
                 onClick={() => addToTop8(friend)}
               >
-                <img src={friend.profile?.image || 'https://via.placeholder.com/40'} alt="friend" />
+                <Avatar pubkey={friend.pubkey} src={friend.profile?.image} size={40} />
                 <span>{friend.profile?.name || 'Unknown'}</span>
                 <span className="add-icon">+</span>
               </div>

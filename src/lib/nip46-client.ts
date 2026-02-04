@@ -210,7 +210,10 @@ export class NIP46Client {
           const unsignedEvent = {
             kind: 24133,
             created_at: Math.floor(Date.now() / 1000),
-            tags: [['p', this.bunkerPubkey]],
+            tags: [
+              ['p', this.bunkerPubkey],
+              ['client', 'MyNostrSpace'],
+            ],
             content: encrypted,
           };
 

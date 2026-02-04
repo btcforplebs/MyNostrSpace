@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
+import { nip19 } from 'nostr-tools';
 import { useNostr } from '../../context/NostrContext';
 
 interface InteractionBarProps {
@@ -11,8 +12,13 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
   const { ndk, user, login } = useNostr();
   const [likes, setLikes] = useState(0);
   const [comments, setComments] = useState(0);
+  const [reposts, setReposts] = useState(0);
   const [zaps, setZaps] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
+  const [isReposted, setIsReposted] = useState(false);
+  const [showQuoteForm, setShowQuoteForm] = useState(false);
+  const [quoteText, setQuoteText] = useState('');
+  const [isQuoting, setIsQuoting] = useState(false);
   const [zapInvoice, setZapInvoice] = useState<string | null>(null);
   const [isZapping, setIsZapping] = useState(false);
 
@@ -22,35 +28,38 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
     try {
       const filter: NDKFilter = {
         '#e': [event.id],
-        kinds: [7, 1, 9735],
+        kinds: [7, 1, 6, 9735],
       };
 
       const relatedEvents = await ndk.fetchEvents(filter);
 
       let likeCount = 0;
       let commentCount = 0;
+      let repostCount = 0;
       let zapTotal = 0;
       let likedByMe = false;
+      let repostedByMe = false;
 
       relatedEvents.forEach((e) => {
         if (e.kind === 7) {
           likeCount++;
           if (user && e.pubkey === user.pubkey) likedByMe = true;
+        } else if (e.kind === 6) {
+          repostCount++;
+          if (user && e.pubkey === user.pubkey) repostedByMe = true;
         } else if (e.kind === 1) {
-          // Simple check: if it tags our event with 'e', count as comment
-          // We could be more strict with 'reply' marker but for now this is fine
           commentCount++;
         } else if (e.kind === 9735) {
-          // Extract amount from zap invoice or tag if possible
-          // For now, let's just count them or try to sum (simplified)
           zapTotal++;
         }
       });
 
       setLikes(likeCount);
       setComments(commentCount);
+      setReposts(repostCount);
       setZaps(zapTotal);
       setIsLiked(likedByMe);
+      setIsReposted(repostedByMe);
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -69,11 +78,78 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
     if (isLiked) return; // Already liked
 
     try {
-      await event.react('+');
+      const reaction = new NDKEvent(ndk);
+      reaction.kind = 7;
+      reaction.content = '+';
+      reaction.tags = [
+        ['e', event.id],
+        ['p', event.pubkey],
+        ['client', 'MyNostrSpace'],
+      ];
+      await reaction.publish();
       setLikes((prev) => prev + 1);
       setIsLiked(true);
     } catch (error) {
       console.error('Failed to like:', error);
+    }
+  };
+
+  const handleRepost = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      await login();
+      return;
+    }
+    if (isReposted) return;
+
+    if (!confirm('Repost this note?')) return;
+
+    try {
+      const repost = new NDKEvent(ndk);
+      repost.kind = 6;
+      repost.content = JSON.stringify(event.rawEvent());
+      repost.tags = [
+        ['e', event.id, ''],
+        ['p', event.pubkey],
+        ['client', 'MyNostrSpace'],
+      ];
+      await repost.publish();
+      setReposts((prev) => prev + 1);
+      setIsReposted(true);
+    } catch (error) {
+      console.error('Failed to repost:', error);
+    }
+  };
+
+  const handleQuote = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      await login();
+      return;
+    }
+    if (!quoteText.trim()) return;
+
+    setIsQuoting(true);
+    try {
+      const nevent = nip19.neventEncode({ id: event.id, author: event.pubkey });
+      const quote = new NDKEvent(ndk);
+      quote.kind = 1;
+      quote.content = `${quoteText}\n\nnostr:${nevent}`;
+      quote.tags = [
+        ['e', event.id, '', 'mention'],
+        ['p', event.pubkey],
+        ['q', event.id],
+        ['client', 'MyNostrSpace'],
+      ];
+      await quote.publish();
+      setQuoteText('');
+      setShowQuoteForm(false);
+      alert('Quote posted!');
+    } catch (error) {
+      console.error('Failed to quote:', error);
+      alert('Failed to post quote');
+    } finally {
+      setIsQuoting(false);
     }
   };
 
@@ -140,6 +216,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         ['lnurl', lud16], // Lud16 or encoded lnurl
         ['p', event.author.pubkey],
         ['e', event.id],
+        ['client', 'MyNostrSpace'],
       ];
 
       await zapRequest.sign();
@@ -212,9 +289,55 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         comment ({comments})
       </a>
       |
+      <a
+        href="#"
+        onClick={handleRepost}
+        style={{ color: isReposted ? '#2e7d32' : '#003399', fontWeight: isReposted ? 'bold' : 'normal' }}
+      >
+        {isReposted ? '🔄 reposted' : `repost (${reposts})`}
+      </a>
+      |
+      <a
+        href="#"
+        onClick={(e) => {
+          e.preventDefault();
+          setShowQuoteForm(!showQuoteForm);
+        }}
+        style={{ color: '#003399' }}
+      >
+        quote
+      </a>
+      |
       <a href="#" onClick={handleZap} style={{ color: '#003399' }}>
         {isZapping ? 'zapping...' : `zap (${zaps})`}
       </a>
+      {showQuoteForm && (
+        <div
+          style={{
+            marginTop: '8px',
+            padding: '8px',
+            background: '#f9f9f9',
+            border: '1px solid #ccc',
+          }}
+        >
+          <textarea
+            className="nostr-input"
+            value={quoteText}
+            onChange={(e) => setQuoteText(e.target.value)}
+            placeholder="Add your thoughts..."
+            style={{ width: '100%', minHeight: '60px', fontSize: '9pt' }}
+          />
+          <div style={{ textAlign: 'right', marginTop: '5px' }}>
+            <button
+              onClick={handleQuote}
+              disabled={isQuoting || !quoteText.trim()}
+              style={{ fontSize: '8pt', padding: '2px 8px', cursor: 'pointer' }}
+            >
+              {isQuoting ? 'Posting...' : 'Post Quote'}
+            </button>
+          </div>
+        </div>
+      )}
       {zapInvoice && (
         <div
           className="zap-modal"

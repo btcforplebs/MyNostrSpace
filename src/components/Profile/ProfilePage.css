@@ -17,7 +17,7 @@ body {
 
 .profile-container {
   width: 100%;
-  max-width: 800px;
+  max-width: 992px;
   margin: 0 auto;
   background: var(--myspace-container-bg);
   color: var(--myspace-text);

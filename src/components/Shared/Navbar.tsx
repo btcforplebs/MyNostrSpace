@@ -1,9 +1,13 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useNostr } from '../../context/NostrContext';
 import './Navbar.css';
 
 export const Navbar = () => {
   const { user, logout, login } = useNostr();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   const handleLogin = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -11,10 +15,18 @@ export const Navbar = () => {
       try {
         await login();
       } catch (err) {
-        console.error("Navbar login error:", err);
+        console.error('Navbar login error:', err);
       }
     } else {
-      window.location.href = "/#login-section";
+      window.location.href = '/#login-section';
+    }
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
     }
   };
 
@@ -36,19 +48,34 @@ export const Navbar = () => {
           <div className="header-links">
             <Link to="/help">Help</Link> |{' '}
             {user ? (
-              <a href="#" onClick={(e) => { e.preventDefault(); logout(); }}>Sign Out</a>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  logout();
+                }}
+              >
+                Sign Out
+              </a>
             ) : (
               // If not logged in, show Sign Up / Login
               // Clicking "Sign Up" or "Login" simply goes to homepage or triggers login
               <>
-                <Link to="/" onClick={handleLogin}>Login</Link> | <Link to="/">Sign Up</Link>
+                <Link to="/" onClick={handleLogin}>
+                  Login
+                </Link>{' '}
+                | <Link to="/">Sign Up</Link>
               </>
             )}
           </div>
           <div className="header-search">
-            <form onSubmit={(e) => e.preventDefault()}>
-              <input type="text" placeholder="People" />
-              <button type="submit">Search</button>
+            <form onSubmit={handleSearch}>
+              <input
+                type="text"
+                placeholder="People"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </form>
             <div className="powered-by">
               powered by <span>Nostr</span>
@@ -60,15 +87,37 @@ export const Navbar = () => {
       {/* Blue Nav Bar */}
       <nav className="navbar-container">
         <div className="navbar-container-inner">
-          <Link to="/">Home</Link> | <Link to="/browse">Browse</Link> | <Link to="/search">Search</Link> |{' '}
-          <a href="#" onClick={(e) => e.preventDefault()}>Invite</a> | <Link to="/film">Film</Link> | <a href="#" onClick={(e) => e.preventDefault()}>Mail</a> | <Link to="/blogs">Blog</Link>{' '}
-          | <a href="#" onClick={(e) => e.preventDefault()}>Favorites</a> | <a href="#" onClick={(e) => e.preventDefault()}>Forum</a> | <a href="#" onClick={(e) => e.preventDefault()}>Groups</a> |{' '}
-          <a href="#" onClick={(e) => e.preventDefault()}>Events</a> | <Link to="/videos">Videos</Link> | <Link to="/music">Music</Link> |{' '}
-          <a href="#" onClick={(e) => e.preventDefault()}>Comedy</a> | <Link to="/livestreams">Livestreams</Link>
-
+          <Link to="/">Home</Link> | <Link to="/browse">Browse</Link> | <Link to="/film">Film</Link>{' '}
+          |{' '}
+          <a href="#" onClick={(e) => e.preventDefault()}>
+            Mail
+          </a>{' '}
+          | <Link to="/blogs">Blog</Link> | <Link to="/calendar">Calendar</Link> |{' '}
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              alert('Coming Soon');
+            }}
+          >
+            Groups
+          </a>{' '}
+          |{' '}
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              alert('Coming Soon');
+            }}
+          >
+            Events
+          </a>{' '}
+          | <Link to="/videos">Videos</Link> | <Link to="/music">Music</Link> |{' '}
+          <Link to="/marketplace">Marketplace</Link> | <Link to="/livestreams">Livestreams</Link>
           {user && (
             <>
-              {' '}| <Link to={`/p/${user.pubkey}`}>My Profile</Link>
+              {' '}
+              | <Link to={`/p/${user.pubkey}`}>My Profile</Link>
             </>
           )}
         </div>

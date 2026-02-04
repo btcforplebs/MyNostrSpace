@@ -110,6 +110,14 @@ const ProfilePage = () => {
                     .join(', ')}
                 </p>
               </div>
+              {profile?.nip05 && (
+                <div
+                  className="nip05"
+                  style={{ fontSize: '8pt', color: '#666', fontWeight: 'bold' }}
+                >
+                  {profile.nip05}
+                </div>
+              )}
               <div className="last-login" style={{ fontSize: '8pt', margin: '10px 0' }}>
                 Last Login: {new Date().toLocaleDateString()}
               </div>
@@ -143,7 +151,7 @@ const ProfilePage = () => {
           <div className="url-box">
             <b>MyNostrSpace URL:</b>
             <br />
-            http://mynostrspace.com/p/{profile?.nip05 || profile?.name || hexPubkey?.slice(0, 8)}
+            http://mynostrspace.com/p/{hexPubkey}
           </div>
 
           <div className="interests-box">

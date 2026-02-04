@@ -1,151 +1,216 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
-import { NDKKind, type NDKFilter } from '@nostr-dev-kit/ndk';
+import { type NDKFilter, NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
+import { SEO } from '../Shared/SEO';
+import { useCustomLayout } from '../../hooks/useCustomLayout';
+import { BlogEditor } from '../Home/BlogEditor';
 import './BlogsPage.css';
 
 interface BlogArticle {
-    id: string;
-    pubkey: string;
-    identifier: string;
-    title: string;
-    summary?: string;
-    publishedAt: number;
-    image?: string;
-    authorProfile?: {
-        name?: string;
-        picture?: string;
-    };
+  id: string;
+  pubkey: string;
+  identifier: string;
+  title: string;
+  summary?: string;
+  publishedAt: number;
+  image?: string;
+  authorProfile?: {
+    name?: string;
+    picture?: string;
+  };
 }
 
 export const BlogsPage = () => {
-    const { ndk } = useNostr();
-    const [articles, setArticles] = useState<BlogArticle[]>([]);
-    const [loading, setLoading] = useState(true);
+  const { ndk, user: loggedInUser } = useNostr();
+  const { layoutCss } = useCustomLayout(loggedInUser?.pubkey);
+  const [articles, setArticles] = useState<BlogArticle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isBlogEditorOpen, setIsBlogEditorOpen] = useState(false);
 
-    useEffect(() => {
-        if (!ndk) return;
+  useEffect(() => {
+    if (!ndk) return;
 
-        const fetchArticles = async () => {
-            setLoading(true);
-            try {
-                // Fetch recent long-form content (Kind 30023)
-                // We can add specific relays or authors later if needed, global for now
-                const filter: NDKFilter = {
-                    kinds: [30023 as NDKKind],
-                    limit: 20
-                };
+    let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
 
-                const events = await ndk.fetchEvents(filter);
-                const sortedEvents = Array.from(events).sort((a, b) => {
-                    const aTime = a.created_at || 0;
-                    const bTime = b.created_at || 0;
-                    return bTime - aTime;
-                });
-
-                const formattedArticles: BlogArticle[] = [];
-
-                // Process events
-                for (const event of sortedEvents) {
-                    const title = event.getMatchingTags('title')[0]?.[1] || 'Untitled';
-                    const identifier = event.getMatchingTags('d')[0]?.[1];
-                    const summary = event.getMatchingTags('summary')[0]?.[1] || event.content.slice(0, 150) + '...';
-                    const publishedAt = event.created_at || 0;
-                    // Try to find an image in tags or content? content is long markdown.
-                    // Look for 'image' tag
-                    const image = event.getMatchingTags('image')[0]?.[1];
-
-                    if (identifier) {
-                        formattedArticles.push({
-                            id: event.id,
-                            pubkey: event.pubkey,
-                            identifier,
-                            title,
-                            summary,
-                            publishedAt,
-                            image
-                        });
-                    }
-                }
-
-                // Fetch authors
-                const pubkeys = new Set(formattedArticles.map(a => a.pubkey));
-                if (pubkeys.size > 0) {
-                    await Promise.all(formattedArticles.map(async (article) => {
-                        const user = ndk.getUser({ pubkey: article.pubkey });
-                        const profile = await user.fetchProfile();
-                        article.authorProfile = {
-                            name: profile?.name || profile?.displayName || String(profile?.display_name || ''),
-                            picture: profile?.image || profile?.picture
-                        };
-                    }));
-                }
-
-                setArticles(formattedArticles);
-
-            } catch (err) {
-                console.error("Failed to fetch blog articles", err);
-            } finally {
-                setLoading(false);
-            }
+    const fetchArticles = async () => {
+      setLoading(true);
+      try {
+        const filter: NDKFilter = {
+          kinds: [30023],
+          limit: 50,
         };
 
-        fetchArticles();
-    }, [ndk]);
+        const processBlogEvent = (event: NDKEvent) => {
+          const identifier = event.getMatchingTags('d')[0]?.[1];
+          if (!identifier) return;
 
-    return (
-        <div className="blogs-page-container">
-            <div className="blogs-header-area">
-                <Navbar />
-            </div>
+          const title = event.getMatchingTags('title')[0]?.[1] || 'Untitled';
+          const summary =
+            event.getMatchingTags('summary')[0]?.[1] || event.content.slice(0, 150) + '...';
+          const publishedAt = event.created_at || 0;
+          const image = event.getMatchingTags('image')[0]?.[1];
 
-            <div className="blogs-content">
-                <h2 className="section-header">Recent Blog Entries</h2>
+          setArticles((prev) => {
+            if (prev.find((a) => a.id === event.id)) return prev;
+            const newArticle: BlogArticle = {
+              id: event.id,
+              pubkey: event.pubkey,
+              identifier,
+              title,
+              summary,
+              publishedAt,
+              image,
+            };
+            const next = [...prev, newArticle];
+            return next.sort((a, b) => b.publishedAt - a.publishedAt);
+          });
 
-                {loading ? (
-                    <div style={{ padding: '20px', textAlign: 'center' }}>Loading articles...</div>
-                ) : (
-                    <div className="blogs-grid">
-                        {articles.map((article) => (
-                            <div key={article.id} className="blog-card">
-                                <div className="blog-card-left">
-                                    <Link to={`/p/${article.pubkey}`}>
-                                        <img
-                                            src={article.authorProfile?.picture || `https://robohash.org/${article.pubkey}?set=set4`}
-                                            alt={article.authorProfile?.name}
-                                            className="blog-author-pic"
-                                        />
-                                    </Link>
-                                    <Link to={`/p/${article.pubkey}`} className="blog-author-name">
-                                        {article.authorProfile?.name || article.pubkey.slice(0, 8)}
-                                    </Link>
-                                </div>
-                                <div className="blog-card-right">
-                                    <div className="blog-card-title">
-                                        <Link to={`/blog/${article.pubkey}/${article.identifier}`}>
-                                            {article.title}
-                                        </Link>
-                                    </div>
-                                    <div className="blog-card-meta">
-                                        Posted on {new Date(article.publishedAt * 1000).toLocaleDateString()}
-                                    </div>
-                                    <div className="blog-card-snippet">
-                                        {article.summary}
-                                        <Link to={`/blog/${article.pubkey}/${article.identifier}`} className="read-more-link">
-                                            (view more)
-                                        </Link>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+          // Proactively fetch profile
+          event.author
+            .fetchProfile()
+            .then((profile) => {
+              if (profile) {
+                setArticles((prev) =>
+                  prev.map((a) =>
+                    a.pubkey === event.pubkey
+                      ? {
+                          ...a,
+                          authorProfile: {
+                            name: String(
+                              profile.name ||
+                                profile.displayName ||
+                                profile.display_name ||
+                                a.pubkey.slice(0, 8)
+                            ),
+                            picture: profile.image || profile.picture,
+                          },
+                        }
+                      : a
+                  )
+                );
+              }
+            })
+            .catch(() => {});
+        };
+
+        sub = ndk.subscribe(filter, {
+          closeOnEose: false,
+          cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+        });
+
+        sub.on('event', (apiEvent: NDKEvent) => {
+          processBlogEvent(apiEvent);
+        });
+
+        sub.on('eose', () => {
+          setLoading(false);
+          console.log('Blogs Page: Initial fetch complete');
+        });
+      } catch (err) {
+        console.error('Failed to fetch blog articles', err);
+        setLoading(false);
+      }
+    };
+
+    fetchArticles();
+
+    return () => {
+      if (sub) sub.stop();
+    };
+  }, [ndk]);
+
+  return (
+    <div className="home-page-container bp-page-container">
+      {layoutCss && <style>{layoutCss}</style>}
+      <SEO
+        title="Blogs"
+        description="Read long-form articles and stories from the Nostr network."
+      />
+
+      <div className="home-wrapper bp-wrapper">
+        <Navbar />
+
+        <div className="home-content bp-content">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 className="bp-section-header" style={{ margin: 0 }}>Recent Blog Entries</h2>
+            {loggedInUser && (
+              <button
+                onClick={() => setIsBlogEditorOpen(true)}
+                style={{
+                  background: '#ff9933',
+                  color: 'white',
+                  border: '1px solid #cc7a29',
+                  padding: '5px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '9pt',
+                }}
+              >
+                Write New Blog
+              </button>
+            )}
+          </div>
+
+          {loading && articles.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center' }}>Loading articles...</div>
+          ) : (
+            <div className="bp-grid">
+              {articles.map((article) => (
+                <div key={article.id} className="bp-card">
+                  <div className="bp-card-left">
+                    <Link to={`/p/${article.pubkey}`}>
+                      <img
+                        src={
+                          article.authorProfile?.picture ||
+                          `https://robohash.org/${article.pubkey}?set=set4`
+                        }
+                        alt={article.authorProfile?.name}
+                        className="bp-author-pic"
+                      />
+                    </Link>
+                    <Link to={`/p/${article.pubkey}`} className="bp-author-name">
+                      {article.authorProfile?.name || article.pubkey.slice(0, 8)}
+                    </Link>
+                  </div>
+                  <div className="bp-card-right">
+                    <div className="bp-card-title">
+                      <Link to={`/blog/${article.pubkey}/${article.identifier}`}>
+                        {article.title}
+                      </Link>
                     </div>
-                )}
-
-                {!loading && articles.length === 0 && (
-                    <div style={{ padding: '20px', textAlign: 'center' }}>No articles found. Check back later!</div>
-                )}
+                    <div className="bp-card-meta">
+                      Posted on {new Date(article.publishedAt * 1000).toLocaleDateString()}
+                    </div>
+                    <div className="bp-card-snippet">
+                      {article.summary}
+                      <Link
+                        to={`/blog/${article.pubkey}/${article.identifier}`}
+                        className="bp-read-more"
+                      >
+                        (view more)
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
+          )}
+
+          {!loading && articles.length === 0 && (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              No articles found. Check back later!
+            </div>
+          )}
         </div>
-    );
+      </div>
+
+      <BlogEditor
+        isOpen={isBlogEditorOpen}
+        onClose={() => setIsBlogEditorOpen(false)}
+        onPostComplete={() => {}}
+      />
+    </div>
+  );
 };

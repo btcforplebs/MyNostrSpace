@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk';
+import { NDKEvent, NDKKind, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { useNostr } from '../context/NostrContext';
-import { getCachedData, setCachedData } from '../utils/cache';
 
 export interface ExtendedProfileData {
   headline?: string;
@@ -40,14 +39,6 @@ export const useExtendedProfile = (pubkey?: string) => {
     if (!pubkey || !ndk) return;
 
     const fetchExtendedProfile = async () => {
-      // Check cache
-      const cached = getCachedData<ExtendedProfileData>(`extended_${pubkey}`);
-      if (cached) {
-        setData(cached);
-        setLoading(false);
-      }
-
-      setLoading(!cached);
       try {
         let hexPubkey = pubkey;
         if (pubkey.startsWith('npub') || pubkey.startsWith('nprofile')) {
@@ -57,19 +48,21 @@ export const useExtendedProfile = (pubkey?: string) => {
           hexPubkey = tempUser.pubkey;
         }
 
-        // Fetch Parameterized Replaceable Event
-        const e = await ndk.fetchEvent({
-          kinds: [30001 as NDKKind],
-          authors: [hexPubkey],
-          '#d': ['mynostrspace_v1'],
-        });
+        // Fetch Parameterized Replaceable Event using Cache
+        const e = await ndk.fetchEvent(
+          {
+            kinds: [30001 as NDKKind],
+            authors: [hexPubkey],
+            '#d': ['mynostrspace_v1'],
+          },
+          { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
+        );
 
         if (e) {
           setEvent(e);
           try {
             const parsed = JSON.parse(e.content);
             setData(parsed);
-            setCachedData(`extended_${pubkey}`, parsed);
           } catch (err) {
             console.error('Failed to parse extended profile content', err);
           }
@@ -92,7 +85,10 @@ export const useExtendedProfile = (pubkey?: string) => {
     const e = new NDKEvent(ndk);
     e.kind = 30001 as NDKKind;
     e.content = JSON.stringify(newData);
-    e.tags = [['d', 'mynostrspace_v1']];
+    e.tags = [
+      ['d', 'mynostrspace_v1'],
+      ['client', 'MyNostrSpace'],
+    ];
 
     await e.publish();
     setData(newData);

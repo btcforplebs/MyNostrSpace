@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@nostr-dev-kit/ndk": "^2.18.1",
+    "@nostr-dev-kit/ndk-cache-dexie": "^2.6.44",
+    "dexie": "^4.3.0",
     "hls.js": "^1.6.15",
     "lucide-react": "^0.563.0",
     "nostr-tools": "^2.22.1",
@@ -39,5 +41,8 @@
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
     "websocket-polyfill": "^1.0.0"
+  },
+  "overrides": {
+    "@nostr-dev-kit/ndk": "$@nostr-dev-kit/ndk"
   }
 }

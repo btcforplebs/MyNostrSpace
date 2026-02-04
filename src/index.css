@@ -45,6 +45,23 @@ button {
   appearance: none;
 }
 
+.nostr-input {
+  width: 100%;
+  padding: 8px;
+  font-size: 9pt;
+  background-color: #fff !important;
+  color: #000 !important;
+  border: 1px solid #ccc !important;
+  border-radius: 0;
+  /* Retro MySpace feel */
+  font-family: verdana, arial, sans-serif;
+}
+
+.nostr-input:focus {
+  outline: 1px solid #6699cc;
+  border-color: #6699cc !important;
+}
+
 @media (max-width: 768px) {
 
   input,

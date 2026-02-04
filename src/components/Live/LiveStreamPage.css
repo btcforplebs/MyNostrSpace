@@ -1,262 +1,260 @@
 .myspace-container {
-    background-color: #E5E5E5;
-    min-height: 100vh;
-    font-family: Arial, Helvetica, sans-serif;
-    display: flex;
-    flex-direction: column;
-    overflow-x: hidden;
-    /* Prevent horizontal scroll */
-    max-width: 100vw;
-    width: 100%;
+  background-color: #e5e5e5;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  /* Prevent horizontal scroll */
+  max-width: 100vw;
+  width: 100%;
 }
 
-
-
 .myspace-body {
-    width: 95%;
-    /* Use percentage to ensure margins don't cause overflow */
-    max-width: 1280px;
-    /* Increased from 960px for larger video */
-    margin: 20px auto;
-    background-color: white;
-    display: flex;
-    gap: 20px;
-    padding: 20px;
-    border: 1px solid #6699CC;
-    box-sizing: border-box;
-    /* Explicit check */
+  width: 95%;
+  /* Use percentage to ensure margins don't cause overflow */
+  max-width: 992px;
+  /* Increased from 960px for larger video */
+  margin: 20px auto;
+  background-color: white;
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid #6699cc;
+  box-sizing: border-box;
+  /* Explicit check */
 }
 
 .col-left {
-    width: 300px;
-    flex-shrink: 0;
-    min-width: 0;
-    /* Prevent flex blowout */
+  width: 300px;
+  flex-shrink: 0;
+  min-width: 0;
+  /* Prevent flex blowout */
 }
 
 .col-right {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    min-width: 0;
-    /* Prevent flex blowout */
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  /* Prevent flex blowout */
 }
 
 /* Profile Box */
 .profile-box {
-    text-align: center;
+  text-align: center;
 }
 
 .profile-box h3 {
-    color: #FF6600;
-    margin-top: 0;
+  color: #ff6600;
+  margin-top: 0;
 }
 
 .profile-pic img {
-    max-width: 100%;
-    border: 2px solid black;
+  max-width: 100%;
+  border: 2px solid black;
 }
 
 .status-badge {
-    display: inline-block;
-    padding: 5px 10px;
-    color: white;
-    font-weight: bold;
-    margin: 10px 0;
-    border-radius: 4px;
+  display: inline-block;
+  padding: 5px 10px;
+  color: white;
+  font-weight: bold;
+  margin: 10px 0;
+  border-radius: 4px;
 }
 
 .status-badge.live {
-    background-color: red;
-    animation: blink 2s infinite;
+  background-color: red;
+  animation: blink 2s infinite;
 }
 
 .status-badge.offline {
-    background-color: gray;
+  background-color: gray;
 }
 
 @keyframes blink {
-    0% {
-        opacity: 1;
-    }
+  0% {
+    opacity: 1;
+  }
 
-    50% {
-        opacity: 0.5;
-    }
+  50% {
+    opacity: 0.5;
+  }
 
-    100% {
-        opacity: 1;
-    }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* Content Boxes */
 .content-box {
-    border: 1px solid #6699CC;
+  border: 1px solid #6699cc;
 }
 
 .box-header {
-    background-color: #FFCC99;
-    /* Classic MySpace Orange */
-    padding: 5px 10px;
-    border-bottom: 1px solid #6699CC;
+  background-color: #ffcc99;
+  /* Classic MySpace Orange */
+  padding: 5px 10px;
+  border-bottom: 1px solid #6699cc;
 }
 
 .box-header h2 {
-    margin: 0;
-    color: #FF6600;
-    /* Darker Orange text */
-    font-size: 1.1rem;
+  margin: 0;
+  color: #ff6600;
+  /* Darker Orange text */
+  font-size: 1.1rem;
 }
 
 /* Video Player */
 .video-player-wrapper {
-    width: 100%;
-    max-height: 80vh;
-    /* Strict max height on wrapper */
-    aspect-ratio: 16/9;
-    background-color: black;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+  width: 100%;
+  max-height: 80vh;
+  /* Strict max height on wrapper */
+  aspect-ratio: 16/9;
+  background-color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .stream-summary {
-    padding: 10px;
-    font-size: 0.9rem;
+  padding: 10px;
+  font-size: 0.9rem;
 }
 
 /* Chat Box */
 .chat-window {
-    height: 300px;
-    overflow-y: auto;
-    padding: 10px;
-    background-color: #f9f9f9;
-    border-bottom: 1px solid #ccc;
+  height: 300px;
+  overflow-y: auto;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-bottom: 1px solid #ccc;
 }
 
 .chat-message {
-    font-size: 0.9rem;
-    margin-bottom: 6px;
-    line-height: 1.4;
-    color: #333;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  line-height: 1.4;
+  color: #333;
 }
 
 .chat-author a {
-    font-weight: bold;
-    color: #003399;
-    text-decoration: none;
-    margin-right: 5px;
+  font-weight: bold;
+  color: #003399;
+  text-decoration: none;
+  margin-right: 5px;
 }
 
 .chat-author a:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .chat-time {
-    color: #999;
-    font-size: 0.8rem;
-    margin-left: 5px;
+  color: #999;
+  font-size: 0.8rem;
+  margin-left: 5px;
 }
 
 .chat-input-area {
-    padding: 10px;
-    display: flex;
-    gap: 10px;
-    background-color: #eee;
+  padding: 10px;
+  display: flex;
+  gap: 10px;
+  background-color: #eee;
 }
 
 .chat-input-area input {
-    flex-grow: 1;
-    padding: 5px;
+  flex-grow: 1;
+  padding: 5px;
 }
 
 .myspace-footer {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    font-size: 0.8rem;
-    background-color: white;
-    width: 95%;
-    max-width: 1280px;
-    margin: 0 auto 20px auto;
-    border: 1px solid #6699CC;
-    border-top: none;
-    box-sizing: border-box;
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-size: 0.8rem;
+  background-color: white;
+  width: 95%;
+  max-width: 992px;
+  margin: 0 auto 20px auto;
+  border: 1px solid #6699cc;
+  border-top: none;
+  box-sizing: border-box;
 }
 
 .myspace-footer a {
-    color: #003399;
-    text-decoration: none;
-    margin: 0 5px;
+  color: #003399;
+  text-decoration: none;
+  margin: 0 5px;
 }
 
 /* Skeleton Loader */
 .skeleton-loader {
-    width: 100%;
-    height: 100%;
-    background-color: #222;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 5;
+  width: 100%;
+  height: 100%;
+  background-color: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
 }
 
 .skeleton-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    border-top-color: #fff;
-    animation: spin 1s ease-in-out infinite;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Mobile Responsive Layout */
 @media (max-width: 768px) {
-    .myspace-body {
-        flex-direction: column;
-        width: 100%;
-        margin: 0;
-        border: none;
-        padding: 10px;
-    }
+  .myspace-body {
+    flex-direction: column;
+    width: 100%;
+    margin: 0;
+    border: none;
+    padding: 10px;
+  }
 
-    .col-left {
-        width: 100%;
-        order: 2;
-        /* Profile below content */
-    }
+  .col-left {
+    width: 100%;
+    order: 2;
+    /* Profile below content */
+  }
 
-    .col-right {
-        width: 100%;
-        order: 1;
-        /* Video/Chat on top */
-    }
+  .col-right {
+    width: 100%;
+    order: 1;
+    /* Video/Chat on top */
+  }
 
-    /* Video on top of chat is already default flow of col-right */
+  /* Video on top of chat is already default flow of col-right */
 
-    .video-player-wrapper {
-        max-height: 60vh;
-        /* Allow smaller height on mobile */
-    }
+  .video-player-wrapper {
+    max-height: 60vh;
+    /* Allow smaller height on mobile */
+  }
 
-    .chat-window {
-        height: 250px;
-        /* Slightly smaller chat on mobile */
-    }
+  .chat-window {
+    height: 250px;
+    /* Slightly smaller chat on mobile */
+  }
 
-    .myspace-footer {
-        width: 100%;
-        border: none;
-    }
+  .myspace-footer {
+    width: 100%;
+    border: none;
+  }
 }

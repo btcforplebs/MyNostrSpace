@@ -93,7 +93,11 @@ export const useTop8 = (pubkey?: string) => {
     try {
       const event = new NDKEvent(ndk);
       event.kind = 30000 as NDKKind;
-      event.tags = [['d', 'top8'], ...newTop8.map((u) => ['p', u.pubkey])];
+      event.tags = [
+        ['d', 'top8'],
+        ['client', 'MyNostrSpace'],
+        ...newTop8.map((u) => ['p', u.pubkey]),
+      ];
       await event.publish();
       setTop8(newTop8);
       alert('Top 8 updated!');

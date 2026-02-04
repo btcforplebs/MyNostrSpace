@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import NDK, { NDKUser, NDKNip07Signer } from '@nostr-dev-kit/ndk';
+import NDKCacheAdapterDexie from '@nostr-dev-kit/ndk-cache-dexie';
 import { NIP46Client } from '../lib/nip46-client';
 
 interface NostrContextType {
@@ -26,18 +27,31 @@ const DEFAULT_RELAYS = [
 export const NostrProvider = ({ children }: { children: ReactNode }) => {
   const [relays, setRelays] = useState<string[]>(() => {
     const saved = localStorage.getItem('mynostrspace_relays');
-    return saved ? JSON.parse(saved) : DEFAULT_RELAYS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Filter out dead/unreliable relays
+        return parsed.filter(
+          (r: string) =>
+            !r.includes('relayable.org') &&
+            !r.includes('nostr.band') &&
+            !r.includes('search.nos.today')
+        );
+      } catch (e) {
+        console.warn('Failed to parse saved relays', e);
+      }
+    }
+    return DEFAULT_RELAYS;
   });
-
-  // Re-initialize NDK if we wanted to support hot-swapping fully,
-  // but for now we just initialize once with the current storage state.
-  // However, to support adding relays dynamically, we'll keep the single instance
-  // and just use addExplicitRelay via updateRelays.
 
   // We need to keep the NDK instance construction stable or we loop.
   // So we just use the initial state for the constructor.
   const [ndk] = useState(() => {
-    const n = new NDK({ explicitRelayUrls: relays });
+    const cacheAdapter = new NDKCacheAdapterDexie({ dbName: 'mynostrspace-ndk-cache' });
+    const n = new NDK({
+      explicitRelayUrls: relays,
+      cacheAdapter: cacheAdapter as any,
+    });
     return n;
   });
 
@@ -45,11 +59,12 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const updateRelays = (newRelays: string[]) => {
-    setRelays(newRelays);
-    localStorage.setItem('mynostrspace_relays', JSON.stringify(newRelays));
+    const deduplicated = Array.from(new Set(newRelays.map((r) => r.trim())));
+    setRelays(deduplicated);
+    localStorage.setItem('mynostrspace_relays', JSON.stringify(deduplicated));
 
     // Add any new ones immediately
-    newRelays.forEach((url) => {
+    deduplicated.forEach((url) => {
       try {
         ndk.addExplicitRelay(url);
       } catch (e) {
@@ -182,7 +197,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
       console.error('NIP-46 Login failed:', error);
       alert(
         'Failed to connect to remote signer: ' +
-        (error instanceof Error ? error.message : String(error))
+          (error instanceof Error ? error.message : String(error))
       );
       throw error;
     }

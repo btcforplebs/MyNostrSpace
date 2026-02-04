@@ -4,6 +4,7 @@ import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, NDKKind, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
 // ReactPlayer removed in favor of native hls.js implementation
+// @ts-ignore: hls.js types are sometimes tricky with bundlers
 import Hls from 'hls.js';
 import { ChatMessage } from './ChatMessage';
 import './LiveStreamPage.css';
@@ -11,7 +12,7 @@ import './LiveStreamPage.css';
 export const LiveStreamPage = () => {
     const { pubkey, identifier } = useParams();
     const dTag = identifier;
-    const { ndk, isLoading } = useNostr();
+    const { ndk, isLoading, user, login } = useNostr();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [streamerProfile, setStreamerProfile] = useState<any>(null);
     const [streamEvent, setStreamEvent] = useState<NDKEvent | null>(null);
@@ -19,6 +20,8 @@ export const LiveStreamPage = () => {
     const [chatMessages, setChatMessages] = useState<NDKEvent[]>([]);
     const [isVideoReady, setIsVideoReady] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<string>("Initializing...");
+    const [chatInput, setChatInput] = useState('');
+    const [sending, setSending] = useState(false);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const subRef = useRef<any>(null);
@@ -180,6 +183,36 @@ export const LiveStreamPage = () => {
 
     }, [ndk, pubkey, dTag, isLoading, retryCount]);
 
+    const handleSendMessage = async () => {
+        if (!ndk || !chatInput.trim() || !pubkey || !dTag) return;
+
+        if (!user) {
+            login();
+            return;
+        }
+
+        setSending(true);
+        try {
+            const event = new NDKEvent(ndk);
+            event.kind = 1311;
+            event.content = chatInput;
+            event.tags = [
+                ['a', `30311:${pubkey}:${dTag}`, '']
+            ];
+            await event.publish();
+
+            // Optimistic update handled by subscription mostly, but we can clear input immediately
+            setChatInput('');
+
+            // Optional: Add to local state immediately for instant feedback if sub is slow
+            // setChatMessages(prev => [...prev, event]);
+        } catch (e) {
+            console.error("Failed to send message", e);
+            alert("Failed to send message");
+        } finally {
+            setSending(false);
+        }
+    };
 
 
     // Initialize HLS
@@ -239,7 +272,8 @@ export const LiveStreamPage = () => {
                 if (isMounted) attemptPlay();
             });
 
-            hls.on(Hls.Events.ERROR, (_event, data) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
                 if (data.fatal) {
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
@@ -394,10 +428,26 @@ export const LiveStreamPage = () => {
                             )}
                             <div ref={chatBottomRef} />
                         </div>
-                        {/* Chat Input Placeholder - implement interaction later */}
                         <div className="chat-input-area">
-                            <input type="text" placeholder="Login to chat..." disabled />
-                            <button disabled>Post</button>
+                            {user ? (
+                                <>
+                                    <input
+                                        type="text"
+                                        placeholder="Say something..."
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                        disabled={sending}
+                                    />
+                                    <button onClick={handleSendMessage} disabled={sending || !chatInput.trim()}>
+                                        {sending ? '...' : 'Post'}
+                                    </button>
+                                </>
+                            ) : (
+                                <button onClick={() => login()} style={{ width: '100%' }}>
+                                    Login to Chat
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

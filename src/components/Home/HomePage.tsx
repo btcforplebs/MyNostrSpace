@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
@@ -8,17 +8,38 @@ import { FeedItem } from '../Shared/FeedItem';
 import { SEO } from '../Shared/SEO';
 import { MediaUpload } from './MediaUpload';
 import { BlogEditor } from './BlogEditor';
+import { WavlakePlayer } from '../Music/WavlakePlayer';
 import './HomePage.css';
 
-export const HomePage: React.FC = () => {
-  const { user, ndk } = useNostr();
+interface MusicTrack {
+  title: string;
+  url: string;
+  link: string;
+  artist?: string;
+}
+
+interface MediaItem {
+  id: string;
+  url: string;
+  type: 'image' | 'video';
+  created_at: number;
+  originalEvent: NDKEvent;
+  thumb?: string;
+}
+
+const HomePage = () => {
+  const { ndk, user } = useNostr();
+  const navigate = useNavigate();
   const { layoutCss } = useCustomLayout(user?.pubkey);
   const [feed, setFeed] = useState<NDKEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [musicLoading, setMusicLoading] = useState(false);
+  // Deprecated single loading state, using fine-grained instead
   const [status, setStatus] = useState('');
   const [mood, setMood] = useState('None');
   const [notifications, setNotifications] = useState<NDKEvent[]>([]);
-  const [parentEvents, setParentEvents] = useState<Record<string, NDKEvent>>({});
+  const [parentEvents] = useState<Record<string, NDKEvent>>({});
   const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [stats, setStats] = useState({
     followers: 0,
@@ -27,12 +48,20 @@ export const HomePage: React.FC = () => {
   });
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [mediaModalType, setMediaModalType] = useState<'photo' | 'video'>('photo');
-  const [mediaEvents, setMediaEvents] = useState<NDKEvent[]>([]);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  // Keep legacy state for now to avoid breaking too much, but we'll use mediaItems mostly
+  // mediaEvents removed as we used mediaItems now
   const [blogEvents, setBlogEvents] = useState<NDKEvent[]>([]);
+  const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([]);
+  const [streamEvents, setStreamEvents] = useState<NDKEvent[]>([]);
   const [viewMode, setViewMode] = useState<
-    'feed' | 'photos' | 'videos' | 'blog' | 'calendar' | 'reviews'
+    'feed' | 'media' | 'blog' | 'music' | 'streams' | 'calendar' | 'reviews'
   >('feed');
   const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
+
+  // Infinite Scroll State
+  const [feedUntil, setFeedUntil] = useState<number | null>(null);
+  const [hasMoreFeed, setHasMoreFeed] = useState(true);
 
   const MOODS = [
     'None',
@@ -47,142 +76,315 @@ export const HomePage: React.FC = () => {
     'Creative',
   ];
 
-  const fetchHomeData = useCallback(async () => {
-    if (!ndk || !user) return;
-    setLoading(true);
+  // Helper for safe follows
+  const getFollows = useCallback(async () => {
+    if (!ndk || !user) return [];
+    const activeUser = ndk.getUser({ pubkey: user.pubkey });
+    // Timeout helper
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+      ]);
+    };
 
-    try {
-      // 1. Get followed users
-      const activeUser = ndk.getUser({ pubkey: user.pubkey });
-      const followedUsersSet = await activeUser.follows();
-      const followedUsers = Array.from(followedUsersSet);
+    const followedUsersSet = await withTimeout(
+      activeUser.follows().catch(() => new Set<import('@nostr-dev-kit/ndk').NDKUser>()),
+      3000,
+      new Set<import('@nostr-dev-kit/ndk').NDKUser>()
+    );
+    const followPubkeys = Array.from(followedUsersSet || new Set()).map(u => u.pubkey);
+    if (!followPubkeys.includes(user.pubkey)) followPubkeys.push(user.pubkey);
+    return followPubkeys;
+  }, [ndk, user]);
 
-      // 2. Fetch feed from followed users
-      const followPubkeys = followedUsers.map((u) => u.pubkey);
-      if (followPubkeys.length > 0) {
-        const filter: NDKFilter = {
-          kinds: [1],
-          authors: followPubkeys,
-          limit: 20,
-        };
-        const events = await ndk.fetchEvents(filter);
-        const sortedEvents = Array.from(events).sort(
-          (a: NDKEvent, b: NDKEvent) => (b.created_at || 0) - (a.created_at || 0)
-        );
+  // Pagination Handler (Load More)
+  const loadMoreFeed = useCallback(async () => {
+    if (!feedUntil || !ndk) return;
+    // Fetch older items (blocking fetch is fine for pagination)
+    const authors = await getFollows();
+    const filter: NDKFilter = {
+      kinds: [1],
+      authors: authors,
+      limit: 20,
+      until: feedUntil
+    };
+    const events = await ndk.fetchEvents(filter);
+    const newEvents = Array.from(events).filter(e => !e.tags.some(t => t[0] === 'e'));
+    if (newEvents.length === 0) {
+      setHasMoreFeed(false);
+      return;
+    }
 
-        // Fetch profiles for the feed
-        await Promise.all(sortedEvents.map((e) => e.author.fetchProfile()));
-        setFeed(sortedEvents);
+    setFeed(prev => {
+      const combined = [...prev, ...newEvents];
+      // Dedup
+      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+      return unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+    });
+
+    // Update cursor
+    const oldest = newEvents.sort((a, b) => (a.created_at || 0) - (b.created_at || 0))[0];
+    if (oldest?.created_at) setFeedUntil(oldest.created_at - 1);
+  }, [feedUntil, ndk, getFollows]);
+
+
+
+  // Infinite Scroll Handler
+  useEffect(() => {
+    const handleScroll = () => {
+      // Allow scroll if we have more feed AND a cursor (meaning we've finished at least one load)
+      if (viewMode !== 'feed' || !feedUntil || !hasMoreFeed) return;
+
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+        loadMoreFeed();
       }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [viewMode, feedUntil, loadMoreFeed]);
 
-      // 3. Fetch Notifications (kind 1 replies, kind 7 likes, kind 9735 zaps)
-      const notificationFilter: NDKFilter = {
-        '#p': [user.pubkey],
-        kinds: [1, 7, 9735],
-        limit: 30,
-      };
-      const notificationEvents = await ndk.fetchEvents(notificationFilter);
-      const sortedNotifications = Array.from(notificationEvents).sort(
-        (a: NDKEvent, b: NDKEvent) => (b.created_at || 0) - (a.created_at || 0)
-      );
+  // Separate function for heavy media fetching
 
-      // Fetch profiles for notifications
-      await Promise.all(
-        sortedNotifications.map(async (e) => {
-          try {
-            await e.author.fetchProfile();
-          } catch (err) {
-            console.warn(`Failed to fetch profile for ${e.pubkey}`, err);
-          }
-        })
-      );
 
-      // Filter out self-notifications
-      const filteredNotifications = sortedNotifications.filter((n) => n.pubkey !== user.pubkey);
-      setNotifications(filteredNotifications);
+  // Initial Subscription (Streaming)
+  useEffect(() => {
+    if (!ndk || !user || viewMode !== 'feed') return;
 
-      // 4. Fetch Parent Events for Replies (Kind 1)
-      const replyEvents = sortedNotifications.filter((n) => n.kind === 1);
-      const parentIds = replyEvents
-        .map((n) => n.tags.find((t) => t[0] === 'e' && (t[3] === 'reply' || !t[3]))?.[1])
-        .filter(Boolean) as string[];
+    let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
 
-      if (parentIds.length > 0) {
-        const parentsFilter: NDKFilter = {
-          ids: parentIds,
-        };
-        const fetchedParents = await ndk.fetchEvents(parentsFilter);
-        const parentMap: Record<string, NDKEvent> = {};
-        fetchedParents.forEach((p) => {
-          parentMap[p.id] = p;
-        });
-        setParentEvents((prev) => ({ ...prev, ...parentMap }));
-      }
+    // Only set loading if feed is empty to avoid flickering on re-nav
+    if (feed.length === 0) setFeedLoading(true);
 
-      // 5. Fetch Profile Stats
-      const statsPromises = [];
-
-      // Follower count (Kind 3 events tagging the user)
-      const followerFilter: NDKFilter = {
-        kinds: [3],
-        '#p': [user.pubkey],
-      };
-      statsPromises.push(ndk.fetchEvents(followerFilter).then((evs: Set<NDKEvent>) => evs.size));
-
-      // Zap count (Kind 9735)
-      const zapFilter: NDKFilter = {
-        kinds: [9735],
-        '#p': [user.pubkey],
-      };
-      statsPromises.push(ndk.fetchEvents(zapFilter).then((evs: Set<NDKEvent>) => evs.size));
-
-      // Post count (Kind 1)
-      const postFilter: NDKFilter = {
+    const startSub = async () => {
+      const authors = await getFollows();
+      const filter: NDKFilter = {
         kinds: [1],
-        authors: [user.pubkey],
+        authors: authors,
+        limit: 20
       };
-      statsPromises.push(ndk.fetchEvents(postFilter).then((evs: Set<NDKEvent>) => evs.size));
 
-      const [followerCount, zapCount, postCount] = await Promise.all(statsPromises);
-      setStats({
-        followers: followerCount,
-        zaps: zapCount,
-        posts: postCount,
+      sub = ndk.subscribe(filter, { closeOnEose: false });
+
+      sub.on('event', (apiEvent: NDKEvent) => {
+        // Filter out replies (events with 'e' tags)
+        if (apiEvent.tags.some(t => t[0] === 'e')) return;
+
+        // Fetch profile lazily
+        apiEvent.author.fetchProfile();
+
+        // Update state
+        setFeed(prev => {
+          if (prev.find(e => e.id === apiEvent.id)) return prev;
+          const next = [...prev, apiEvent];
+          return next.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+        });
+
+        // If first event, maybe stop loading? Or wait for EOSE.
       });
 
-      // 6. Fetch Media Events (Kind 1063)
-      const mediaFilter: NDKFilter = {
-        kinds: [1063],
-        authors: [user.pubkey],
-      };
-      const fetchedMedia = await ndk.fetchEvents(mediaFilter);
-      setMediaEvents(
-        Array.from(fetchedMedia).sort(
-          (a: NDKEvent, b: NDKEvent) => (b.created_at || 0) - (a.created_at || 0)
-        )
-      );
+      sub.on('eose', () => {
+        setFeedLoading(false);
+        // Set initial cursor for pagination
+        setFeed(prev => {
+          if (prev.length > 0) {
+            const oldest = prev[prev.length - 1];
+            if (oldest.created_at) setFeedUntil(oldest.created_at - 1);
+          }
+          return prev;
+        });
+      });
+    };
 
-      // 7. Fetch Blog Events (Kind 30023)
-      const blogFilter: NDKFilter = {
-        kinds: [30023],
-        authors: [user.pubkey],
+    startSub();
+
+    return () => {
+      if (sub) sub.stop();
+    };
+  }, [ndk, user, viewMode, getFollows]); // Remove feed dependency to avoid loop, but we check feed.length inside
+
+  // Media Subscription
+  useEffect(() => {
+    if (!ndk || !user || viewMode !== 'media') return;
+
+    let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
+    if (mediaItems.length === 0) setMediaLoading(true);
+
+    const startMediaSub = async () => {
+      const authors = await getFollows();
+      const filter: NDKFilter = {
+        kinds: [1, 1063],
+        authors: authors,
+        limit: 50
       };
-      const fetchedBlogs = await ndk.fetchEvents(blogFilter);
-      setBlogEvents(
-        Array.from(fetchedBlogs).sort(
-          (a: NDKEvent, b: NDKEvent) => (b.created_at || 0) - (a.created_at || 0)
-        )
-      );
-    } catch (error) {
-      console.error('Error fetching home data:', error);
-    } finally {
-      setLoading(false);
+
+      sub = ndk.subscribe(filter, { closeOnEose: false });
+
+      sub.on('event', (ev: NDKEvent) => {
+        const newItem: MediaItem | null = (() => {
+          if (ev.kind === 1063) {
+            const url = ev.tags.find(t => t[0] === 'url')?.[1];
+            const mime = ev.tags.find(t => t[0] === 'm')?.[1] || '';
+            const thumb = ev.tags.find(t => t[0] === 'thumb' || t[0] === 'image')?.[1];
+            if (url) {
+              return {
+                id: ev.id,
+                url,
+                type: mime.startsWith('video') ? 'video' : 'image',
+                created_at: ev.created_at || 0,
+                originalEvent: ev,
+                thumb
+              };
+            }
+          } else if (ev.kind === 1) {
+            const imgRegex = /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp))/i;
+            const videoRegex = /(https?:\/\/\S+\.(?:mp4|mov|webm))/i;
+            const imgMatch = ev.content.match(imgRegex);
+            if (imgMatch) {
+              return {
+                id: ev.id + '-img',
+                url: imgMatch[0],
+                type: 'image',
+                created_at: ev.created_at || 0,
+                originalEvent: ev
+              };
+            }
+            const vidMatch = ev.content.match(videoRegex);
+            if (vidMatch) {
+              return {
+                id: ev.id + '-vid',
+                url: vidMatch[0],
+                type: 'video',
+                created_at: ev.created_at || 0,
+                originalEvent: ev
+              };
+            }
+          }
+          return null;
+        })();
+
+        if (newItem) {
+          setMediaItems(prev => {
+            if (prev.find(i => i.id === newItem.id)) return prev;
+            const next = [...prev, newItem];
+            return next.sort((a, b) => b.created_at - a.created_at);
+          });
+        }
+      });
+
+      sub.on('eose', () => setMediaLoading(false));
+    };
+
+    startMediaSub();
+    return () => { if (sub) sub.stop(); };
+  }, [ndk, user, viewMode, getFollows]);
+
+  // Blog Subscription
+  useEffect(() => {
+    if (!ndk || !user || viewMode !== 'blog') return;
+    let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
+
+    const start = async () => {
+      const authors = await getFollows();
+      sub = ndk.subscribe({ kinds: [30023], authors, limit: 20 }, { closeOnEose: false });
+      sub.on('event', (ev) => {
+        setBlogEvents(prev => {
+          if (prev.find(e => e.id === ev.id)) return prev;
+          return [...prev, ev].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+        });
+      });
+    };
+    start();
+    return () => { if (sub) sub.stop(); };
+  }, [ndk, user, viewMode, getFollows]);
+
+  // Stream Subscription
+  useEffect(() => {
+    if (!ndk || !user || viewMode !== 'streams') return;
+    let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
+
+    const start = async () => {
+      const authors = await getFollows();
+      // @ts-ignore
+      sub = ndk.subscribe({ kinds: [30311], authors, limit: 20 }, { closeOnEose: false });
+      sub.on('event', (ev) => {
+        setStreamEvents(prev => {
+          if (prev.find(e => e.id === ev.id)) return prev;
+          // Live sort logic
+          const sorted = [...prev, ev].sort((a, b) => {
+            const aStatus = a.tags.find(t => t[0] === 'status')?.[1] || 'ended';
+            const bStatus = b.tags.find(t => t[0] === 'status')?.[1] || 'ended';
+            if (aStatus === 'live' && bStatus !== 'live') return -1;
+            if (bStatus === 'live' && aStatus !== 'live') return 1;
+            return (b.created_at || 0) - (a.created_at || 0);
+          });
+          return sorted;
+        });
+      });
+    };
+    start();
+    return () => { if (sub) sub.stop(); };
+  }, [ndk, user, viewMode, getFollows]);
+
+  // Music Subscription
+  useEffect(() => {
+    if (!ndk || !user || viewMode !== 'music') return;
+    setMusicLoading(true);
+    let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
+
+    const start = async () => {
+      const authors = await getFollows();
+      sub = ndk.subscribe({ kinds: [1], authors, limit: 50 }, { closeOnEose: false });
+
+      sub.on('event', (ev) => {
+        const match = ev.content.match(/https?:\/\/(?:www\.)?wavlake\.com\/(?:track|embed)\/([a-zA-Z0-9-]+)/);
+        if (match) {
+          const url = match[0];
+          const track: MusicTrack = {
+            title: ev.content.replace(url, '').trim().split('\n')[0].substring(0, 50) || 'Untitled',
+            url,
+            link: url,
+            artist: ev.author.profile?.name || 'Unknown'
+          };
+
+          setMusicTracks(prev => {
+            if (prev.find(t => t.url === url)) return prev;
+            return [...prev, track];
+          });
+        }
+      });
+
+      sub.on('eose', () => setMusicLoading(false));
+    };
+    start();
+    return () => { if (sub) sub.stop(); };
+  }, [ndk, user, viewMode, getFollows]);
+
+  // Aux Data Fetcher
+  const fetchAuxData = useCallback(async () => {
+    if (!ndk || !user) return;
+    try {
+      const notificationFilter: NDKFilter = { '#p': [user.pubkey], kinds: [1, 7, 9735], limit: 30 };
+      const notificationEvents = await ndk.fetchEvents(notificationFilter);
+      const sortedNotifications = Array.from(notificationEvents).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      await Promise.allSettled(sortedNotifications.map(async (e) => { try { await e.author.fetchProfile(); } catch { } }));
+      setNotifications(sortedNotifications.filter(n => n.pubkey !== user.pubkey));
+
+      // Stats
+      const statsPromises = [];
+      statsPromises.push(ndk.fetchEvents({ kinds: [3], '#p': [user.pubkey] }).then(s => s.size));
+      statsPromises.push(ndk.fetchEvents({ kinds: [9735], '#p': [user.pubkey] }).then(s => s.size));
+      statsPromises.push(ndk.fetchEvents({ kinds: [1], authors: [user.pubkey] }).then(s => s.size));
+      const [followers, zaps, posts] = await Promise.all(statsPromises);
+      setStats({ followers, zaps, posts });
+    } catch (e) {
+      console.error("Aux data fetch error", e);
     }
   }, [ndk, user]);
 
   useEffect(() => {
-    fetchHomeData();
-  }, [fetchHomeData]);
+    fetchAuxData();
+  }, [fetchAuxData]);
 
   const handlePostStatus = async () => {
     if (!ndk || !status.trim()) return;
@@ -197,7 +399,7 @@ export const HomePage: React.FC = () => {
       }
       await event.publish();
       setStatus('');
-      fetchHomeData(); // Refresh feed
+      fetchAuxData(); // Refresh aux data (feed auto-updates via sub)
     } catch (error) {
       console.error('Error posting status:', error);
     }
@@ -271,7 +473,7 @@ export const HomePage: React.FC = () => {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      setViewMode('photos');
+                      setViewMode('media');
                     }}
                   >
                     Edit
@@ -294,7 +496,7 @@ export const HomePage: React.FC = () => {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      setViewMode('videos');
+                      setViewMode('media');
                     }}
                   >
                     Edit
@@ -419,11 +621,11 @@ export const HomePage: React.FC = () => {
                                 <div className="notification-time">
                                   {n.created_at
                                     ? new Date(n.created_at * 1000).toLocaleDateString([], {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })
                                     : ''}
                                 </div>
                               </div>
@@ -505,19 +707,13 @@ export const HomePage: React.FC = () => {
                     className={viewMode === 'feed' ? 'active' : ''}
                     onClick={() => setViewMode('feed')}
                   >
-                    Stream
+                    Feed
                   </button>
                   <button
-                    className={viewMode === 'photos' ? 'active' : ''}
-                    onClick={() => setViewMode('photos')}
+                    className={viewMode === 'media' ? 'active' : ''}
+                    onClick={() => setViewMode('media')}
                   >
-                    Photos
-                  </button>
-                  <button
-                    className={viewMode === 'videos' ? 'active' : ''}
-                    onClick={() => setViewMode('videos')}
-                  >
-                    Videos
+                    Media
                   </button>
                   <button
                     className={viewMode === 'blog' ? 'active' : ''}
@@ -525,99 +721,168 @@ export const HomePage: React.FC = () => {
                   >
                     Blog
                   </button>
+                  <button
+                    className={viewMode === 'music' ? 'active' : ''}
+                    onClick={() => setViewMode('music')}
+                  >
+                    Music
+                  </button>
+                  <button
+                    className={viewMode === 'streams' ? 'active' : ''}
+                    onClick={() => setViewMode('streams')}
+                  >
+                    Streams
+                  </button>
                 </div>
 
-                {loading && <div style={{ padding: '10px' }}>Loading...</div>}
+                {feedLoading && viewMode === 'feed' && <div style={{ padding: '10px' }}>Loading Feed...</div>}
 
                 {viewMode === 'feed' && (
                   <>
                     {feed.map((event: NDKEvent) => (
                       <FeedItem key={event.id} event={event} />
                     ))}
-                    {!loading && feed.length === 0 && (
+                    {!feedLoading && feed.length === 0 && (
                       <div style={{ padding: '10px' }}>No updates from friends yet.</div>
                     )}
                   </>
                 )}
 
-                {viewMode === 'photos' && (
+                {viewMode === 'media' && (
                   <div className="media-gallery">
-                    {mediaEvents
-                      .filter((e: NDKEvent) =>
-                        e.tags.find((t: string[]) => t[0] === 'm' && t[1].startsWith('image/'))
-                      )
-                      .map((event: NDKEvent) => (
-                        <div key={event.id} className="gallery-item">
+                    {mediaItems.map((item) => (
+                      <div key={item.id} className="gallery-item">
+                        {item.type === 'image' ? (
                           <img
-                            src={event.tags.find((t: string[]) => t[0] === 'url')?.[1]}
-                            alt={event.content}
-                            onClick={() =>
-                              window.open(
-                                event.tags.find((t: string[]) => t[0] === 'url')?.[1] || '',
-                                '_blank'
-                              )
-                            }
+                            src={item.url}
+                            alt=""
+                            loading="lazy"
+                            onClick={() => window.open(item.url, '_blank')}
                           />
-                        </div>
-                      ))}
-                    {!loading &&
-                      mediaEvents.filter((e: NDKEvent) =>
-                        e.tags.find((t: string[]) => t[0] === 'm' && t[1].startsWith('image/'))
-                      ).length === 0 && (
-                        <div style={{ padding: '20px', textAlign: 'center' }}>No photos yet.</div>
-                      )}
-                  </div>
-                )}
-
-                {viewMode === 'videos' && (
-                  <div className="media-gallery">
-                    {mediaEvents
-                      .filter((e: NDKEvent) =>
-                        e.tags.find((t: string[]) => t[0] === 'm' && t[1].startsWith('video/'))
-                      )
-                      .map((event: NDKEvent) => (
-                        <div key={event.id} className="gallery-item">
+                        ) : (
                           <video
-                            src={event.tags.find((t: string[]) => t[0] === 'url')?.[1]}
+                            src={item.url}
                             controls
+                            preload="metadata"
+                            poster={item.thumb}
                           />
-                        </div>
-                      ))}
-                    {!loading &&
-                      mediaEvents.filter((e: NDKEvent) =>
-                        e.tags.find((t: string[]) => t[0] === 'm' && t[1].startsWith('video/'))
-                      ).length === 0 && (
-                        <div style={{ padding: '20px', textAlign: 'center' }}>No videos yet.</div>
-                      )}
+                        )}
+                      </div>
+                    ))}
+                    {mediaLoading && <div style={{ padding: '10px' }}>Loading Media...</div>}
+                    {!mediaLoading && mediaItems.length === 0 && (
+                      <div style={{ padding: '20px', textAlign: 'center' }}>No media found.</div>
+                    )}
                   </div>
                 )}
 
                 {viewMode === 'blog' && (
                   <div className="blog-gallery">
-                    {blogEvents.map((event: NDKEvent) => (
-                      <div key={event.id} className="blog-entry-card">
-                        {event.tags.find((t: string[]) => t[0] === 'image') && (
-                          <img
-                            src={event.tags.find((t: string[]) => t[0] === 'image')?.[1]}
-                            alt=""
-                            className="blog-entry-image"
-                          />
-                        )}
-                        <div className="blog-entry-content">
-                          <h3 className="blog-entry-title">
-                            {event.tags.find((t: string[]) => t[0] === 'title')?.[1]}
-                          </h3>
-                          <p className="blog-entry-summary">
-                            {event.tags.find((t: string[]) => t[0] === 'summary')?.[1]}
-                          </p>
-                          <div className="blog-entry-meta">
-                            {new Date((event.created_at || 0) * 1000).toLocaleDateString()}
+                    {blogEvents.map((event: NDKEvent) => {
+                      const dTag = event.tags.find(t => t[0] === 'd')?.[1];
+                      const title = event.tags.find((t: string[]) => t[0] === 'title')?.[1] || 'Untitled';
+                      const summary = event.tags.find((t: string[]) => t[0] === 'summary')?.[1];
+                      const image = event.tags.find((t: string[]) => t[0] === 'image')?.[1];
+
+                      return (
+                        <div
+                          key={event.id}
+                          className="blog-entry-card"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            if (dTag) navigate(`/blog/${event.pubkey}/${dTag}`);
+                          }}
+                        >
+                          {image && (
+                            <img
+                              src={image}
+                              alt={title}
+                              className="blog-entry-image"
+                            />
+                          )}
+                          <div className="blog-entry-content">
+                            <h3 className="blog-entry-title">
+                              {title}
+                            </h3>
+                            <p className="blog-entry-summary">
+                              {summary}
+                            </p>
+                            <div className="blog-entry-meta">
+                              {new Date((event.created_at || 0) * 1000).toLocaleDateString()}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                    {!loading && blogEvents.length === 0 && (
+                      );
+                    })}
+                    {!feedLoading && blogEvents.length === 0 && (
                       <div style={{ padding: '20px', textAlign: 'center' }}>No blog posts yet.</div>
+                    )}
+                  </div>
+                )}
+
+                {viewMode === 'music' && (
+                  <div className="music-tab-container" style={{ padding: '10px' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '15px' }}>Friend's Mixtape</h3>
+                    {musicLoading && <div style={{ padding: '10px' }}>Loading Mixtape...</div>}
+                    {!musicLoading && musicTracks.length > 0 ? (
+                      <WavlakePlayer
+                        tracks={musicTracks}
+                        autoplay={false}
+                      />
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                        No music found in your circle yet. Post a Wavlake link to start the party!
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {viewMode === 'streams' && (
+                  <div className="streams-tab-container">
+                    <h3 style={{ marginTop: 0, marginBottom: '15px' }}>Live Streams</h3>
+                    {mediaLoading && <div style={{ padding: '10px' }}>Scanning frequencies...</div>}
+                    <div className="media-gallery">
+                      {streamEvents.map((event) => {
+                        const title = event.tags.find(t => t[0] === 'title')?.[1] || 'Untitled Stream';
+                        const status = event.tags.find(t => t[0] === 'status')?.[1] || 'ended';
+                        const image = event.tags.find(t => t[0] === 'image')?.[1] || 'https://via.placeholder.com/300x200?text=No+Preview';
+                        const dTag = event.tags.find(t => t[0] === 'd')?.[1];
+
+                        return (
+                          <div key={event.id} className="gallery-item" style={{ position: 'relative', cursor: 'pointer' }}>
+                            <div style={{
+                              position: 'absolute',
+                              top: 5,
+                              left: 5,
+                              background: status === 'live' ? 'red' : 'gray',
+                              color: 'white',
+                              padding: '2px 5px',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              borderRadius: '3px'
+                            }}>
+                              {status.toUpperCase()}
+                            </div>
+                            <img
+                              src={image}
+                              alt={title}
+                              onClick={() => {
+                                if (dTag) navigate(`/live/${event.pubkey}/${dTag}`);
+                              }}
+                            />
+                            <div style={{ padding: '5px', fontSize: '10px', fontWeight: 'bold' }}>
+                              {title}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {!mediaLoading && streamEvents.length === 0 && (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                        No streams found from people you follow.
+                        <br />
+                        <small>Make sure you are following active streamers!</small>
+                      </div>
                     )}
                   </div>
                 )}
@@ -642,12 +907,12 @@ export const HomePage: React.FC = () => {
         isOpen={isMediaModalOpen}
         type={mediaModalType}
         onClose={() => setIsMediaModalOpen(false)}
-        onUploadComplete={fetchHomeData}
+        onUploadComplete={fetchAuxData}
       />
       <BlogEditor
         isOpen={isBlogModalOpen}
         onClose={() => setIsBlogModalOpen(false)}
-        onPostComplete={fetchHomeData}
+        onPostComplete={fetchAuxData}
       />
     </div>
   );

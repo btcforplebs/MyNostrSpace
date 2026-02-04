@@ -147,15 +147,27 @@ export const FilmPage = () => {
                             <button className="close-modal-btn" onClick={() => setSelectedMovie(null)}>×</button>
                         </div>
                         <div className="film-player-wrapper">
-                            <ReactPlayer
-                                // @ts-expect-error ReactPlayer types are notoriously tricky with strict mode
-                                url={selectedMovie.videoUrl}
-                                className="film-player"
-                                width="100%"
-                                height="100%"
-                                controls
-                                playing
-                            />
+                            {selectedMovie.videoUrl.includes('archive.org') && !selectedMovie.videoUrl.match(/\.(mp4|webm|ogg|m3u8)$/i) ? (
+                                <iframe
+                                    src={selectedMovie.videoUrl.replace('/details/', '/embed/')}
+                                    className="film-player"
+                                    width="100%"
+                                    height="100%"
+                                    frameBorder="0"
+                                    allowFullScreen
+                                    title={selectedMovie.title}
+                                />
+                            ) : (
+                                <ReactPlayer
+                                    // @ts-ignore
+                                    url={selectedMovie.videoUrl}
+                                    className="film-player"
+                                    width="100%"
+                                    height="100%"
+                                    controls
+                                    playing
+                                />
+                            )}
                         </div>
                         <div className="film-details">
                             <p className="film-meta">Event ID: {selectedMovie.id}</p>

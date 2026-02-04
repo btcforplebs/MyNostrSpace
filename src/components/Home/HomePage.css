@@ -532,4 +532,11 @@
   .home-content {
     padding: 10px;
   }
+
+  /* Force 2 columns on mobile for media/streams */
+  .media-gallery {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+    padding: 5px;
+  }
 }

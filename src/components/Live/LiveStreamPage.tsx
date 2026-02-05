@@ -8,22 +8,28 @@ import Hls from 'hls.js';
 import { ChatMessage } from './ChatMessage';
 import './LiveStreamPage.css';
 
+const CONNECTION_TIMEOUT = 10000;
+
 export const LiveStreamPage = () => {
   const { pubkey, identifier } = useParams();
   const dTag = identifier;
   const { ndk, isLoading, user, login } = useNostr();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [streamerProfile, setStreamerProfile] = useState<any>(null);
+  const [streamerProfile, setStreamerProfile] = useState<
+    import('@nostr-dev-kit/ndk').NDKUserProfile | null
+  >(null);
   const [streamEvent, setStreamEvent] = useState<NDKEvent | null>(null);
+  const streamEventRef = useRef<NDKEvent | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<NDKEvent[]>([]);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string>('Initializing...');
   const [chatInput, setChatInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [isZapping, setIsZapping] = useState(false);
+  const [zapInvoice, setZapInvoice] = useState<string | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subRef = useRef<any>(null);
+  const subRef = useRef<import('@nostr-dev-kit/ndk').NDKSubscription | null>(null);
+  const chatWindowRef = useRef<HTMLDivElement>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -35,15 +41,6 @@ export const LiveStreamPage = () => {
     connectionRef.current = false;
     setRetryCount((prev) => prev + 1);
   };
-
-  // Unified settings for all browsers
-  const STREAM_RELAYS = [
-    'wss://relay.zap.stream',
-    'wss://relay.highlighter.com',
-    'wss://relay.damus.io',
-    'wss://nos.lol',
-  ];
-  const CONNECTION_TIMEOUT = 10000;
 
   useEffect(() => {
     if (isLoading || !ndk || !pubkey || !dTag) return;
@@ -59,32 +56,6 @@ export const LiveStreamPage = () => {
       const cleanDTag = dTag.toLowerCase();
 
       setConnectionStatus('Connecting...');
-
-      console.log('Discovery: Ensuring specific relays are connected...', STREAM_RELAYS);
-
-      // Connect to specific relays individually to avoid global connection storms
-      const connectPromises = STREAM_RELAYS.map(async (url) => {
-        try {
-          // Check if relay already exists in pool
-          let relay = ndk.pool.relays.get(url);
-
-          if (!relay) {
-            relay = ndk.addExplicitRelay(url, undefined);
-          }
-
-          if (relay.status !== 1) {
-            // 1 = CONNECTED
-            await relay.connect();
-          }
-          return relay;
-        } catch (e) {
-          console.warn(`Discovery: Failed to connect to ${url}`, e);
-          return null;
-        }
-      });
-
-      // Wait for all attempts to finish
-      await Promise.allSettled(connectPromises);
 
       try {
         // Short wait to ensure socket stability
@@ -124,7 +95,7 @@ export const LiveStreamPage = () => {
 
       // Timeout
       setTimeout(() => {
-        if (isMounted && !streamEvent) {
+        if (isMounted && !streamEventRef.current) {
           setConnectionStatus('Nothing found. Check relays or URL?');
           console.warn('Discovery: Subscription timed out.');
         }
@@ -135,6 +106,7 @@ export const LiveStreamPage = () => {
     const handleStreamEvent = async (event: NDKEvent) => {
       if (!isMounted) return;
       setStreamEvent(event);
+      streamEventRef.current = event;
       setConnectionStatus('Loading broadcast data...');
       const url = event.getMatchingTags('streaming')[0]?.[1];
       setStreamUrl(url || null);
@@ -143,9 +115,9 @@ export const LiveStreamPage = () => {
       const hostPubkey = event.getMatchingTags('p')[0]?.[1] || event.pubkey;
 
       // Fetch streamer profile manually
-      const user = ndk.getUser({ pubkey: hostPubkey });
+      const streamer = ndk.getUser({ pubkey: hostPubkey });
       try {
-        const profile = await user.fetchProfile();
+        const profile = await streamer.fetchProfile();
         if (isMounted) setStreamerProfile(profile);
       } catch (e) {
         console.warn('Failed to fetch profile', e);
@@ -175,15 +147,16 @@ export const LiveStreamPage = () => {
 
     return () => {
       isMounted = false;
-      // We don't reset connectionRef.current here because we want to prevent re-runs on quick unmount/remount in strict mode
-      // unless the actual dependencies changes (which will recreate the effect entirely?)
-      // Actually, in Strict Mode, the effect runs twice on the SAME component instance.
-      // But if the user navigates away and back, we DO want it to run again.
-      // React handles this: new component instance = new ref. Strict mode double-effect = same ref.
-
       if (subRef.current) subRef.current.stop();
     };
   }, [ndk, pubkey, dTag, isLoading, retryCount]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    if (chatWindowRef.current) {
+      chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
 
   const handleSendMessage = async () => {
     if (!ndk || !chatInput.trim() || !pubkey || !dTag) return;
@@ -206,14 +179,111 @@ export const LiveStreamPage = () => {
 
       // Optimistic update handled by subscription mostly, but we can clear input immediately
       setChatInput('');
-
-      // Optional: Add to local state immediately for instant feedback if sub is slow
-      // setChatMessages(prev => [...prev, event]);
     } catch (e) {
       console.error('Failed to send message', e);
       alert('Failed to send message');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleZap = async () => {
+    if (!ndk || !streamEvent) return;
+    if (!user) {
+      login();
+      return;
+    }
+
+    const amount = prompt('Enter amount in sats to zap:', '21');
+    if (!amount) return;
+
+    setIsZapping(true);
+    setZapInvoice(null);
+
+    try {
+      const amountInMSats = parseInt(amount) * 1000;
+      if (isNaN(amountInMSats) || amountInMSats <= 0) {
+        alert('Invalid amount');
+        return;
+      }
+
+      const streamer = ndk.getUser({ pubkey: streamEvent.pubkey });
+      if (!streamer.profile) {
+        await streamer.fetchProfile();
+      }
+
+      const profile = streamer.profile;
+      const lud16 = profile?.lud16 || profile?.lud06;
+
+      if (!lud16) {
+        alert("This user hasn't set up a Lightning address (lud16).");
+        return;
+      }
+
+      // Manual LNURL-Zap Flow
+      let lnurl = '';
+      if (lud16.includes('@')) {
+        const [name, domain] = lud16.split('@');
+        lnurl = `https://${domain}/.well-known/lnurlp/${name}`;
+      } else {
+        lnurl = lud16;
+      }
+
+      const lnurlRes = await fetch(lnurl);
+      const lnurlData = await lnurlRes.json();
+      const callback = lnurlData.callback;
+
+      if (!callback) {
+        throw new Error('No callback found in LNURL data');
+      }
+
+      // Create Zap Request (Kind 9734)
+      const zapRequest = new NDKEvent(ndk);
+      zapRequest.kind = 9734;
+      zapRequest.content = 'Zap from MyNostrSpace';
+      zapRequest.tags = [
+        ['relays', ...ndk.pool.relays.keys()],
+        ['amount', amountInMSats.toString()],
+        ['lnurl', lud16],
+        ['p', streamer.pubkey],
+        ['e', streamEvent.id],
+        ['a', `30311:${streamEvent.pubkey}:${dTag}`],
+        ['client', 'MyNostrSpace'],
+      ];
+
+      await zapRequest.sign();
+      const zapRequestJson = JSON.stringify(zapRequest.rawEvent());
+
+      const cbUrl = new URL(callback);
+      cbUrl.searchParams.append('amount', amountInMSats.toString());
+      cbUrl.searchParams.append('nostr', zapRequestJson);
+      cbUrl.searchParams.append('lnurl', lud16);
+
+      const invoiceRes = await fetch(cbUrl.toString());
+      const invoiceData = await invoiceRes.json();
+
+      if (invoiceData.pr) {
+        setZapInvoice(invoiceData.pr);
+        const nostrWindow = window as unknown as {
+          nostr?: { zap: (pr: string) => Promise<void> };
+        };
+        if (nostrWindow.nostr?.zap) {
+          try {
+            await nostrWindow.nostr.zap(invoiceData.pr);
+            setZapInvoice(null);
+            alert('Zap successful!');
+          } catch (e) {
+            console.log('Auto-zap failed, showing QR', e);
+          }
+        }
+      } else {
+        throw new Error(invoiceData.reason || 'Failed to get invoice');
+      }
+    } catch (error: unknown) {
+      console.error('Zap flow failed:', error);
+      alert(`Zap failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsZapping(false);
     }
   };
 
@@ -245,14 +315,12 @@ export const LiveStreamPage = () => {
       console.log('Using native HLS (Safari)');
       video.src = streamUrl;
 
-      // Safari often needs a listener or a slight delay after setting src
       const handleCanPlay = () => {
         if (isMounted) attemptPlay();
         video.removeEventListener('canplay', handleCanPlay);
       };
 
       video.addEventListener('canplay', handleCanPlay);
-      // Also try immediately in case it's already cached/ready
       if (video.readyState >= 3) {
         attemptPlay();
       }
@@ -265,7 +333,7 @@ export const LiveStreamPage = () => {
       }
 
       const hls = new Hls({
-        debug: false, // Reduced noise
+        debug: false,
       });
 
       hls.loadSource(streamUrl);
@@ -367,7 +435,7 @@ export const LiveStreamPage = () => {
               </Link>
             </div>
             <div className="profile-details">
-              <p>{streamerProfile?.about?.slice(0, 100)}</p>
+              <p>{streamerProfile?.about}</p>
               <div className="online-status">
                 {status === 'live' ? (
                   <span className="status-badge live">ONLINE NOW!</span>
@@ -437,7 +505,7 @@ export const LiveStreamPage = () => {
             <div className="box-header">
               <h2>Live Chat</h2>
             </div>
-            <div className="chat-window">
+            <div className="chat-window" ref={chatWindowRef}>
               {chatMessages.length === 0 ? (
                 <div className="empty-chat">No messages yet. Say hello!</div>
               ) : (
@@ -457,16 +525,94 @@ export const LiveStreamPage = () => {
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                     disabled={sending}
                   />
-                  <button onClick={handleSendMessage} disabled={sending || !chatInput.trim()}>
+                  <button
+                    className="post-button zap-button"
+                    onClick={handleZap}
+                    disabled={isZapping}
+                  >
+                    {isZapping ? '...' : '⚡ Zap'}
+                  </button>
+                  <button
+                    className="post-button"
+                    onClick={handleSendMessage}
+                    disabled={sending || !chatInput.trim()}
+                  >
                     {sending ? '...' : 'Post'}
                   </button>
                 </>
               ) : (
-                <button onClick={() => login()} style={{ width: '100%' }}>
+                <button className="post-button" onClick={() => login()} style={{ width: '100%' }}>
                   Login to Chat
                 </button>
               )}
             </div>
+            {zapInvoice && (
+              <div
+                className="zap-modal"
+                style={{
+                  position: 'fixed',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  background: 'white',
+                  padding: '20px',
+                  border: '1px solid #ccc',
+                  boxShadow: '10px 10px 0px rgba(0,0,0,0.2)',
+                  zIndex: 1000,
+                  textAlign: 'center',
+                  maxWidth: '90vw',
+                  color: 'black',
+                }}
+              >
+                <h3
+                  style={{
+                    margin: '0 0 10px 0',
+                    background: '#ffcc99',
+                    color: '#ff6600',
+                    padding: '5px',
+                  }}
+                >
+                  Scan to Zap
+                </h3>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${zapInvoice}`}
+                  alt="Zap QR Code"
+                  style={{ border: '1px solid #ccc', marginBottom: '10px' }}
+                />
+                <div
+                  style={{
+                    fontSize: '8pt',
+                    marginBottom: '15px',
+                    wordBreak: 'break-all',
+                    maxHeight: '100px',
+                    overflowY: 'auto',
+                    border: '1px solid #ccc',
+                    padding: '5px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <code>{zapInvoice}</code>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(zapInvoice);
+                      alert('Invoice copied!');
+                    }}
+                    className="post-button"
+                  >
+                    Copy
+                  </button>
+                  <button
+                    onClick={() => setZapInvoice(null)}
+                    className="post-button"
+                    style={{ background: '#ccc' }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

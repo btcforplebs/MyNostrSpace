@@ -14,15 +14,9 @@ interface NostrContextType {
   updateRelays: (relays: string[]) => void;
 }
 
-const NostrContext = createContext<NostrContextType | undefined>(undefined);
+import { filterRelays, ALL_INITIAL_RELAYS } from '../utils/relay';
 
-const DEFAULT_RELAYS = [
-  'wss://relay.damus.io',
-  'wss://relay.primal.net',
-  'wss://nos.lol',
-  'wss://relay.snort.social',
-  'wss://purplepag.es',
-];
+const NostrContext = createContext<NostrContextType | undefined>(undefined);
 
 export const NostrProvider = ({ children }: { children: ReactNode }) => {
   const [relays, setRelays] = useState<string[]>(() => {
@@ -30,18 +24,12 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Filter out dead/unreliable relays
-        return parsed.filter(
-          (r: string) =>
-            !r.includes('relayable.org') &&
-            !r.includes('nostr.band') &&
-            !r.includes('search.nos.today')
-        );
+        return filterRelays(parsed);
       } catch (e) {
         console.warn('Failed to parse saved relays', e);
       }
     }
-    return DEFAULT_RELAYS;
+    return ALL_INITIAL_RELAYS;
   });
 
   // We need to keep the NDK instance construction stable or we loop.
@@ -50,7 +38,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
     const cacheAdapter = new NDKCacheAdapterDexie({ dbName: 'mynostrspace-ndk-cache' });
     const n = new NDK({
       explicitRelayUrls: relays,
-      cacheAdapter: cacheAdapter as any,
+      cacheAdapter: cacheAdapter as import('@nostr-dev-kit/ndk').NDKCacheAdapter,
     });
     return n;
   });
@@ -59,7 +47,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const updateRelays = (newRelays: string[]) => {
-    const deduplicated = Array.from(new Set(newRelays.map((r) => r.trim())));
+    const deduplicated = filterRelays(Array.from(new Set(newRelays.map((r) => r.trim()))));
     setRelays(deduplicated);
     localStorage.setItem('mynostrspace_relays', JSON.stringify(deduplicated));
 
@@ -120,8 +108,8 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
         try {
           const extRelays = await window.nostr.getRelays();
           // relays is usually { "url": { read: boolean, write: boolean } }
-          const relayUrls = Object.keys(extRelays);
-          console.log('Found extension relays:', relayUrls);
+          const relayUrls = filterRelays(Object.keys(extRelays));
+          console.log('Found extension relays (filtered):', relayUrls);
           relayUrls.forEach((url) => ndk.addExplicitRelay(url));
         } catch (err) {
           console.warn('Failed to get relays from extension', err);

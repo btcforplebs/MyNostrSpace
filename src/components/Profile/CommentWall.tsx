@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { useNostr } from '../../context/NostrContext';
 import { RichTextRenderer } from '../Shared/RichTextRenderer';
@@ -145,26 +146,25 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
       .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
 
   const renderComment = (comment: NDKEvent, isReply = false) => (
-    <tr key={comment.id} className={isReply ? 'comment-reply-row' : 'comment-row'}>
-      <td className={`comment-author-col ${isReply ? 'reply' : ''}`}>
-        <a
-          href={`/p/${comment.pubkey}`}
-          style={{ fontWeight: 'bold', fontSize: isReply ? '8pt' : '10pt' }}
-        >
-          {comment.author?.profile?.name || comment.pubkey.slice(0, 8)}
-        </a>
-        <br />
-        <Avatar
-          pubkey={comment.pubkey}
-          src={comment.author?.profile?.image}
-          size={isReply ? 30 : 50}
-          className="comment-user-pic"
-          style={{ marginTop: '5px' }}
-        />
-      </td>
-      <td className="comment-content-col">
-        <div className="comment-date">
-          {new Date((comment.created_at || 0) * 1000).toLocaleString()}
+    <div key={comment.id} className={`comment-item ${isReply ? 'comment-reply' : ''}`}>
+      <div className="comment-left">
+        <Link to={`/p/${comment.pubkey}`}>
+          <Avatar
+            pubkey={comment.pubkey}
+            src={comment.author?.profile?.image}
+            size={isReply ? 40 : 60}
+            className="comment-user-pic"
+          />
+        </Link>
+      </div>
+      <div className="comment-right">
+        <div className="comment-header-line">
+          <Link to={`/p/${comment.pubkey}`} className="comment-author-name">
+            {comment.author?.profile?.name || comment.pubkey.slice(0, 8)}
+          </Link>
+          <span className="comment-date">
+            {new Date((comment.created_at || 0) * 1000).toLocaleString()}
+          </span>
         </div>
         <div className="comment-body">
           <RichTextRenderer content={comment.content} />
@@ -198,13 +198,11 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
         {/* Render nested replies */}
         {!isReply && getReplies(comment.id).length > 0 && (
           <div className="nested-replies-container">
-            <table className="comments-table nested">
-              <tbody>{getReplies(comment.id).map((r) => renderComment(r, true))}</tbody>
-            </table>
+            {getReplies(comment.id).map((r) => renderComment(r, true))}
           </div>
         )}
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 
   return (
@@ -223,32 +221,49 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
         </h3>
       </div>
 
-      <div className="comment-form" id="post-comment">
-        {user ? (
-          <>
-            <textarea
-              className="nostr-input"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Leave a comment..."
-            />
-            <button onClick={handlePostTopLevel} disabled={isSubmitting}>
-              {isSubmitting ? 'Posting...' : 'Post Comment'}
-            </button>
-          </>
-        ) : (
-          <div onClick={() => login()} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-            Login to leave a comment
-          </div>
-        )}
+      <div className="comment-form-box">
+        <div className="comment-form-header">Post a Comment</div>
+        <div className="comment-form-body">
+          {user ? (
+            <>
+              <textarea
+                className="nostr-input"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Leave a comment..."
+              />
+              <div style={{ textAlign: 'right' }}>
+                <button
+                  className="post-comment-btn"
+                  onClick={handlePostTopLevel}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Posting...' : 'Post Comment'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div
+              onClick={() => login()}
+              style={{
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                textAlign: 'center',
+                padding: '10px',
+              }}
+            >
+              Login to leave a comment
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="comments-list">
         {loading && comments.length === 0 && <div>Loading comments...</div>}
 
-        <table className="comments-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <tbody>{topLevelComments.map((comment) => renderComment(comment))}</tbody>
-        </table>
+        <div className="comments-items-wrapper">
+          {topLevelComments.map((comment) => renderComment(comment))}
+        </div>
 
         <div style={{ textAlign: 'right', marginTop: '10px', fontSize: '8pt' }}>
           <a

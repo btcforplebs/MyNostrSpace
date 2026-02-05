@@ -6,6 +6,8 @@ import { Navbar } from '../Shared/Navbar';
 import { SEO } from '../Shared/SEO';
 import './LiveStreamPage.css'; // Re-use existing css if appropriate or create new
 
+const PINNED_PUBKEY = 'cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5';
+
 export const LivestreamsPage = () => {
   const { ndk } = useNostr();
   const [liveStreams, setLiveStreams] = useState<NDKEvent[]>([]);
@@ -16,30 +18,10 @@ export const LivestreamsPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subRef = useRef<any>(null);
 
-  // специализированные реле для поиска лайвстримов
-  const DISCOVERY_RELAYS = [
-    'wss://relay.zap.stream',
-    'wss://relay.highlighter.com',
-    'wss://nos.lol',
-    'wss://relay.damus.io',
-    'wss://relay.primal.net',
-    'wss://relay.snort.social',
-    'wss://offchain.pub',
-  ];
-
-  const PINNED_PUBKEY = 'cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5';
-
   useEffect(() => {
     if (!ndk) return;
 
     const startSubscription = async () => {
-      // Add relays but don't wait for them to connect
-      for (const url of DISCOVERY_RELAYS) {
-        if (!ndk.pool.relays.has(url)) {
-          ndk.addExplicitRelay(url);
-        }
-      }
-
       // Start subscription immediately (don't wait for connections)
       const liveStreamSub = ndk.subscribe(
         [
@@ -131,7 +113,7 @@ export const LivestreamsPage = () => {
     return () => {
       if (subRef.current) subRef.current.stop();
     };
-  }, [ndk]);
+  }, [ndk, activeProfiles]);
 
   return (
     <div className="livestreams-page-container">

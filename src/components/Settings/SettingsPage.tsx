@@ -3,6 +3,7 @@ import { useNostr } from '../../context/NostrContext';
 import { Navbar } from '../Shared/Navbar';
 import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk';
 import { getBlossomServers } from '../../services/blossom';
+import { isOnion, APP_RELAYS } from '../../utils/relay';
 
 export const SettingsPage = () => {
   const { relays, updateRelays, ndk, user } = useNostr();
@@ -24,6 +25,11 @@ export const SettingsPage = () => {
       url = 'wss://' + url;
     }
 
+    if (isOnion(url)) {
+      alert('Onion relays are not supported for performance reasons.');
+      return;
+    }
+
     if (relays.includes(url)) {
       alert('Relay already in list');
       return;
@@ -43,8 +49,7 @@ export const SettingsPage = () => {
 
   const handleResetRelays = () => {
     if (confirm('Reset to default relays?')) {
-      const DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://nos.lol'];
-      updateRelays(DEFAULT_RELAYS);
+      updateRelays(APP_RELAYS.DEFAULT);
     }
   };
 

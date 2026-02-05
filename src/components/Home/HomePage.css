@@ -147,6 +147,18 @@
   line-height: 1.4;
 }
 
+.profile-stats-clickable {
+  font-size: 8pt;
+  margin: 10px 0;
+  cursor: pointer;
+  font-weight: bold;
+  text-align: center;
+  background: #f9f9f9;
+  padding: 5px;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
 .quick-links {
   list-style: none;
   padding: 0;
@@ -211,18 +223,19 @@
 
 .status-input {
   width: 100%;
-  height: 30px;
   min-height: 30px;
+  max-height: 80px;
   background-color: white;
-  /* Changed to white */
   color: black;
-  /* Changed to black */
   padding: 5px;
   border: 1px solid #ccc;
   font-size: 9pt;
   box-sizing: border-box;
   margin-bottom: 5px;
   font-family: inherit;
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.4;
 }
 
 .status-controls {
@@ -256,27 +269,40 @@
 }
 
 .feed-container {
-  background-color: #f5f5f5;
+  background: transparent;
+}
+
+.new-posts-banner {
+  background-color: var(--myspace-light-blue);
+  color: #003399;
+  text-align: center;
+  padding: 8px;
+  font-size: 9pt;
+  font-weight: bold;
+  cursor: pointer;
+  border-bottom: 1px solid var(--myspace-blue);
+}
+
+.new-posts-banner:hover {
+  background-color: #a0c4e8;
 }
 
 .feed-item {
   padding: 10px;
-  border-bottom: 1px solid #ccc;
   display: flex;
   gap: 12px;
+  border: 1px solid #b8d4f0;
+  border-left: 3px solid var(--myspace-blue);
+  background: white;
 }
 
 .feed-item:nth-child(even) {
-  background-color: #fcfcfc;
-}
-
-.feed-item:last-child {
-  border-bottom: none;
+  background-color: #f0f5ff;
 }
 
 .feed-user-pic {
-  width: 60px;
-  height: 60px;
+  width: 36px;
+  height: 36px;
   object-fit: cover;
   border: 1px solid #ccc;
 }
@@ -291,7 +317,9 @@
 }
 
 .feed-header-line {
-  margin-bottom: 4px;
+  background: var(--myspace-light-blue);
+  padding: 3px 6px;
+  margin-bottom: 6px;
 }
 
 .feed-user-name {
@@ -338,6 +366,20 @@
 .add-friend-btn {
   color: #003399;
   text-decoration: none;
+}
+
+.interaction-bar {
+  flex-wrap: wrap !important;
+  gap: 4px 8px !important;
+}
+
+.interaction-separator {
+  display: none;
+}
+
+.repost-header,
+.repost-loading {
+  margin-left: 48px;
 }
 
 /* Notifications / Alerts */
@@ -417,35 +459,42 @@
 .view-mode-tabs {
   display: flex;
   background-color: transparent;
-  padding-top: 5px;
+  padding-top: 10px;
   padding-left: 5px;
-  border-bottom: 1px solid #6699cc;
+  border-bottom: 2px solid var(--myspace-blue);
+  gap: 4px;
 }
 
 .view-mode-tabs button {
-  background: #b1d0f0;
-  /* var(--myspace-light-blue) */
+  background: linear-gradient(to bottom, #e8f2fc 0%, #d4e6f8 100%);
   border: 1px solid #6699cc;
   border-bottom: none;
-  padding: 3px 10px;
-  font-size: 9pt;
+  border-radius: 8px 8px 0 0;
+  padding: 8px 20px;
+  font-size: 10pt;
   font-weight: bold;
   cursor: pointer;
   color: #003399;
-  margin-right: 2px;
+  margin-right: 0;
   position: relative;
-  top: 1px;
+  top: 2px;
+  transition: all 0.2s ease;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .view-mode-tabs button:hover {
-  background: #d0e0f0;
+  background: linear-gradient(to bottom, #f0f8ff 0%, #e0f0ff 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 -3px 6px rgba(0, 0, 0, 0.1);
 }
 
 .view-mode-tabs button.active {
   background: white;
-  color: black;
-  border-bottom: 1px solid white;
+  color: #000;
+  border-bottom: 2px solid white;
   z-index: 1;
+  box-shadow: 0 -4px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(0);
 }
 
 /* Media Gallery */
@@ -509,12 +558,17 @@
 
 .blog-entry-content {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .blog-entry-title {
   margin: 0 0 5px 0;
   font-size: 11pt;
   color: #003399;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .blog-entry-summary {
@@ -526,6 +580,8 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .blog-entry-meta {
@@ -533,8 +589,39 @@
   color: #888;
 }
 
+/* Streams List */
+.stream-item {
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid #ccc;
+  border-left: 3px solid var(--myspace-orange);
+  background: #fcfcfc;
+  transition: all 0.2s ease;
+}
+
+.stream-item:hover {
+  border-color: var(--myspace-blue);
+  background: #f0f8ff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stream-item a {
+  color: #003399;
+  font-weight: bold;
+  text-decoration: none;
+  font-size: 10pt;
+}
+
+.stream-item a:hover {
+  text-decoration: underline;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
+  .home-wrapper {
+    box-shadow: none;
+  }
+
   .home-layout {
     grid-template-columns: 1fr;
   }
@@ -551,7 +638,113 @@
   }
 
   .home-content {
-    padding: 10px;
+    padding: 5px;
+    border: none;
+  }
+
+  .my-url-text {
+    word-break: break-all;
+    overflow-wrap: break-word;
+  }
+
+  .status-input-container {
+    padding: 5px;
+  }
+
+  .mood-selector {
+    font-size: 7pt;
+  }
+
+  .mood-selector select {
+    font-size: 7pt;
+    padding: 1px 2px;
+  }
+
+  .view-mode-tabs {
+    padding-left: 0;
+  }
+
+  .view-mode-tabs button {
+    padding: 3px 7px;
+    font-size: 8pt;
+  }
+
+  /* Mobile feed adjustments */
+  .feed-item {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .feed-user-pic {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Compact profile section: avatar left, stats/links right */
+  .user-pic-box .home-box-body {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 8px;
+    text-align: left;
+  }
+
+  .user-pic-box .home-box-body>a {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    align-self: start;
+  }
+
+  .user-pic-box .user-pic {
+    width: 80px !important;
+    height: 80px !important;
+  }
+
+  .user-pic-box .profile-stats-clickable {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+
+  .user-pic-box .profile-stats-clickable>div {
+    gap: 1px !important;
+  }
+
+  .user-pic-box .quick-links {
+    grid-column: 2;
+    grid-row: 2;
+    margin: 0;
+  }
+
+  .user-pic-box .user-bio {
+    grid-column: 1 / -1;
+  }
+
+  /* Mobile interaction bar size tweaks */
+  .interaction-bar {
+    font-size: 8pt !important;
+    margin-top: 6px !important;
+  }
+
+  /* Adjust repost header margin for smaller mobile avatar */
+  .repost-header,
+  .repost-loading {
+    margin-left: 36px;
+  }
+
+  /* Blog gallery mobile */
+  .blog-gallery {
+    padding: 6px;
+    gap: 6px;
+  }
+
+  .blog-entry-card {
+    padding: 8px;
+    gap: 8px;
+    overflow: hidden;
   }
 
   /* Force 2 columns on mobile for media/streams */

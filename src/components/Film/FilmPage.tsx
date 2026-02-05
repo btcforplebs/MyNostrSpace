@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { NDKEvent, NDKFilter } from '@nostr-dev-kit/ndk';
 import NDK from '@nostr-dev-kit/ndk';
 import ReactPlayer from 'react-player';
@@ -20,80 +20,72 @@ interface Movie {
   event: NDKEvent;
 }
 
-const RELAYS = [
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-  'wss://relay.snort.social',
-  'wss://relay.primal.net',
-];
+const cleanVideoUrl = (url: string): string => {
+  try {
+    // eslint-disable-next-line no-control-regex
+    const decoded = decodeURIComponent(url).replace(/\u0000/g, '');
+    return encodeURI(decoded);
+  } catch {
+    console.warn('Failed to clean video URL:', url);
+    return encodeURI(url);
+  }
+};
+
+const parseMovieEvent = (event: NDKEvent): Movie | null => {
+  const content = event.content;
+
+  if (!content.match(/^(.*?)\s*\((\d{4})\)/)) {
+    return null;
+  }
+
+  const lines = content.split('\n');
+  const titleLine = lines[0] || '';
+  const titleMatch = titleLine.match(/^(.*?)\s*\((\d{4})\)/);
+
+  if (!titleMatch) return null;
+
+  const title = titleMatch[1].trim();
+  const year = titleMatch[2];
+
+  let poster = '';
+  const imgMatch = content.match(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp)/i);
+  if (imgMatch) {
+    poster = imgMatch[0];
+  }
+
+  let videoUrl = '';
+  const rTags = event.tags.filter((t) => t[0] === 'r');
+  const videoTag = rTags.find((t) => t[1].endsWith('.mp4') || t[1].includes('archive.org'));
+
+  if (videoTag) {
+    videoUrl = videoTag[1];
+  } else {
+    const vidMatch = content.match(/https?:\/\/\S+\.(?:mp4|m3u8)/i);
+    if (vidMatch) {
+      videoUrl = vidMatch[0];
+    }
+  }
+
+  if (!videoUrl) return null;
+
+  return {
+    id: event.id,
+    title,
+    year,
+    poster,
+    videoUrl: cleanVideoUrl(videoUrl),
+    event,
+  };
+};
 
 export const FilmPage = () => {
-  const { user: loggedInUser } = useNostr();
+  const { ndk: globalNdk, user: loggedInUser } = useNostr();
   const { layoutCss } = useCustomLayout(loggedInUser?.pubkey);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
-  const ndkRef = useRef<NDK | null>(null);
 
-  const cleanVideoUrl = (url: string): string => {
-    try {
-      // eslint-disable-next-line no-control-regex
-      const decoded = decodeURIComponent(url).replace(/\u0000/g, '');
-      return encodeURI(decoded);
-    } catch {
-      console.warn('Failed to clean video URL:', url);
-      return encodeURI(url);
-    }
-  };
-
-  const parseMovieEvent = (event: NDKEvent): Movie | null => {
-    const content = event.content;
-
-    if (!content.match(/^(.*?)\s*\((\d{4})\)/)) {
-      return null;
-    }
-
-    const lines = content.split('\n');
-    const titleLine = lines[0] || '';
-    const titleMatch = titleLine.match(/^(.*?)\s*\((\d{4})\)/);
-
-    if (!titleMatch) return null;
-
-    const title = titleMatch[1].trim();
-    const year = titleMatch[2];
-
-    let poster = '';
-    const imgMatch = content.match(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp)/i);
-    if (imgMatch) {
-      poster = imgMatch[0];
-    }
-
-    let videoUrl = '';
-    const rTags = event.tags.filter((t) => t[0] === 'r');
-    const videoTag = rTags.find((t) => t[1].endsWith('.mp4') || t[1].includes('archive.org'));
-
-    if (videoTag) {
-      videoUrl = videoTag[1];
-    } else {
-      const vidMatch = content.match(/https?:\/\/\S+\.(?:mp4|m3u8)/i);
-      if (vidMatch) {
-        videoUrl = vidMatch[0];
-      }
-    }
-
-    if (!videoUrl) return null;
-
-    return {
-      id: event.id,
-      title,
-      year,
-      poster,
-      videoUrl: cleanVideoUrl(videoUrl),
-      event,
-    };
-  };
-
-  const fetchMovies = (ndk: NDK) => {
+  const fetchMovies = useCallback((ndk: NDK) => {
     const filter: NDKFilter = {
       authors: [MOVIE_PUBKEY],
       kinds: [1], // Text notes containing movie info
@@ -148,20 +140,13 @@ export const FilmPage = () => {
       flushBuffer();
       setLoading(false);
     });
-  };
+  }, []);
 
   useEffect(() => {
-    const initNDK = async () => {
-      const ndk = new NDK({ explicitRelayUrls: RELAYS });
-      ndkRef.current = ndk;
-      await ndk.connect();
-      fetchMovies(ndk);
-    };
-
-    if (!ndkRef.current) {
-      initNDK();
+    if (globalNdk) {
+      fetchMovies(globalNdk);
     }
-  }, []);
+  }, [globalNdk, fetchMovies]);
 
   return (
     <div className="home-page-container fp-page-container">

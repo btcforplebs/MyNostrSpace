@@ -15,6 +15,8 @@ interface SearchResult {
   createdAt?: number;
 }
 
+import { APP_RELAYS } from '../../utils/relay';
+
 export const SearchPage = () => {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
@@ -30,10 +32,7 @@ export const SearchPage = () => {
       setResults([]);
 
       try {
-        const relaySet = NDKRelaySet.fromRelayUrls(
-          ['wss://purplepag.es', 'wss://relay.damus.io', 'wss://nos.lol'],
-          ndk
-        );
+        const relaySet = NDKRelaySet.fromRelayUrls(APP_RELAYS.SEARCH, ndk);
 
         const sub = ndk.subscribe(
           {

@@ -87,8 +87,7 @@ export const BlogEditor: React.FC<BlogEditorProps> = ({ isOpen, onClose, onPostC
     const end = textarea.selectionEnd;
     const selected = content.substring(start, end);
     const text = selected || placeholder;
-    const newContent =
-      content.substring(0, start) + before + text + after + content.substring(end);
+    const newContent = content.substring(0, start) + before + text + after + content.substring(end);
     setContent(newContent);
 
     // Restore cursor position after React re-render
@@ -106,8 +105,7 @@ export const BlogEditor: React.FC<BlogEditorProps> = ({ isOpen, onClose, onPostC
 
     const start = textarea.selectionStart;
     const lineStart = content.lastIndexOf('\n', start - 1) + 1;
-    const newContent =
-      content.substring(0, lineStart) + prefix + content.substring(lineStart);
+    const newContent = content.substring(0, lineStart) + prefix + content.substring(lineStart);
     setContent(newContent);
 
     requestAnimationFrame(() => {
@@ -195,13 +193,25 @@ export const BlogEditor: React.FC<BlogEditorProps> = ({ isOpen, onClose, onPostC
           />
 
           <div className="blog-toolbar">
-            <button type="button" title="Bold" onClick={() => insertMarkdown('**', '**', 'bold text')}>
+            <button
+              type="button"
+              title="Bold"
+              onClick={() => insertMarkdown('**', '**', 'bold text')}
+            >
               <b>B</b>
             </button>
-            <button type="button" title="Italic" onClick={() => insertMarkdown('*', '*', 'italic text')}>
+            <button
+              type="button"
+              title="Italic"
+              onClick={() => insertMarkdown('*', '*', 'italic text')}
+            >
               <i>I</i>
             </button>
-            <button type="button" title="Strikethrough" onClick={() => insertMarkdown('~~', '~~', 'strikethrough')}>
+            <button
+              type="button"
+              title="Strikethrough"
+              onClick={() => insertMarkdown('~~', '~~', 'strikethrough')}
+            >
               <s>S</s>
             </button>
             <span className="toolbar-divider" />
@@ -215,23 +225,39 @@ export const BlogEditor: React.FC<BlogEditorProps> = ({ isOpen, onClose, onPostC
               H3
             </button>
             <span className="toolbar-divider" />
-            <button type="button" title="Link" onClick={() => insertMarkdown('[', '](url)', 'link text')}>
+            <button
+              type="button"
+              title="Link"
+              onClick={() => insertMarkdown('[', '](url)', 'link text')}
+            >
               Link
             </button>
-            <button type="button" title="Image" onClick={() => insertMarkdown('![', '](url)', 'alt text')}>
+            <button
+              type="button"
+              title="Image"
+              onClick={() => insertMarkdown('![', '](url)', 'alt text')}
+            >
               Img
             </button>
             <span className="toolbar-divider" />
             <button type="button" title="Blockquote" onClick={() => insertLine('> ')}>
               Quote
             </button>
-            <button type="button" title="Code Block" onClick={() => insertMarkdown('```\n', '\n```', 'code')}>
+            <button
+              type="button"
+              title="Code Block"
+              onClick={() => insertMarkdown('```\n', '\n```', 'code')}
+            >
               Code
             </button>
             <button type="button" title="Bullet List" onClick={() => insertLine('- ')}>
               List
             </button>
-            <button type="button" title="Horizontal Rule" onClick={() => insertMarkdown('\n---\n', '', '')}>
+            <button
+              type="button"
+              title="Horizontal Rule"
+              onClick={() => insertMarkdown('\n---\n', '', '')}
+            >
               HR
             </button>
             <span className="toolbar-divider" />

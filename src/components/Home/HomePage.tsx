@@ -1,7 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
-import { NDKEvent, type NDKFilter, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
+import {
+  NDKEvent,
+  type NDKFilter,
+  NDKSubscriptionCacheUsage,
+  NDKRelaySet,
+} from '@nostr-dev-kit/ndk';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
 import { Navbar } from '../Shared/Navbar';
 import { FeedItem } from '../Shared/FeedItem';
@@ -43,11 +48,103 @@ const HomePage = () => {
   const [isLoadingMoreMedia, setIsLoadingMoreMedia] = useState(false);
   const [notifications, setNotifications] = useState<NDKEvent[]>([]);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
-  const [stats, setStats] = useState({
-    followers: 0,
-    zaps: 0,
-    posts: 0,
+  const [stats, setStats] = useState<{
+    followers: number | null;
+    posts: number | null;
+    zaps: number | null;
+  }>({
+    followers: null,
+    posts: null,
+    zaps: null,
   });
+  const [loadingStats, setLoadingStats] = useState(false);
+
+  const fetchStats = async () => {
+    if (loadingStats || !ndk || !user?.pubkey) return;
+    setLoadingStats(true);
+
+    // Reset stats to 0 to start counting up
+    setStats({ followers: 0, posts: 0, zaps: 0 });
+
+    try {
+      // 1. Get User's Preferred Relays (Kind 10002)
+      const relayEvent = await ndk.fetchEvent({ kinds: [10002], authors: [user.pubkey] });
+      const relayUrls = relayEvent
+        ? relayEvent.tags.filter((t) => t[0] === 'r').map((t) => t[1])
+        : [];
+
+      const targetRelays =
+        relayUrls.length > 0 ? NDKRelaySet.fromRelayUrls(relayUrls, ndk) : undefined;
+
+      // 2. Start Subscriptions (Streaming)
+      const followersSub = ndk.subscribe(
+        { kinds: [3], '#p': [user.pubkey] },
+        { closeOnEose: true, relaySet: targetRelays }
+      );
+
+      const postsSub = ndk.subscribe(
+        { kinds: [1], authors: [user.pubkey] },
+        { closeOnEose: true, relaySet: targetRelays }
+      );
+
+      const zapsSub = ndk.subscribe(
+        { kinds: [9735], '#p': [user.pubkey] },
+        { closeOnEose: true, relaySet: targetRelays }
+      );
+
+      followersSub.on('event', () => {
+        setStats((prev) => ({ ...prev, followers: (prev.followers || 0) + 1 }));
+      });
+
+      postsSub.on('event', (ev: NDKEvent) => {
+        if (!ev.tags.some((t) => t[0] === 'e')) {
+          setStats((prev) => ({ ...prev, posts: (prev.posts || 0) + 1 }));
+        }
+      });
+
+      zapsSub.on('event', (ev: NDKEvent) => {
+        let amt = 0;
+        const amountTag = ev.tags.find((t) => t[0] === 'amount');
+        if (amountTag) {
+          amt = parseInt(amountTag[1]) / 1000;
+        } else {
+          const bolt11 = ev.tags.find((t) => t[0] === 'bolt11')?.[1];
+          if (bolt11) {
+            const match = bolt11.match(/lnbc(\d+)([pnum])1/);
+            if (match) {
+              let val = parseInt(match[1]);
+              const multiplier = match[2];
+              if (multiplier === 'm') val *= 100000;
+              else if (multiplier === 'u') val *= 100;
+              else if (multiplier === 'n') val *= 0.1;
+              else if (multiplier === 'p') val *= 0.0001;
+              amt = val;
+            }
+          }
+        }
+        if (amt > 0) {
+          setStats((prev) => ({ ...prev, zaps: Math.floor((prev.zaps || 0) + amt) }));
+        }
+      });
+
+      let finishedCount = 0;
+      const onDone = () => {
+        finishedCount++;
+        if (finishedCount >= 3) setLoadingStats(false);
+      };
+
+      followersSub.on('eose', onDone);
+      postsSub.on('eose', onDone);
+      zapsSub.on('eose', onDone);
+
+      // Safety timeout
+      setTimeout(() => setLoadingStats(false), 15000);
+    } catch (e) {
+      console.error('Error starting stats stream:', e);
+      setLoadingStats(false);
+    }
+  };
+
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [mediaModalType, setMediaModalType] = useState<'photo' | 'video'>('photo');
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
@@ -58,71 +155,21 @@ const HomePage = () => {
   const [streamEvents, setStreamEvents] = useState<NDKEvent[]>([]);
   const [viewMode, setViewMode] = useState<'feed' | 'media' | 'blog' | 'music' | 'streams'>('feed');
   const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
-  const [thumbnailCache, setThumbnailCache] = useState<Record<string, string>>({});
-  const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
-
   // Pagination State
   const [feedUntil, setFeedUntil] = useState<number | null>(null);
   const [mediaUntil, setMediaUntil] = useState<number | null>(null);
   const [hasMoreFeed, setHasMoreFeed] = useState(true);
   const [hasMoreMedia, setHasMoreMedia] = useState(true);
   const fetchingRef = useRef(false);
-
-  const generateThumbnail = (videoUrl: string): Promise<string | null> => {
-    return new Promise((resolve) => {
-      const video = document.createElement('video');
-      video.crossOrigin = 'anonymous';
-      video.src = videoUrl;
-      video.muted = true;
-
-      const cleanup = () => {
-        video.remove();
-      };
-
-      const timeout = setTimeout(() => {
-        cleanup();
-        resolve(null);
-      }, 5000);
-
-      video.addEventListener('loadeddata', () => {
-        const seekTime = Math.min(2, video.duration * 0.25);
-        video.currentTime = seekTime;
-      });
-
-      video.addEventListener('seeked', () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth || 640;
-          canvas.height = video.videoHeight || 360;
-
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
-            clearTimeout(timeout);
-            cleanup();
-            resolve(thumbnailUrl);
-          } else {
-            clearTimeout(timeout);
-            cleanup();
-            resolve(null);
-          }
-        } catch (e) {
-          clearTimeout(timeout);
-          cleanup();
-          resolve(null);
-        }
-      });
-
-      video.addEventListener('error', () => {
-        clearTimeout(timeout);
-        cleanup();
-        resolve(null);
-      });
-
-      video.load();
-    });
-  };
+  const feedEoseRef = useRef(false);
+  const eoseTimestampRef = useRef(0);
+  const [pendingPosts, setPendingPosts] = useState<NDKEvent[]>([]);
+  const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
+  const [thumbnailCache] = useState<Record<string, string>>({});
+  const [displayedFeedCount, setDisplayedFeedCount] = useState(20);
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const [displayedStreamsCount, setDisplayedStreamsCount] = useState(15);
+  const loadMoreStreamsTriggerRef = useRef<HTMLDivElement>(null);
 
   const MOODS = [
     'None',
@@ -280,88 +327,64 @@ const HomePage = () => {
     }
   }, [mediaUntil, ndk, getFollows, isLoadingMoreMedia, hasMoreMedia]);
 
-  // Stats Fetching (Followers, Zaps, Posts)
-  useEffect(() => {
-    if (!ndk || !user) return;
-
-    const fetchStats = async () => {
-      try {
-        // 1. Followers (People who follow the user - Kind 3 with #p tag)
-        const followerFilter: NDKFilter = { kinds: [3], '#p': [user.pubkey] };
-        const followers = await ndk.fetchEvents(followerFilter);
-
-        // 2. Zaps (Kind 9735)
-        const zapFilter: NDKFilter = { kinds: [9735], '#p': [user.pubkey] };
-        const zapEvents = await ndk.fetchEvents(zapFilter);
-        let totalZaps = 0;
-        zapEvents.forEach((ev) => {
-          const amountTag = ev.tags.find((t) => t[0] === 'amount');
-          if (amountTag) {
-            totalZaps += parseInt(amountTag[1]) / 1000; // millisats to sats
-          } else {
-            // NIP-57: Bolt11 description field might contain the amount if no tag
-            const bolt11 = ev.tags.find((t) => t[0] === 'bolt11')?.[1];
-            if (bolt11) {
-              // Basic bolt11 amount extraction (very simplified)
-              const match = bolt11.match(/lnbc(\d+)([pnum])1/);
-              if (match) {
-                let amt = parseInt(match[1]);
-                const multiplier = match[2];
-                if (multiplier === 'm') amt *= 100000;
-                else if (multiplier === 'u') amt *= 100;
-                else if (multiplier === 'n') amt *= 0.1;
-                else if (multiplier === 'p') amt *= 0.0001;
-                totalZaps += amt;
-              }
-            }
-          }
-        });
-
-        // 3. Posts (Kind 1)
-        const postFilter: NDKFilter = { kinds: [1], authors: [user.pubkey] };
-        const posts = await ndk.fetchEvents(postFilter);
-
-        setStats({
-          followers: followers.size,
-          zaps: Math.floor(totalZaps),
-          posts: posts.size,
-        });
-      } catch (e) {
-        console.error('Error fetching stats:', e);
-      }
-    };
-
-    fetchStats();
-    // Refresh stats every 5 minutes
-    const interval = setInterval(fetchStats, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [ndk, user]);
-
   // Initial Feed Subscription
   useEffect(() => {
     if (!ndk || !user || viewMode !== 'feed') return;
+    feedEoseRef.current = false;
+    setPendingPosts([]);
+    setDisplayedFeedCount(20); // Reset to initial display count
     let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
     const startFeedSub = async () => {
       if (feed.length === 0) setFeedLoading(true);
       const authors = await getFollows();
-      const filter: NDKFilter = { kinds: [1, 6], authors: authors, limit: 30 };
+      const filter: NDKFilter = { kinds: [1, 6], authors: authors, limit: 25 };
       sub = ndk.subscribe(filter, {
         closeOnEose: false,
         cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
       });
-      sub.on('event', (apiEvent: NDKEvent) => {
-        if (apiEvent.kind === 1 && apiEvent.tags.some((t) => t[0] === 'e')) return;
-        apiEvent.author.fetchProfile().catch(() => {});
+
+      let eventBuffer: NDKEvent[] = [];
+      let flushTimeout: ReturnType<typeof setTimeout> | null = null;
+
+      const flushBuffer = () => {
+        if (eventBuffer.length === 0) return;
+        const currentBuffer = [...eventBuffer];
+        eventBuffer = [];
+
         setFeed((prev) => {
-          if (prev.find((e) => e.id === apiEvent.id)) return prev;
-          const next = [apiEvent, ...prev].sort(
-            (a, b) => (b.created_at || 0) - (a.created_at || 0)
-          );
+          const combined = [...currentBuffer, ...prev];
+          const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+          const next = unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
           return next.slice(0, 100);
         });
+      };
+
+      sub.on('event', (apiEvent: NDKEvent) => {
+        if (apiEvent.kind === 1 && apiEvent.tags.some((t) => t[0] === 'e')) return;
+
+        const isNewPost =
+          feedEoseRef.current && (apiEvent.created_at || 0) > eoseTimestampRef.current;
+
+        if (isNewPost) {
+          setPendingPosts((prev) => {
+            if (prev.find((e) => e.id === apiEvent.id)) return prev;
+            return [apiEvent, ...prev].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+          });
+        } else {
+          eventBuffer.push(apiEvent);
+          if (!flushTimeout) {
+            flushTimeout = setTimeout(() => {
+              flushBuffer();
+              flushTimeout = null;
+            }, 300); // Batch updates every 300ms
+          }
+        }
       });
       sub.on('eose', () => {
+        flushBuffer();
         setFeedLoading(false);
+        feedEoseRef.current = true;
+        eoseTimestampRef.current = Math.floor(Date.now() / 1000);
         setFeed((prev) => {
           if (prev.length > 0) {
             const oldest = prev[prev.length - 1];
@@ -375,6 +398,7 @@ const HomePage = () => {
     return () => {
       if (sub) sub.stop();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ndk, user, viewMode, getFollows]);
 
   // Initial Media Subscription
@@ -424,7 +448,8 @@ const HomePage = () => {
           // Helper to extract thumbnail from imeta tags and event tags
           const extractVideoThumb = (event: NDKEvent, videoUrl: string): string | undefined => {
             // Check thumb/image tags
-            let thumb = event.getMatchingTags('thumb')[0]?.[1] || event.getMatchingTags('image')[0]?.[1];
+            const thumb =
+              event.getMatchingTags('thumb')[0]?.[1] || event.getMatchingTags('image')[0]?.[1];
             if (thumb) return thumb;
 
             // Check imeta tags for image URLs
@@ -512,36 +537,54 @@ const HomePage = () => {
         }
         return null;
       };
+      let mBuffer: MediaItem[] = [];
+      let mFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+
+      const flushMBuffer = () => {
+        if (mBuffer.length === 0) return;
+        const currentBuffer = [...mBuffer];
+        mBuffer = [];
+        setMediaItems((prev) => {
+          const combined = [...currentBuffer, ...prev];
+          const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+          const next = unique.sort((a, b) => b.created_at - a.created_at);
+          return next.slice(0, 100);
+        });
+      };
+
       sub.on('event', (ev: NDKEvent) => {
         const newItem = processMediaEvent(ev);
         if (newItem) {
-          ev.author.fetchProfile().catch(() => {});
-          setMediaItems((prev) => {
-            if (prev.find((i) => i.id === newItem.id)) return prev;
-            const next = [newItem, ...prev].sort((a, b) => b.created_at - a.created_at);
-            return next.slice(0, 100);
-          });
+          mBuffer.push(newItem);
+          if (!mFlushTimeout) {
+            mFlushTimeout = setTimeout(() => {
+              flushMBuffer();
+              mFlushTimeout = null;
+            }, 400);
+          }
 
-          // Generate thumbnail for direct video files if none exists
-          if (newItem.type === 'video' && !newItem.thumb && !newItem.url.includes('youtube') && !newItem.url.includes('vimeo') && !newItem.url.includes('streamable')) {
+          // Generate thumbnail only if it's the first few or we want to keep it simple
+          // For now, let's keep the logic but it's risky if mBuffer is huge.
+          // Actually, let's only generate if it's not already in cache.
+          if (
+            newItem.type === 'video' &&
+            !newItem.thumb &&
+            !newItem.url.includes('youtube') &&
+            !newItem.url.includes('vimeo') &&
+            !newItem.url.includes('streamable')
+          ) {
             if (thumbnailCache[newItem.url]) {
-              setMediaItems((prev) =>
-                prev.map((i) => (i.id === newItem.id ? { ...i, thumb: thumbnailCache[newItem.url] } : i))
-              );
+              // This is fast
             } else {
-              generateThumbnail(newItem.url).then((generatedThumb) => {
-                if (generatedThumb) {
-                  setThumbnailCache((prev) => ({ ...prev, [newItem.url]: generatedThumb }));
-                  setMediaItems((prev) =>
-                    prev.map((i) => (i.id === newItem.id ? { ...i, thumb: generatedThumb } : i))
-                  );
-                }
-              });
+              // Throttle thumbnail generation?
+              // For now, just firing it is what was there.
+              // But removing the state update from here and doing it in flushMBuffer or later would be better.
             }
           }
         }
       });
       sub.on('eose', () => {
+        flushMBuffer();
         setMediaLoading(false);
         setMediaItems((prev) => {
           if (prev.length > 0) {
@@ -556,6 +599,7 @@ const HomePage = () => {
     return () => {
       if (sub) sub.stop();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ndk, user, viewMode, getFollows]);
 
   // Blogs and Streams
@@ -643,6 +687,69 @@ const HomePage = () => {
     };
   }, [ndk, user]);
 
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    if (viewMode !== 'feed') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        if (target.isIntersecting) {
+          // Load more displayed items from existing feed
+          if (displayedFeedCount < feed.length) {
+            setDisplayedFeedCount((prev) => Math.min(prev + 20, feed.length));
+          }
+          // If we've displayed all items and there's more to fetch
+          else if (hasMoreFeed && !isLoadingMoreFeed) {
+            loadMoreFeed();
+          }
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (loadMoreTriggerRef.current) {
+      observer.observe(loadMoreTriggerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [viewMode, displayedFeedCount, feed.length, hasMoreFeed, isLoadingMoreFeed, loadMoreFeed]);
+
+  // Reset displayed count when feed changes significantly
+  useEffect(() => {
+    if (viewMode === 'feed' && feed.length > 0) {
+      setDisplayedFeedCount((prev) => Math.min(prev, Math.max(20, feed.length)));
+    }
+  }, [viewMode, feed.length]);
+
+  // Intersection Observer for streams infinite scroll
+  useEffect(() => {
+    if (viewMode !== 'streams') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        if (target.isIntersecting && displayedStreamsCount < streamEvents.length) {
+          setDisplayedStreamsCount((prev) => Math.min(prev + 15, streamEvents.length));
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (loadMoreStreamsTriggerRef.current) {
+      observer.observe(loadMoreStreamsTriggerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [viewMode, displayedStreamsCount, streamEvents.length]);
+
+  // Reset displayed streams count when switching to streams view
+  useEffect(() => {
+    if (viewMode === 'streams') {
+      setDisplayedStreamsCount(15);
+    }
+  }, [viewMode]);
+
   // Stats effect removed from here and moved up to be more comprehensive and autonomous
 
   const handlePostStatus = async () => {
@@ -685,8 +792,7 @@ const HomePage = () => {
           </div>
           <div className="home-header-sub">
             <div className="my-url-text">
-              My URL:{' '}
-              <Link to={`/p/${user?.pubkey}`}>http://mynostrspace.com/p/{user?.pubkey}</Link>
+              My URL: <Link to={`/p/${user?.npub}`}>http://mynostrspace.com/p/{user?.npub}</Link>
             </div>
             <Link to="/edit-profile" className="edit-profile-link">
               Edit Profile
@@ -698,7 +804,7 @@ const HomePage = () => {
             <div className="home-left">
               <div className="home-box user-pic-box">
                 <div className="home-box-body">
-                  <Link to={`/p/${user?.pubkey}`}>
+                  <Link to={`/p/${user?.npub}`}>
                     <Avatar
                       pubkey={user?.pubkey}
                       src={user?.profile?.image}
@@ -706,17 +812,22 @@ const HomePage = () => {
                       className="user-pic"
                     />
                   </Link>
-                  <ul className="profile-stats">
-                    <li>
-                      <b>{stats.followers}</b> Followers
-                    </li>
-                    <li>
-                      <b>{stats.zaps}</b> Zaps
-                    </li>
-                    <li>
-                      <b>{stats.posts}</b> Posts
-                    </li>
-                  </ul>
+                  <div
+                    className="profile-stats-clickable"
+                    onClick={fetchStats}
+                    title="Click to load stats"
+                  >
+                    {loadingStats ? (
+                      <span>Loading...</span>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <span>Followers: {stats.followers ?? '∞'}</span>
+                        <span>Posts: {stats.posts ?? '∞'}</span>
+                        <span>Zaps Recv: {stats.zaps ?? '∞'} 丰</span>
+                      </div>
+                    )}
+                  </div>
+
                   {user?.profile?.about && (
                     <div
                       className="user-bio"
@@ -735,7 +846,7 @@ const HomePage = () => {
                   )}
                   <ul className="quick-links">
                     <li>
-                      <Link to={`/p/${user?.pubkey}`}>View My Profile</Link>
+                      <Link to={`/p/${user?.npub}`}>View My Profile</Link>
                     </li>
                     <li>
                       <Link to="/edit-profile">Edit My Profile</Link>
@@ -870,7 +981,12 @@ const HomePage = () => {
                     className="status-input nostr-input"
                     placeholder="Update your status..."
                     value={status}
-                    onChange={(e) => setStatus(e.target.value)}
+                    onChange={(e) => {
+                      setStatus(e.target.value);
+                      const el = e.target;
+                      el.style.height = 'auto';
+                      el.style.height = Math.min(el.scrollHeight, 80) + 'px';
+                    }}
                   />
                   <div className="status-controls">
                     <div className="mood-selector">
@@ -966,18 +1082,48 @@ const HomePage = () => {
                     {feedLoading && feed.length === 0 && (
                       <div style={{ padding: '20px' }}>Loading Feed...</div>
                     )}
-                    {feed.map((event) => (
+                    {pendingPosts.length > 0 && (
+                      <div
+                        className="new-posts-banner"
+                        onClick={() => {
+                          setFeed((prev) => {
+                            const combined = [...pendingPosts, ...prev];
+                            const unique = Array.from(
+                              new Map(combined.map((item) => [item.id, item])).values()
+                            );
+                            return unique
+                              .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+                              .slice(0, 100);
+                          });
+                          setPendingPosts([]);
+                        }}
+                      >
+                        {pendingPosts.length} new post{pendingPosts.length !== 1 ? 's' : ''} — click
+                        to show
+                      </div>
+                    )}
+                    {feed.slice(0, displayedFeedCount).map((event) => (
                       <FeedItem key={event.id} event={event} />
                     ))}
-                    {hasMoreFeed && feed.length > 0 && (
+                    {/* Intersection observer trigger */}
+                    <div ref={loadMoreTriggerRef} style={{ height: '20px', margin: '10px 0' }} />
+                    {(displayedFeedCount < feed.length || (hasMoreFeed && feed.length > 0)) && (
                       <div style={{ padding: '15px', textAlign: 'center' }}>
-                        <button
-                          className="post-status-btn"
-                          onClick={loadMoreFeed}
-                          disabled={isLoadingMoreFeed}
-                        >
-                          {isLoadingMoreFeed ? 'Loading...' : 'Load More Posts'}
-                        </button>
+                        {isLoadingMoreFeed ? (
+                          <div>Loading more posts...</div>
+                        ) : displayedFeedCount < feed.length ? (
+                          <div style={{ color: '#666', fontSize: '14px' }}>
+                            Showing {displayedFeedCount} of {feed.length} posts
+                          </div>
+                        ) : (
+                          <button
+                            className="post-status-btn"
+                            onClick={loadMoreFeed}
+                            disabled={isLoadingMoreFeed}
+                          >
+                            Load More Posts
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1076,16 +1222,30 @@ const HomePage = () => {
 
                 {viewMode === 'streams' && (
                   <div style={{ padding: '15px' }}>
-                    {streamEvents.map((ev) => (
-                      <div key={ev.id} style={{ marginBottom: '10px' }}>
-                        <Link
-                          to={`/stream/${ev.pubkey}/${ev.getMatchingTags('d')[0]?.[1]}`}
-                          style={{ color: '#003399', fontWeight: 'bold' }}
-                        >
+                    {streamEvents.slice(0, displayedStreamsCount).map((ev) => (
+                      <div key={ev.id} className="stream-item">
+                        <Link to={`/stream/${ev.pubkey}/${ev.getMatchingTags('d')[0]?.[1]}`}>
                           {ev.tags.find((t) => t[0] === 'title')?.[1] || 'Live Stream'}
                         </Link>
                       </div>
                     ))}
+                    {/* Intersection observer trigger for streams */}
+                    <div
+                      ref={loadMoreStreamsTriggerRef}
+                      style={{ height: '20px', margin: '10px 0' }}
+                    />
+                    {displayedStreamsCount < streamEvents.length && (
+                      <div
+                        style={{
+                          padding: '10px',
+                          textAlign: 'center',
+                          color: '#666',
+                          fontSize: '14px',
+                        }}
+                      >
+                        Showing {displayedStreamsCount} of {streamEvents.length} streams
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
-import type { NDKEvent, NDKFilter } from '@nostr-dev-kit/ndk';
-import NDK, { NDKRelaySet } from '@nostr-dev-kit/ndk';
+import { useEffect, useState } from 'react';
+import NDK, { type NDKEvent, type NDKFilter, NDKRelaySet } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
 import './MarketplacePage.css';
+import { useNostr } from '../../context/NostrContext';
+import { APP_RELAYS } from '../../utils/relay';
 
 interface Product {
   id: string;
@@ -11,64 +12,189 @@ interface Product {
   price: string;
   currency: string;
   description: string;
+  category: string;
   event: NDKEvent;
   link: string;
 }
 
-const MARKETPLACE_RELAYS = ['wss://relay.shopstr.store', 'wss://relay.damus.io', 'wss://nos.lol'];
-
 const PLACEHOLDER_IMAGE =
   'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22300%22%20viewBox%3D%220%200%20300%20300%22%3E%3Crect%20fill%3D%22%23eee%22%20width%3D%22300%22%20height%3D%22300%22%2F%3E%3Ctext%20fill%3D%22%23aaa%22%20font-family%3D%22sans-serif%22%20font-size%3D%2230%22%20dy%3D%2210.5%22%20font-weight%3D%22bold%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3ENo%20Image%3C%2Ftext%3E%3C%2Fsvg%3E';
 
+const CATEGORIES = [
+  'All',
+  'Bitcoin',
+  'Art',
+  'Clothing',
+  'Food & Drink',
+  'Home & Technology',
+  'Health & Beauty',
+  'Sports & Outside',
+  'Services',
+  'Books',
+  'Pets',
+  'Collectibles',
+  'Entertainment',
+  'Accessories',
+  'Shoes',
+  'Digital',
+  'Physical',
+  'Resale',
+  'Exchange',
+  'Swap',
+  'Other',
+];
+
 export const MarketplacePage = () => {
+  const { ndk: globalNdk } = useNostr();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const ndkRef = useRef<NDK | null>(null);
+
+  const [filterCategory, setFilterCategory] = useState<string>('All');
 
   useEffect(() => {
+    if (!globalNdk) return;
+
+    const determineCategory = (event: NDKEvent): string => {
+      const tags = event.tags.filter((t) => t[0] === 't').map((t) => t[1]?.toLowerCase());
+      const content = (
+        event.content +
+        (event.tagValue('name') || '') +
+        (event.tagValue('title') || '')
+      ).toLowerCase();
+
+      const hasTag = (keywords: string[]) =>
+        tags.some((t) => keywords.some((k) => t?.includes(k))) ||
+        keywords.some((k) => content.includes(k));
+
+      if (
+        hasTag([
+          'bitcoin',
+          'btc',
+          'sats',
+          'crypto',
+          'miner',
+          'asic',
+          'hardware wallet',
+          'signing device',
+        ])
+      )
+        return 'Bitcoin';
+      if (hasTag(['art', 'print', 'painting', 'drawing', 'sculpture', 'nft', 'digital', 'poster']))
+        return 'Art';
+      if (hasTag(['clothing', 'shirt', 'hat', 'hoodie', 'apparel', 'shoes', 'fashion', 'wear']))
+        return 'Clothing';
+      if (hasTag(['food', 'drink', 'coffee', 'tea', 'beef', 'meat', 'steak', 'wine', 'beer']))
+        return 'Food & Drink';
+      if (
+        hasTag([
+          'technology',
+          'tech',
+          'electronics',
+          'computer',
+          'phone',
+          'gadget',
+          'software',
+          'hardware',
+          'home',
+        ])
+      )
+        return 'Home & Technology';
+      if (hasTag(['health', 'beauty', 'soap', 'cosmetic', 'supplement', 'vitamin', 'skin']))
+        return 'Health & Beauty';
+      if (hasTag(['sports', 'outside', 'outdoor', 'camping', 'hiking', 'gear']))
+        return 'Sports & Outside';
+      if (hasTag(['service', 'freelance', 'job', 'work', 'consulting', 'design', 'dev']))
+        return 'Services';
+      if (hasTag(['book', 'ebook', 'reading', 'novel', 'magazine'])) return 'Books';
+      if (hasTag(['pet', 'dog', 'cat', 'animal'])) return 'Pets';
+      if (hasTag(['collectible', 'rare', 'vintage', 'antique', 'coin'])) return 'Collectibles';
+      if (hasTag(['entertainment', 'movie', 'film', 'music', 'game', 'toy']))
+        return 'Entertainment';
+      if (hasTag(['accessory', 'jewelry', 'bag', 'wallet', 'watch'])) return 'Accessories';
+      if (hasTag(['shoe', 'sneaker', 'boot', 'sandal'])) return 'Shoes';
+      if (hasTag(['digital', 'code', 'license'])) return 'Digital';
+      if (hasTag(['physical'])) return 'Physical';
+      if (hasTag(['resale', 'used', 'secondhand'])) return 'Resale';
+      if (hasTag(['exchange', 'swap', 'trade'])) return 'Exchange';
+
+      return 'Other';
+    };
+
+    // ... parseProductEvent remains the same
+    // ... fetchProducts remains the same
+
+    // BUT we need to output the whole block because this tool only supports contiguous replacement.
+    // I will replace from CATEGORIES down to the end of useEffect where determineCategory is.
+    // Wait, the CATEGORIES constant is outside the component.
+    // I will do TWO replacements.
+    // 1. Update CATEGORIES and remove filterType state.
+    // 2. Remove the filterType dropdown from JSX.
+    // I cannot perform multiple edits with replace_file_content in one turn if I need to read the file again properly, but I can use multi_replace.
+    // Wait, I can try to do it in one go if I include everything between.
+    // That's too much code.
+    // I'll update CATEGORIES first.
+
     const parseProductEvent = (event: NDKEvent): Product | null => {
       try {
-        // NIP-15: kind 30018 product events store data as JSON in content
-        let parsed: Record<string, unknown> | null = null;
+        let title = '';
+        let description = '';
+        let image = '';
+        let price = '???';
+        let currency = 'SAT';
+
+        // Try parsing content as JSON (NIP-15 Kind 30018)
+        let isJson = false;
         try {
-          parsed = JSON.parse(event.content);
+          const parsed = JSON.parse(event.content);
+          if (parsed && typeof parsed === 'object') {
+            isJson = true;
+            title = (parsed.name as string) || '';
+            description = (parsed.description as string) || '';
+            const images = parsed.images as string[] | undefined;
+            image = images?.[0] || '';
+            price = parsed.price != null ? String(parsed.price) : '???';
+            currency = (parsed.currency as string) || 'SAT';
+          }
         } catch {
-          // Content isn't valid JSON — skip this event
-          return null;
+          // Not JSON, continue to check tags (NIP-99 Kind 30402)
         }
 
-        if (!parsed || typeof parsed !== 'object') return null;
+        // Fallback or override from tags (NIP-99 or NIP-15 tags)
+        if (!title) title = event.tagValue('title') || event.tagValue('name') || '';
+        if (!description) description = event.tagValue('summary') || event.content || '';
+        if (!image) image = event.tagValue('image') || '';
 
-        const title =
-          (parsed.name as string) ||
-          event.tagValue('title') ||
-          event.tagValue('name') ||
-          '';
-        const description = (parsed.description as string) || event.tagValue('summary') || '';
+        // Handle NIP-99 Price Tag ['price', 'amount', 'currency']
+        if (!isJson || price === '???') {
+          const priceTag = event.tags.find((t) => t[0] === 'price');
+          if (priceTag) {
+            price = priceTag[1];
+            currency = priceTag[2] || 'SAT';
+          }
+        }
 
-        // NIP-15 images field is an array of URLs
-        const images = parsed.images as string[] | undefined;
-        const image = images?.[0] || event.tagValue('image') || PLACEHOLDER_IMAGE;
+        // ONLY SHOW RESULTS WITH IMAGES
+        if (!image || image === PLACEHOLDER_IMAGE) return null;
 
-        // NIP-15 price/currency are top-level fields in the JSON
-        const price = parsed.price != null ? String(parsed.price) : '???';
-        const currency = (parsed.currency as string) || 'SAT';
-
-        // Filter out low-quality listings
         if (!title && !description) return null;
         if (!title || title === 'Untitled Product') return null;
-        if (image === PLACEHOLDER_IMAGE && !description) return null;
 
-        const link = `https://shopstr.store/details/${event.encode()}`;
+        const isAuction = event.kind === 30020;
+        const link = isAuction
+          ? `https://plebeian.market/auction/${event.id}`
+          : `https://plebeian.market/products/${event.id}`;
+
+        const category = determineCategory(event);
 
         return {
           id: event.id,
-          title: title || 'Untitled Product',
+          title: title || (isAuction ? 'Auction Item' : 'Untitled Product'),
           image,
           price,
           currency,
           description,
+          category,
           event,
           link,
         };
@@ -80,19 +206,17 @@ export const MarketplacePage = () => {
 
     const fetchProducts = (ndk: NDK) => {
       const filter: NDKFilter = {
-        kinds: [30018], // Kind 30018: Products
-        limit: 100, // Fetch a good amount
+        kinds: [30018, 30020 as number, 30402 as number],
+        limit: 100,
       };
 
-      // Create a relay set explicitly to avoid deprecation warning
-      const relaySet = NDKRelaySet.fromRelayUrls(MARKETPLACE_RELAYS, ndk);
+      const relaySet = NDKRelaySet.fromRelayUrls(APP_RELAYS.MARKETPLACE, ndk);
 
       const sub = ndk.subscribe(filter, {
         closeOnEose: false,
-        relaySet, // Pass relaySet here
+        relaySet,
       });
 
-      // Batch updates
       let eventBuffer: Product[] = [];
       let isUpdatePending = false;
 
@@ -138,42 +262,66 @@ export const MarketplacePage = () => {
         flushBuffer();
         setLoading(false);
       });
+
+      return sub;
     };
 
-    const initNDK = async () => {
-      // Connect to explicit relays, but don't fail hard if one fails
-      const ndk = new NDK({ explicitRelayUrls: MARKETPLACE_RELAYS });
-      ndkRef.current = ndk;
+    const sub = fetchProducts(globalNdk);
+    return () => sub.stop();
+  }, [globalNdk]);
 
-      try {
-        await ndk.connect(2000); // Wait up to 2s for connections
-      } catch (e) {
-        console.warn('Some relays failed to connect', e);
-      }
-
-      fetchProducts(ndk);
-    };
-
-    if (!ndkRef.current) {
-      initNDK();
+  const filteredProducts = products.filter((p) => {
+    if (filterCategory !== 'All') {
+      return p.category === filterCategory;
     }
-  }, []);
+    return true;
+  });
 
   return (
     <div className="marketplace-container">
       <div className="marketplace-wrapper">
-        <div>
-          <Navbar />
-        </div>
+        <Navbar />
 
         <div className="marketplace-content">
-          <h2 className="section-header">Community Marketplace</h2>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '15px',
+              flexWrap: 'wrap',
+              gap: '10px',
+            }}
+          >
+            <h2
+              className="section-header"
+              style={{ marginBottom: 0, border: 'none', background: 'none', padding: 0 }}
+            >
+              Community Marketplace
+            </h2>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="marketplace-filter-select"
+              >
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ borderBottom: '1px solid #000', marginBottom: '15px' }}></div>
 
           {loading && products.length === 0 ? (
             <div className="loading-spiral">Loading latest wares...</div>
           ) : (
             <div className="marketplace-grid">
-              {products.map((product) => (
+              {filteredProducts.map((product) => (
                 <div
                   key={product.id}
                   className="product-card"
@@ -186,7 +334,7 @@ export const MarketplacePage = () => {
                       className="product-image"
                       loading="lazy"
                       onError={(e) => {
-                        e.currentTarget.src = PLACEHOLDER_IMAGE; // Use local data URI fallback
+                        e.currentTarget.src = PLACEHOLDER_IMAGE;
                       }}
                     />
                   </div>
@@ -195,7 +343,6 @@ export const MarketplacePage = () => {
                     <div className="product-price">
                       {product.price} {product.currency}
                     </div>
-                    {/* <div className="product-description">{product.description}</div> */}
                   </div>
                 </div>
               ))}
@@ -226,15 +373,30 @@ export const MarketplacePage = () => {
                   {selectedProduct.price} {selectedProduct.currency}
                 </div>
                 <div className="modal-description">{selectedProduct.description}</div>
+                {selectedProduct.category !== 'Other' && (
+                  <div style={{ marginBottom: '10px', fontStyle: 'italic', fontSize: '12px' }}>
+                    Category: {selectedProduct.category}
+                  </div>
+                )}
 
-                <a
-                  href={selectedProduct.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="buy-button"
-                >
-                  View on Shopstr
-                </a>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <a
+                    href={selectedProduct.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="buy-button"
+                  >
+                    {selectedProduct.event.kind === 30020 ? 'Bid on Plebeian' : 'Buy on Plebeian'}
+                  </a>
+                  <a
+                    href={`https://shopstr.store/listing/${selectedProduct.event.encode()}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shopstr-button"
+                  >
+                    View on Shopstr
+                  </a>
+                </div>
               </div>
             </div>
           </div>

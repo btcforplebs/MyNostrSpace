@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { RichTextRenderer } from './RichTextRenderer';
 
@@ -9,6 +10,7 @@ interface EmbeddedNoteProps {
 
 export const EmbeddedNote = ({ id }: EmbeddedNoteProps) => {
   const { ndk } = useNostr();
+  const navigate = useNavigate();
   const [event, setEvent] = useState<NDKEvent | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -70,9 +72,16 @@ export const EmbeddedNote = ({ id }: EmbeddedNoteProps) => {
       </div>
     );
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking a link inside the embedded content
+    if ((e.target as HTMLElement).closest('a')) return;
+    navigate(`/thread/${event.id}`);
+  };
+
   return (
     <div
       className="embedded-note"
+      onClick={handleClick}
       style={{
         border: '1px solid #6699cc',
         background: '#fff',
@@ -82,10 +91,17 @@ export const EmbeddedNote = ({ id }: EmbeddedNoteProps) => {
         borderRadius: '0',
         maxWidth: '100%',
         textAlign: 'left',
+        cursor: 'pointer',
       }}
     >
       <div
-        style={{ fontWeight: 'bold', fontSize: '0.85em', marginBottom: '8px', color: '#003399' }}
+        style={{
+          fontWeight: 'bold',
+          fontSize: '0.85em',
+          marginBottom: '8px',
+          color: '#003399',
+          textDecoration: 'underline',
+        }}
       >
         {event.author.profile?.name || event.author.pubkey.slice(0, 8)} said:
       </div>

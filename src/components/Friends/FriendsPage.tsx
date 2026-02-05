@@ -105,13 +105,13 @@ const FriendsPage = () => {
               >
                 <div style={{ marginBottom: 5 }}>
                   <Link
-                    to={`/p/${friend.profile?.nip05 || friend.profile?.name || friend.pubkey}`}
+                    to={`/p/${friend.npub}`}
                     style={{ fontWeight: 'bold', textDecoration: 'none' }}
                   >
                     {friend.profile?.displayName || friend.profile?.name || 'Friend'}
                   </Link>
                 </div>
-                <Link to={`/p/${friend.profile?.nip05 || friend.profile?.name || friend.pubkey}`}>
+                <Link to={`/p/${friend.npub}`}>
                   <Avatar
                     pubkey={friend.pubkey}
                     src={friend.profile?.image}

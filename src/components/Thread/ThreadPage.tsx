@@ -61,7 +61,15 @@ export const ThreadPage = () => {
       <Navbar />
       <div className="thread-content">
         <div style={{ marginBottom: '10px' }}>
-          <Link to="/" style={{ color: '#003399', fontSize: '9pt', fontWeight: 'bold' }}>
+          <Link
+            to="/"
+            style={{
+              color: '#003399',
+              fontSize: '9pt',
+              fontWeight: 'bold',
+              textDecoration: 'none',
+            }}
+          >
             &laquo; Back to Home
           </Link>
         </div>

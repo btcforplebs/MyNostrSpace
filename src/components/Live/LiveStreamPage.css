@@ -1,5 +1,24 @@
 .myspace-container {
   background-color: #e5e5e5;
+  color: #000;
+}
+
+.myspace-container * {
+  color: #000;
+}
+
+/* Override some specific elements that SHOULD be white */
+.myspace-container .status-badge,
+.myspace-container .post-button,
+.myspace-container .skeleton-spinner {
+  color: white;
+}
+
+.myspace-container a {
+  color: #003399;
+}
+
+.myspace-container {
   min-height: 100vh;
   font-family: Arial, Helvetica, sans-serif;
   display: flex;
@@ -107,6 +126,17 @@
   font-size: 1.1rem;
 }
 
+.zap-button {
+  background-color: #ffcc99 !important;
+  color: #ff6600 !important;
+  margin-right: 5px;
+  font-weight: bold;
+}
+
+.zap-button:hover {
+  background-color: #ffb366 !important;
+}
+
 /* Video Player */
 .video-player-wrapper {
   width: 100%;
@@ -170,6 +200,30 @@
   padding: 5px;
 }
 
+.chat-input-area button,
+.post-button {
+  background-color: #6699cc;
+  color: white;
+  border: 1px solid black;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-family: verdana, arial, sans-serif;
+  font-size: 9pt;
+  font-weight: bold;
+}
+
+.chat-input-area button:hover,
+.post-button:hover {
+  background-color: #537ca5;
+}
+
+.chat-input-area button:disabled,
+.post-button:disabled {
+  background-color: #ccc;
+  color: #666;
+  cursor: not-allowed;
+}
+
 .myspace-footer {
   text-align: center;
   padding: 20px;
@@ -231,26 +285,78 @@
 
   .col-left {
     width: 100%;
-    order: 2;
-    /* Profile below content */
+    order: 1;
+    /* Profile on top */
+    margin-bottom: 20px;
   }
 
   .col-right {
     width: 100%;
-    order: 1;
-    /* Video/Chat on top */
+    order: 2;
+    /* Video/Chat below */
   }
 
-  /* Video on top of chat is already default flow of col-right */
+  .profile-box {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    text-align: left;
+    gap: 15px;
+    padding: 15px;
+    background: #f8f8f8;
+    border: 1px solid #6699cc;
+    box-sizing: border-box;
+  }
+
+  .profile-box h3 {
+    width: 100%;
+    margin: 0 0 10px 0;
+    font-size: 1.2rem;
+    color: #ff6600;
+  }
+
+  .profile-pic {
+    width: 60px;
+    /* Smaller pic as requested */
+    flex-shrink: 0;
+  }
+
+  .profile-pic img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border: 1px solid black;
+    border-radius: 4px;
+  }
+
+  .profile-details {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .profile-details p {
+    margin: 0 0 8px 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #333;
+  }
+
+  .online-status {
+    display: inline-block;
+  }
+
+  .status-badge {
+    margin: 5px 0;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+  }
 
   .video-player-wrapper {
     max-height: 60vh;
-    /* Allow smaller height on mobile */
   }
 
   .chat-window {
-    height: 250px;
-    /* Slightly smaller chat on mobile */
+    height: 300px;
   }
 
   .myspace-footer {

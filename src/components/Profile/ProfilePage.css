@@ -184,7 +184,19 @@ h3,
   display: grid;
   grid-template-columns: 1fr 1fr;
   /* Force 2 columns */
-  gap: 2px;
+  gap: 5px;
+  padding: 5px 0;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8pt;
+}
+
+.contact-item a {
+  font-weight: bold;
 }
 
 /* Mobile Responsiveness */
@@ -206,4 +218,37 @@ h3,
     padding-bottom: 50px;
     /* Extra padding for mobile scroll */
   }
+
+  /* Compact profile section for mobile */
+  .profile-details-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 15px;
+    align-items: start;
+    text-align: left;
+  }
+
+  .profile-pic {
+    width: 140px !important;
+    height: 140px !important;
+    margin-bottom: 0;
+  }
+
+  .profile-text-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  /* Adjust internal text spacing on mobile */
+  .personal-text p {
+    margin: 2px 0;
+  }
+}
+
+.profile-details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }

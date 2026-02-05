@@ -43,11 +43,14 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event }) => {
     if (event.kind === 6 && ndk && !repostEvent) {
       const targetId = event.tags.find((t) => t[0] === 'e')?.[1];
       if (!targetId) return;
-      ndk.fetchEvent(targetId).then((ev) => {
-        if (ev) setRepostEvent(ev);
-      }).catch((error) => {
-        console.error('Failed to fetch reposted event:', error);
-      });
+      ndk
+        .fetchEvent(targetId)
+        .then((ev) => {
+          if (ev) setRepostEvent(ev);
+        })
+        .catch((error) => {
+          console.error('Failed to fetch reposted event:', error);
+        });
     }
   }, [event, ndk, repostEvent]);
 
@@ -137,13 +140,13 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event }) => {
     return (
       <div className="feed-item repost-item" style={{ flexDirection: 'column', gap: '5px' }}>
         <div
+          className="repost-header"
           style={{
             fontSize: '8pt',
             color: '#666',
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            marginLeft: '60px',
           }}
         >
           <span style={{ fontSize: '10pt' }}>🔄</span>
@@ -159,8 +162,8 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event }) => {
           <FeedItem event={repostEvent} />
         ) : (
           <div
+            className="repost-loading"
             style={{
-              marginLeft: '60px',
               padding: '10px',
               fontSize: '9pt',
               fontStyle: 'italic',

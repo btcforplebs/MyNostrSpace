@@ -31,31 +31,6 @@ export const LandingPage = () => {
     let isMounted = true;
 
     const startSubscription = async () => {
-      // Specialized discovery relays
-      const DISCOVERY_RELAYS = [
-        'wss://relay.zap.stream',
-        'wss://relay.highlighter.com',
-        'wss://nos.lol',
-        'wss://relay.damus.io',
-        'wss://relay.primal.net',
-        'wss://relay.snort.social',
-        'wss://offchain.pub',
-        'wss://purplepag.es',
-      ];
-
-      // Connect to discovery relays explicitly
-      for (const url of DISCOVERY_RELAYS) {
-        if (!ndk.pool.relays.has(url)) {
-          ndk.addExplicitRelay(url);
-        }
-      }
-
-      try {
-        await ndk.connect(5000);
-      } catch {
-        console.warn('NDK connection timeout on landing');
-      }
-
       if (!isMounted) return;
 
       // Subscribe to recent notes (Kind 1)
@@ -258,7 +233,7 @@ export const LandingPage = () => {
 
     const timeout = setTimeout(fetchProfiles, 500);
     return () => clearTimeout(timeout);
-  }, [ndk, articles.length, globalEvents.length]);
+  }, [ndk, articles, globalEvents, activeProfiles]);
 
   useEffect(() => {
     fetch('https://wavlake.com/api/v1/content/rankings?sort=sats&days=7')

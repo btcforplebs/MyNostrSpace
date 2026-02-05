@@ -116,24 +116,6 @@ export const ContactBox = ({ name, pubkey }: ContactBoxProps) => {
           </a>
         </div>
       </div>
-
-      <style>{`
-                .contact-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 5px;
-                    padding: 5px 0;
-                }
-                .contact-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 5px;
-                    font-size: 8pt;
-                }
-                .contact-item a {
-                    font-weight: bold;
-                }
-            `}</style>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { type NDKFilter, NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
@@ -17,17 +17,6 @@ interface VideoFile {
   authorName?: string;
   created_at: number;
 }
-
-const MEDIA_RELAYS = [
-  'wss://relay.satellite.earth', // Good for media
-  'wss://nos.lol',
-  'wss://relay.damus.io',
-  'wss://relay.primal.net',
-  'wss://relay.snort.social',
-  'wss://nostr.wine', // Often has media content
-  'wss://relay.nostr.band', // Good indexing
-  'wss://nostr-pub.wellorder.net',
-];
 
 const BLOCKED_KEYWORDS = [
   'xxx',
@@ -96,7 +85,7 @@ export const VideosPage = () => {
             cleanup();
             resolve(null);
           }
-        } catch (e) {
+        } catch {
           clearTimeout(timeout);
           cleanup();
           resolve(null);
@@ -134,7 +123,7 @@ export const VideosPage = () => {
     return false;
   };
 
-  const processBuffer = () => {
+  const processBuffer = useCallback(() => {
     if (videoBufferRef.current.length === 0) return;
 
     setVideos((prev) => {
@@ -154,219 +143,215 @@ export const VideosPage = () => {
       if (!changed) return prev;
       return next.sort((a, b) => b.created_at - a.created_at);
     });
-  };
+  }, []);
 
-  const handleEvent = (event: NDKEvent) => {
-    if (checkIsNSFW(event)) return;
+  const handleEvent = useCallback(
+    (event: NDKEvent) => {
+      if (checkIsNSFW(event)) return;
 
-    let url: string | undefined;
-    let mime = 'video/mp4';
-    let title = '';
-    let thumbnail: string | undefined;
+      let url: string | undefined;
+      let mime = 'video/mp4';
+      let title = '';
+      let thumbnail: string | undefined;
 
-    if (event.kind === 1) {
-      const content = event.content;
-      const imetaTags = event.getMatchingTags('imeta');
-
-      for (const tag of imetaTags) {
-        let tagUrl: string | undefined;
-        let tagMime: string | undefined;
-        for (let i = 1; i < tag.length; i++) {
-          const part = tag[i];
-          if (part === 'url') tagUrl = tag[i + 1];
-          else if (part.startsWith('url ')) tagUrl = part.slice(4);
-          else if (part === 'm') tagMime = tag[i + 1];
-          else if (part.startsWith('m ')) tagMime = part.slice(2);
-        }
-        if (tagUrl && tagMime?.startsWith('video/') && !tagUrl.includes('.m3u8')) {
-          url = tagUrl;
-          mime = tagMime;
-          break;
-        }
-      }
-
-      if (!url) {
-        // Improved video link matching - catch more formats and hosting sites
+      if (event.kind === 1) {
         const content = event.content;
+        const imetaTags = event.getMatchingTags('imeta');
 
-        // Check for direct video file links
-        const videoFileMatch = content.match(
-          /https?:\/\/[^\s]+\.(mp4|mov|webm|ogv|avi|mkv|m3u8)(\?[^\s]*)?/i
-        );
-        if (videoFileMatch) {
-          url = videoFileMatch[0];
-          const ext = videoFileMatch[1].toLowerCase();
-          mime = `video/${ext === 'ogv' ? 'ogg' : ext === 'm3u8' ? 'mpegurl' : ext}`;
+        for (const tag of imetaTags) {
+          let tagUrl: string | undefined;
+          let tagMime: string | undefined;
+          for (let i = 1; i < tag.length; i++) {
+            const part = tag[i];
+            if (part === 'url') tagUrl = tag[i + 1];
+            else if (part.startsWith('url ')) tagUrl = part.slice(4);
+            else if (part === 'm') tagMime = tag[i + 1];
+            else if (part.startsWith('m ')) tagMime = part.slice(2);
+          }
+          if (tagUrl && tagMime?.startsWith('video/') && !tagUrl.includes('.m3u8')) {
+            url = tagUrl;
+            mime = tagMime;
+            break;
+          }
         }
 
-        // Check for video hosting platforms
         if (!url) {
-          // YouTube
-          const youtubeMatch = content.match(
-            /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
+          // Improved video link matching - catch more formats and hosting sites
+          const content = event.content;
+
+          // Check for direct video file links
+          const videoFileMatch = content.match(
+            /https?:\/\/[^\s]+\.(mp4|mov|webm|ogv|avi|mkv|m3u8)(\?[^\s]*)?/i
           );
-          if (youtubeMatch) {
-            url = `https://www.youtube.com/watch?v=${youtubeMatch[1]}`;
-            mime = 'video/youtube';
-            // Generate YouTube thumbnail
-            thumbnail = `https://img.youtube.com/vi/${youtubeMatch[1]}/maxresdefault.jpg`;
+          if (videoFileMatch) {
+            url = videoFileMatch[0];
+            const ext = videoFileMatch[1].toLowerCase();
+            mime = `video/${ext === 'ogv' ? 'ogg' : ext === 'm3u8' ? 'mpegurl' : ext}`;
+          }
+
+          // Check for video hosting platforms
+          if (!url) {
+            // YouTube
+            const youtubeMatch = content.match(
+              /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
+            );
+            if (youtubeMatch) {
+              url = `https://www.youtube.com/watch?v=${youtubeMatch[1]}`;
+              mime = 'video/youtube';
+              // Generate YouTube thumbnail
+              thumbnail = `https://img.youtube.com/vi/${youtubeMatch[1]}/maxresdefault.jpg`;
+            }
+          }
+
+          if (!url) {
+            // Vimeo
+            const vimeoMatch = content.match(/vimeo\.com\/(\d+)/);
+            if (vimeoMatch) {
+              url = `https://vimeo.com/${vimeoMatch[1]}`;
+              mime = 'video/vimeo';
+            }
+          }
+
+          if (!url) {
+            // Streamable
+            const streamableMatch = content.match(/streamable\.com\/([a-zA-Z0-9]+)/);
+            if (streamableMatch) {
+              url = `https://streamable.com/${streamableMatch[1]}`;
+              mime = 'video/streamable';
+            }
           }
         }
 
-        if (!url) {
-          // Vimeo
-          const vimeoMatch = content.match(/vimeo\.com\/(\d+)/);
-          if (vimeoMatch) {
-            url = `https://vimeo.com/${vimeoMatch[1]}`;
-            mime = 'video/vimeo';
+        if (url) {
+          // Track that we actually found a valid video event
+          if (loadingMore) {
+            loadTrackerRef.current++;
           }
-        }
+          // IMPROVED TITLE PARSING: filter out lines that are just URLs or nostr: links
+          const lines = content
+            .split('\n')
+            .map((l) => l.trim())
+            .filter(
+              (l) =>
+                l.length > 0 &&
+                !l.startsWith('http') &&
+                !l.startsWith('ws') &&
+                !l.startsWith('nostr:')
+            );
 
-        if (!url) {
-          // Streamable
-          const streamableMatch = content.match(/streamable\.com\/([a-zA-Z0-9]+)/);
-          if (streamableMatch) {
-            url = `https://streamable.com/${streamableMatch[1]}`;
-            mime = 'video/streamable';
+          title = lines[0]?.length > 100 ? lines[0].slice(0, 100) + '...' : lines[0];
+          if (!title) title = 'Video Post';
+
+          // Improved thumbnail extraction - only if not already set (e.g., from YouTube)
+          if (!thumbnail) {
+            thumbnail =
+              event.getMatchingTags('thumb')[0]?.[1] || event.getMatchingTags('image')[0]?.[1];
           }
+
+          if (!thumbnail) {
+            for (const tag of imetaTags) {
+              let tagUrl: string | undefined;
+              let tagMime: string | undefined;
+              for (let i = 1; i < tag.length; i++) {
+                const part = tag[i];
+                if (part === 'url') tagUrl = tag[i + 1];
+                else if (part.startsWith('url ')) tagUrl = part.slice(4);
+                else if (part === 'm') tagMime = tag[i + 1];
+                else if (part.startsWith('m ')) tagMime = part.slice(2);
+              }
+              if (tagUrl && tagMime?.startsWith('image/')) {
+                thumbnail = tagUrl;
+                break;
+              }
+            }
+          }
+
+          // Fallback: extract any image URL from content
+          if (!thumbnail) {
+            const imgMatches = content.match(
+              /https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)(\?[^\s]*)?/gi
+            );
+            if (imgMatches) {
+              thumbnail = imgMatches.find((m) => m !== url);
+            }
+          }
+        } else {
+          return;
         }
       }
 
       if (url) {
-        // Track that we actually found a valid video event
-        if (loadingMore) {
-          loadTrackerRef.current++;
-        }
-        // IMPROVED TITLE PARSING: filter out lines that are just URLs or nostr: links
-        const lines = content
-          .split('\n')
-          .map((l) => l.trim())
-          .filter(
-            (l) =>
-              l.length > 0 &&
-              !l.startsWith('http') &&
-              !l.startsWith('ws') &&
-              !l.startsWith('nostr:')
-          );
+        const video: VideoFile = {
+          id: event.id,
+          pubkey: event.pubkey,
+          url,
+          title: title || 'Untitled Video',
+          mime,
+          thumbnail: thumbnail,
+          created_at: event.created_at || 0,
+        };
 
-        title = lines[0]?.length > 100 ? lines[0].slice(0, 100) + '...' : lines[0];
-        if (!title) title = 'Video Post';
-
-        // Improved thumbnail extraction - only if not already set (e.g., from YouTube)
-        if (!thumbnail) {
-          thumbnail =
-            event.getMatchingTags('thumb')[0]?.[1] || event.getMatchingTags('image')[0]?.[1];
+        videoBufferRef.current.push(video);
+        if (!isUpdatePendingRef.current) {
+          isUpdatePendingRef.current = true;
+          setTimeout(processBuffer, 300);
         }
 
-        if (!thumbnail) {
-          for (const tag of imetaTags) {
-            let tagUrl: string | undefined;
-            let tagMime: string | undefined;
-            for (let i = 1; i < tag.length; i++) {
-              const part = tag[i];
-              if (part === 'url') tagUrl = tag[i + 1];
-              else if (part.startsWith('url ')) tagUrl = part.slice(4);
-              else if (part === 'm') tagMime = tag[i + 1];
-              else if (part.startsWith('m ')) tagMime = part.slice(2);
-            }
-            if (tagUrl && tagMime?.startsWith('image/')) {
-              thumbnail = tagUrl;
-              break;
-            }
+        // Fetch profile
+        ndk
+          ?.getUser({ pubkey: event.pubkey })
+          .fetchProfile()
+          .then((profile) => {
+            setVideos((prev) =>
+              prev.map((v) =>
+                v.pubkey === event.pubkey && !v.authorName
+                  ? {
+                      ...v,
+                      authorName:
+                        profile?.name ||
+                        profile?.displayName ||
+                        profile?.nip05 ||
+                        event.pubkey.slice(0, 8),
+                    }
+                  : v
+              )
+            );
+          })
+          .catch(() => {});
+
+        // Generate thumbnail for direct video files if none exists
+        if (
+          !thumbnail &&
+          url &&
+          mime &&
+          !mime.includes('youtube') &&
+          !mime.includes('vimeo') &&
+          !mime.includes('streamable')
+        ) {
+          // Check cache first
+          if (thumbnailCache[url]) {
+            setVideos((prev) =>
+              prev.map((v) => (v.id === event.id ? { ...v, thumbnail: thumbnailCache[url] } : v))
+            );
+          } else {
+            // Generate new thumbnail
+            generateThumbnail(url).then((generatedThumb) => {
+              if (generatedThumb) {
+                setThumbnailCache((prev) => ({ ...prev, [url]: generatedThumb }));
+                setVideos((prev) =>
+                  prev.map((v) => (v.id === event.id ? { ...v, thumbnail: generatedThumb } : v))
+                );
+              }
+            });
           }
         }
-
-        // Fallback: extract any image URL from content
-        if (!thumbnail) {
-          const imgMatches = content.match(
-            /https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)(\?[^\s]*)?/gi
-          );
-          if (imgMatches) {
-            thumbnail = imgMatches.find((m) => m !== url);
-          }
-        }
-      } else {
-        return;
       }
-    }
-
-    if (url) {
-      const video: VideoFile = {
-        id: event.id,
-        pubkey: event.pubkey,
-        url,
-        title: title || 'Untitled Video',
-        mime,
-        thumbnail: thumbnail,
-        created_at: event.created_at || 0,
-      };
-
-      videoBufferRef.current.push(video);
-      if (!isUpdatePendingRef.current) {
-        isUpdatePendingRef.current = true;
-        setTimeout(processBuffer, 300);
-      }
-
-      const ndkUser = ndk?.getUser({ pubkey: event.pubkey });
-      ndkUser
-        ?.fetchProfile()
-        .then((profile) => {
-          setVideos((prev) =>
-            prev.map((v) =>
-              v.pubkey === event.pubkey && !v.authorName
-                ? {
-                    ...v,
-                    authorName:
-                      profile?.name ||
-                      profile?.displayName ||
-                      profile?.nip05 ||
-                      event.pubkey.slice(0, 8),
-                  }
-                : v
-            )
-          );
-        })
-        .catch(() => {});
-
-      // Generate thumbnail for direct video files if none exists
-      if (
-        !thumbnail &&
-        url &&
-        mime &&
-        !mime.includes('youtube') &&
-        !mime.includes('vimeo') &&
-        !mime.includes('streamable')
-      ) {
-        // Check cache first
-        if (thumbnailCache[url]) {
-          setVideos((prev) =>
-            prev.map((v) => (v.id === event.id ? { ...v, thumbnail: thumbnailCache[url] } : v))
-          );
-        } else {
-          // Generate new thumbnail
-          generateThumbnail(url).then((generatedThumb) => {
-            if (generatedThumb) {
-              setThumbnailCache((prev) => ({ ...prev, [url]: generatedThumb }));
-              setVideos((prev) =>
-                prev.map((v) => (v.id === event.id ? { ...v, thumbnail: generatedThumb } : v))
-              );
-            }
-          });
-        }
-      }
-    }
-  };
+    },
+    [ndk, loadingMore, thumbnailCache, processBuffer]
+  );
 
   useEffect(() => {
     if (!ndk) return;
-
-    MEDIA_RELAYS.forEach((url) => {
-      try {
-        ndk.addExplicitRelay(url);
-      } catch (e) {
-        console.warn('Failed to add relay', url, e);
-      }
-    });
 
     setLoading(true);
 
@@ -392,28 +377,9 @@ export const VideosPage = () => {
       sub.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ndk]);
+  }, [ndk, handleEvent]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollBottom = window.innerHeight + window.scrollY;
-      const threshold = document.body.offsetHeight - 800;
-
-      if (
-        scrollBottom >= threshold &&
-        !fetchingRef.current &&
-        videos.length > 0 &&
-        !loadingMore &&
-        hasMore
-      ) {
-        handleLoadMore();
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [videos.length, loadingMore, hasMore]);
-
-  const handleLoadMore = async () => {
+  const handleLoadMore = useCallback(async () => {
     if (!ndk || videos.length === 0 || loadingMore || fetchingRef.current || !hasMore) return;
     fetchingRef.current = true;
     setLoadingMore(true);
@@ -446,7 +412,26 @@ export const VideosPage = () => {
 
       console.log('Video Page: Load More complete, found:', loadTrackerRef.current);
     });
-  };
+  }, [ndk, videos, loadingMore, hasMore, handleEvent, processBuffer]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollBottom = window.innerHeight + window.scrollY;
+      const threshold = document.body.offsetHeight - 800;
+
+      if (
+        scrollBottom >= threshold &&
+        !fetchingRef.current &&
+        videos.length > 0 &&
+        !loadingMore &&
+        hasMore
+      ) {
+        handleLoadMore();
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [videos.length, loadingMore, hasMore, handleLoadMore]);
 
   return (
     <div className="home-page-container vp-page-container">

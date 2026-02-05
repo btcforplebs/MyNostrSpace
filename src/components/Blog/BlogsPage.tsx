@@ -134,7 +134,9 @@ export const BlogsPage = () => {
 
         <div className="home-content bp-content">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 className="bp-section-header" style={{ margin: 0 }}>Recent Blog Entries</h2>
+            <h2 className="bp-section-header" style={{ margin: 0 }}>
+              Recent Blog Entries
+            </h2>
             {loggedInUser && (
               <button
                 onClick={() => setIsBlogEditorOpen(true)}

@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
+import { useState } from 'react';
 import { useProfile } from '../../hooks/useProfile';
 import { useTop8 } from '../../hooks/useTop8';
 import { CommentWall } from './CommentWall';
@@ -12,18 +13,112 @@ import { Navbar } from '../Shared/Navbar';
 import { RichTextRenderer } from '../Shared/RichTextRenderer';
 import { SEO } from '../Shared/SEO';
 import { useLightbox } from '../../context/LightboxContext';
+import { type NDKEvent, NDKRelaySet } from '@nostr-dev-kit/ndk';
 import './ProfilePage.css';
+import { filterRelays } from '../../utils/relay';
 
 const ProfilePage = () => {
-  const { user } = useNostr();
+  const { user, ndk } = useNostr();
   const { pubkey: identifier } = useParams<{ pubkey: string }>();
   const { hexPubkey, loading: resolving } = useResolvedPubkey(identifier);
   const { openLightbox } = useLightbox();
 
   const { profile, loading: profileLoading } = useProfile(hexPubkey || undefined);
   const { top8, loading: top8Loading } = useTop8(hexPubkey || undefined);
+
+  const userObj = hexPubkey ? ndk?.getUser({ pubkey: hexPubkey }) : null;
+  const npub = userObj?.npub;
+
   const { layoutCss } = useCustomLayout(hexPubkey || undefined);
   const { data: extendedProfile } = useExtendedProfile(hexPubkey || undefined);
+
+  const [stats, setStats] = useState<{
+    followers: number | null;
+    posts: number | null;
+    zaps: number | null;
+  }>({
+    followers: null,
+    posts: null,
+    zaps: null,
+  });
+  const [loadingStats, setLoadingStats] = useState(false);
+
+  const fetchStats = async () => {
+    if (loadingStats || !ndk || !hexPubkey) return;
+    setLoadingStats(true);
+
+    // Reset stats to 0 to start counting up
+    setStats({ followers: 0, posts: 0, zaps: 0 });
+
+    try {
+      // 1. Get User's Preferred Relays (Kind 10002)
+      const relayEvent = await ndk.fetchEvent({ kinds: [10002], authors: [hexPubkey] });
+      const relayUrls = relayEvent
+        ? relayEvent.tags.filter((t) => t[0] === 'r').map((t) => t[1])
+        : [];
+
+      const targetRelays =
+        relayUrls.length > 0 ? NDKRelaySet.fromRelayUrls(filterRelays(relayUrls), ndk) : undefined;
+
+      // 2. Start Subscriptions (Streaming)
+      const subOptions = { closeOnEose: true, relaySet: targetRelays };
+
+      const followersSub = ndk.subscribe({ kinds: [3], '#p': [hexPubkey] }, subOptions);
+      const postsSub = ndk.subscribe({ kinds: [1], authors: [hexPubkey] }, subOptions);
+      const zapsSub = ndk.subscribe({ kinds: [9735], '#p': [hexPubkey] }, subOptions);
+
+      followersSub.on('event', () => {
+        setStats((prev) => ({ ...prev, followers: (prev.followers || 0) + 1 }));
+      });
+
+      postsSub.on('event', (ev: NDKEvent) => {
+        if (!ev.tags.some((t) => t[0] === 'e')) {
+          setStats((prev) => ({ ...prev, posts: (prev.posts || 0) + 1 }));
+        }
+      });
+
+      zapsSub.on('event', (ev: NDKEvent) => {
+        let amt = 0;
+        const amountTag = ev.tags.find((t) => t[0] === 'amount');
+        if (amountTag) {
+          amt = parseInt(amountTag[1]) / 1000;
+        } else {
+          const bolt11 = ev.tags.find((t) => t[0] === 'bolt11')?.[1];
+          if (bolt11) {
+            const match = bolt11.match(/lnbc(\d+)([pnum])1/);
+            if (match) {
+              let val = parseInt(match[1]);
+              const multiplier = match[2];
+              if (multiplier === 'm') val *= 100000;
+              else if (multiplier === 'u') val *= 100;
+              else if (multiplier === 'n') val *= 0.1;
+              else if (multiplier === 'p') val *= 0.0001;
+              amt = val;
+            }
+          }
+        }
+        if (amt > 0) {
+          setStats((prev) => ({ ...prev, zaps: Math.floor((prev.zaps || 0) + amt) }));
+        }
+      });
+
+      let finishedCount = 0;
+      const onDone = () => {
+        finishedCount++;
+        if (finishedCount >= 3) setLoadingStats(false);
+      };
+
+      followersSub.on('eose', onDone);
+      postsSub.on('eose', onDone);
+      zapsSub.on('eose', onDone);
+
+      // Safety timeout
+      setTimeout(() => setLoadingStats(false), 20000);
+    } catch (e) {
+      console.error('Error starting stats stream:', e);
+      setLoadingStats(false);
+    }
+  };
 
   if (resolving) {
     return (
@@ -79,7 +174,7 @@ const ProfilePage = () => {
                 </Link>
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <div className="profile-details-grid">
               {profile?.image ? (
                 <img
                   src={profile.image}
@@ -101,47 +196,70 @@ const ProfilePage = () => {
                   ?
                 </div>
               )}
-              <div className="personal-text" style={{ fontSize: '8pt' }}>
-                <RichTextRenderer content={extendedProfile?.headline || '...'} />
-                <p>{extendedProfile?.gender}</p>
-                <p>
-                  {[extendedProfile?.city, extendedProfile?.region, extendedProfile?.country]
-                    .filter(Boolean)
-                    .join(', ')}
-                </p>
-              </div>
-              {profile?.nip05 && (
-                <div
-                  className="nip05"
-                  style={{ fontSize: '8pt', color: '#666', fontWeight: 'bold' }}
-                >
-                  {profile.nip05}
+              <div className="profile-text-details">
+                <div className="personal-text" style={{ fontSize: '8pt' }}>
+                  <RichTextRenderer content={extendedProfile?.headline || '...'} />
+                  <p>{extendedProfile?.gender}</p>
+                  <p>
+                    {[extendedProfile?.city, extendedProfile?.region, extendedProfile?.country]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </p>
                 </div>
-              )}
-              <div className="last-login" style={{ fontSize: '8pt', margin: '10px 0' }}>
-                Last Login: {new Date().toLocaleDateString()}
-              </div>
-              <div className="mood-box" style={{ fontSize: '8pt' }}>
-                View My:{' '}
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Coming soon!');
+                {profile?.nip05 && (
+                  <div
+                    className="nip05"
+                    style={{ fontSize: '8pt', color: '#666', fontWeight: 'bold' }}
+                  >
+                    {profile.nip05}
+                  </div>
+                )}
+                <div className="last-login" style={{ fontSize: '8pt', margin: '10px 0' }}>
+                  Last Login: {new Date().toLocaleDateString()}
+                </div>
+                <div
+                  className="user-stats-clickable"
+                  style={{
+                    fontSize: '8pt',
+                    marginTop: '5px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
                   }}
+                  onClick={fetchStats}
+                  title="Click to load stats"
                 >
-                  Pics
-                </a>{' '}
-                |{' '}
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Coming soon!');
-                  }}
-                >
-                  Videos
-                </a>
+                  {loadingStats ? (
+                    <span>Loading stats...</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span>Followers: {stats.followers ?? '∞'}</span>
+                      <span>Posts: {stats.posts ?? '∞'}</span>
+                      <span>Zaps Received: {stats.zaps ?? '∞'} 丰</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mood-box" style={{ fontSize: '8pt' }}>
+                  View My:{' '}
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      alert('Coming soon!');
+                    }}
+                  >
+                    Pics
+                  </a>{' '}
+                  |{' '}
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      alert('Coming soon!');
+                    }}
+                  >
+                    Videos
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -151,7 +269,7 @@ const ProfilePage = () => {
           <div className="url-box">
             <b>MyNostrSpace URL:</b>
             <br />
-            http://mynostrspace.com/p/{hexPubkey}
+            http://mynostrspace.com/p/{npub || hexPubkey}
           </div>
 
           <div className="interests-box">
@@ -234,19 +352,8 @@ const ProfilePage = () => {
                 <div>Loading Top 8...</div>
               ) : (
                 top8.map((friend) => (
-                  <div
-                    key={friend.pubkey}
-                    className="friend-slot"
-                    onClick={() => {
-                      if (friend.profile?.image) {
-                        openLightbox(friend.profile.image);
-                      }
-                    }}
-                    style={{ cursor: friend.profile?.image ? 'pointer' : 'default' }}
-                  >
-                    <a
-                      href={`/p/${friend.profile?.nip05 || friend.profile?.name || friend.pubkey}`}
-                    >
+                  <div key={friend.pubkey} className="friend-slot" style={{ cursor: 'default' }}>
+                    <a href={`/p/${friend.npub}`}>
                       <p className="friend-name">
                         {friend.profile?.displayName || friend.profile?.name || 'Friend'}
                       </p>

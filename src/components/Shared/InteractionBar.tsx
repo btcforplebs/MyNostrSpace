@@ -22,8 +22,11 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
   const [zapInvoice, setZapInvoice] = useState<string | null>(null);
   const [isZapping, setIsZapping] = useState(false);
 
+  const [hasFetched, setHasFetched] = useState(false);
+
   const fetchStats = useCallback(async () => {
-    if (!ndk) return;
+    if (!ndk || hasFetched) return;
+    setHasFetched(true);
 
     try {
       const filter: NDKFilter = {
@@ -62,12 +65,28 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       setIsReposted(repostedByMe);
     } catch (error) {
       console.error('Error fetching stats:', error);
+      setHasFetched(false); // Allow retry on failure
     }
-  }, [ndk, event.id, user]);
+  }, [ndk, event.id, user, hasFetched]);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchStats();
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    const element = document.getElementById(`interaction-${event.id}`);
+    if (element) {
+      observer.observe(element);
+    }
+
+    return () => observer.disconnect();
+  }, [fetchStats, event.id]);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -261,6 +280,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
 
   return (
     <div
+      id={`interaction-${event.id}`}
       className="interaction-bar"
       style={{
         marginTop: '10px',
@@ -277,7 +297,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       >
         {isLiked ? '♥ Liked' : 'like'} ({likes})
       </a>
-      |
+      <span className="interaction-separator">|</span>
       <a
         href="#"
         onClick={(e) => {
@@ -288,15 +308,18 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       >
         comment ({comments})
       </a>
-      |
+      <span className="interaction-separator">|</span>
       <a
         href="#"
         onClick={handleRepost}
-        style={{ color: isReposted ? '#2e7d32' : '#003399', fontWeight: isReposted ? 'bold' : 'normal' }}
+        style={{
+          color: isReposted ? '#2e7d32' : '#003399',
+          fontWeight: isReposted ? 'bold' : 'normal',
+        }}
       >
         {isReposted ? '🔄 reposted' : `repost (${reposts})`}
       </a>
-      |
+      <span className="interaction-separator">|</span>
       <a
         href="#"
         onClick={(e) => {
@@ -307,7 +330,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       >
         quote
       </a>
-      |
+      <span className="interaction-separator">|</span>
       <a href="#" onClick={handleZap} style={{ color: '#003399' }}>
         {isZapping ? 'zapping...' : `zap (${zaps})`}
       </a>

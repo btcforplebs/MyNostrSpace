@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { useNostr } from '../../context/NostrContext';
+import { uploadToBlossom } from '../../services/blossom';
+import { useRef } from 'react';
 import { RichTextRenderer } from '../Shared/RichTextRenderer';
 import { InteractionBar } from '../Shared/InteractionBar';
 import { Avatar } from '../Shared/Avatar';
@@ -19,6 +21,9 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadTarget, setUploadTarget] = useState<'comment' | 'reply' | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const fetchComments = useCallback(async () => {
     if (!ndk || !pubkey) return;
@@ -60,7 +65,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
           .then(() => {
             setComments((prev) => [...prev]); // Trigger re-render
           })
-          .catch(() => {});
+          .catch(() => { });
       });
     } catch (err) {
       console.error('Failed to fetch comments:', err);
@@ -71,6 +76,39 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
   useEffect(() => {
     fetchComments();
   }, [fetchComments]);
+
+  useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !ndk) return;
+
+    setIsUploading(true);
+    try {
+      const result = await uploadToBlossom(ndk, file);
+      const url = result.url;
+
+      if (uploadTarget === 'comment') {
+        setNewComment((prev) => (prev ? `${prev}\n${url}` : url));
+      } else if (uploadTarget === 'reply') {
+        setReplyText((prev) => (prev ? `${prev}\n${url}` : url));
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload image');
+    } finally {
+      setIsUploading(false);
+      setUploadTarget(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const triggerUpload = (target: 'comment' | 'reply') => {
+    setUploadTarget(target);
+    fileInputRef.current?.click();
+  };
 
   const handlePostTopLevel = async () => {
     if (!ndk || !user) {
@@ -90,9 +128,9 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
 
     try {
       await event.publish();
+      event.author = user; // Ensure profile renders immediately
       setComments([event, ...comments]);
       setNewComment('');
-      alert('Comment posted!');
     } catch (e) {
       console.error('Failed to publish comment', e);
       alert('Failed to post comment');
@@ -126,10 +164,10 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
       ];
 
       await reply.publish();
+      reply.author = user; // Ensure profile renders immediately
       setComments((prev) => [reply, ...prev]);
       setReplyText('');
       setActiveReplyId(null);
-      alert('Reply posted!');
     } catch (error) {
       console.error('Failed to post reply:', error);
       alert('Failed to post reply');
@@ -181,12 +219,32 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
               className="nostr-input"
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  handlePostReply(comment);
+                }
+              }}
               placeholder={`Reply to ${comment.author?.profile?.name || 'user'}...`}
             />
-            <div style={{ textAlign: 'right', marginTop: '5px' }}>
+            <div style={{ textAlign: 'right', marginTop: '5px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => triggerUpload('reply')}
+                disabled={isUploading || isSubmitting}
+                style={{
+                  fontSize: '8pt',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#003399',
+                  textDecoration: 'underline',
+                }}
+              >
+                Add Photo
+              </button>
               <button
                 onClick={() => handlePostReply(comment)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploading}
                 style={{ fontSize: '8pt' }}
               >
                 Post Reply
@@ -230,13 +288,33 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
                 className="nostr-input"
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                    handlePostTopLevel();
+                  }
+                }}
                 placeholder="Leave a comment..."
               />
-              <div style={{ textAlign: 'right' }}>
+              <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => triggerUpload('comment')}
+                  disabled={isUploading || isSubmitting}
+                  style={{
+                    fontSize: '8pt',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#003399',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Add Photo
+                </button>
                 <button
                   className="post-comment-btn"
                   onClick={handlePostTopLevel}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isUploading}
                 >
                   {isSubmitting ? 'Posting...' : 'Post Comment'}
                 </button>
@@ -277,6 +355,13 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
           </a>
         </div>
       </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        style={{ display: 'none' }}
+      />
     </div>
   );
 };

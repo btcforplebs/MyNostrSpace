@@ -170,6 +170,241 @@ const HomePage = () => {
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const [displayedStreamsCount, setDisplayedStreamsCount] = useState(15);
   const loadMoreStreamsTriggerRef = useRef<HTMLDivElement>(null);
+  const [columnCount, setColumnCount] = useState(3);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width <= 600) setColumnCount(1);
+      else if (width <= 900) setColumnCount(2);
+      else setColumnCount(3);
+    };
+
+    handleResize(); // Set initial
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const getCanonicalUrl = (url: string) => {
+    try {
+      const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+      if (ytMatch) return `https://www.youtube.com/watch?v=${ytMatch[1]}`;
+      return url;
+    } catch {
+      return url;
+    }
+  };
+
+  const processMediaEvent = useCallback((ev: NDKEvent): MediaItem | null => {
+    if (ev.kind === 1063) {
+      const url = ev.tags.find((t) => t[0] === 'url')?.[1];
+      const mime = ev.tags.find((t) => t[0] === 'm')?.[1] || '';
+      const thumb = ev.tags.find((t) => t[0] === 'thumb' || t[0] === 'image')?.[1];
+      if (url) {
+        return {
+          id: ev.id,
+          url,
+          type: (mime.startsWith('video') ? 'video' : 'image') as 'image' | 'video',
+          created_at: ev.created_at || 0,
+          originalEvent: ev,
+          thumb,
+        };
+      }
+    } else if (ev.kind === 1) {
+      const content = ev.content;
+      const imgRegex = /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp))/i;
+      const videoRegex = /(https?:\/\/\S+\.(?:mp4|mov|webm|avi|mkv|m3u8))/i;
+
+      // Check for images first
+      const imgMatch = content.match(imgRegex);
+      if (imgMatch) {
+        return {
+          id: ev.id + '-img',
+          url: imgMatch[0],
+          type: 'image' as const,
+          created_at: ev.created_at || 0,
+          originalEvent: ev,
+        };
+      }
+
+      // Helper to extract thumbnail from imeta tags and event tags
+      const extractVideoThumb = (event: NDKEvent, videoUrl: string): string | undefined => {
+        // Check thumb/image tags
+        const thumb =
+          event.getMatchingTags('thumb')[0]?.[1] || event.getMatchingTags('image')[0]?.[1];
+        if (thumb) return thumb;
+
+        // Check imeta tags for image URLs
+        const imetaTags = event.getMatchingTags('imeta');
+        for (const tag of imetaTags) {
+          let tagUrl: string | undefined;
+          let tagMime: string | undefined;
+          for (let i = 1; i < tag.length; i++) {
+            const part = tag[i];
+            if (part === 'url') tagUrl = tag[i + 1];
+            else if (part.startsWith('url ')) tagUrl = part.slice(4);
+            else if (part === 'm') tagMime = tag[i + 1];
+            else if (part.startsWith('m ')) tagMime = part.slice(2);
+          }
+          if (tagUrl && tagMime?.startsWith('image/')) {
+            return tagUrl;
+          }
+        }
+
+        // Fallback: extract any image URL from content that isn't the video URL
+        const imgMatches = content.match(
+          /https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)(\?[^\s]*)?/gi
+        );
+        if (imgMatches) {
+          return imgMatches.find((m) => m !== videoUrl);
+        }
+
+        return undefined;
+      };
+
+      // Check for direct video files
+      const vidMatch = content.match(videoRegex);
+      if (vidMatch) {
+        return {
+          id: ev.id + '-vid',
+          url: vidMatch[0],
+          type: 'video' as const,
+          created_at: ev.created_at || 0,
+          originalEvent: ev,
+          thumb: extractVideoThumb(ev, vidMatch[0]),
+        };
+      }
+
+      // Check for YouTube
+      const youtubeMatch = content.match(
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
+      );
+      if (youtubeMatch) {
+        const videoId = youtubeMatch[1];
+        return {
+          id: ev.id + '-yt',
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+          type: 'video' as const,
+          created_at: ev.created_at || 0,
+          originalEvent: ev,
+          thumb: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        };
+      }
+
+      // Check for Vimeo
+      const vimeoMatch = content.match(/vimeo\.com\/(\d+)/);
+      if (vimeoMatch) {
+        return {
+          id: ev.id + '-vm',
+          url: `https://vimeo.com/${vimeoMatch[1]}`,
+          type: 'video' as const,
+          created_at: ev.created_at || 0,
+          originalEvent: ev,
+          thumb: extractVideoThumb(ev, `https://vimeo.com/${vimeoMatch[1]}`),
+        };
+      }
+
+      // Check for Streamable
+      const streamableMatch = content.match(/streamable\.com\/([a-zA-Z0-9]+)/);
+      if (streamableMatch) {
+        return {
+          id: ev.id + '-st',
+          url: `https://streamable.com/${streamableMatch[1]}`,
+          type: 'video' as const,
+          created_at: ev.created_at || 0,
+          originalEvent: ev,
+          thumb: extractVideoThumb(ev, `https://streamable.com/${streamableMatch[1]}`),
+        };
+      }
+    }
+    return null;
+  }, []);
+
+  const addMediaItems = useCallback((newItems: MediaItem[]) => {
+    if (newItems.length === 0) return;
+    setMediaItems((prev) => {
+      const seenUrls = new Set<string>();
+      const result: MediaItem[] = [];
+
+      // Keep existing items first
+      for (const item of prev) {
+        const canonical = getCanonicalUrl(item.url);
+        if (!seenUrls.has(canonical)) {
+          seenUrls.add(canonical);
+          result.push(item);
+        }
+      }
+
+      // Add new items
+      for (const item of newItems) {
+        const canonical = getCanonicalUrl(item.url);
+        if (!seenUrls.has(canonical)) {
+          seenUrls.add(canonical);
+          result.push(item);
+        }
+      }
+
+      return result.sort((a, b) => b.created_at - a.created_at).slice(0, 150);
+    });
+  }, []);
+
+  const generateThumbnail = (videoUrl: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.src = videoUrl;
+      video.muted = true;
+
+      const cleanup = () => {
+        video.remove();
+      };
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve(null);
+      }, 5000); // 5 second timeout
+
+      video.addEventListener('loadeddata', () => {
+        // Seek to 2 seconds or 25% of duration, whichever is smaller
+        const seekTime = Math.min(2, video.duration * 0.25);
+        video.currentTime = seekTime;
+      });
+
+      video.addEventListener('seeked', () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 360;
+
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
+            clearTimeout(timeout);
+            cleanup();
+            resolve(thumbnailUrl);
+          } else {
+            clearTimeout(timeout);
+            cleanup();
+            resolve(null);
+          }
+        } catch {
+          clearTimeout(timeout);
+          cleanup();
+          resolve(null);
+        }
+      });
+
+      video.addEventListener('error', () => {
+        clearTimeout(timeout);
+        cleanup();
+        resolve(null);
+      });
+
+      // Start loading
+      video.load();
+    });
+  };
 
   const MOODS = [
     'None',
@@ -260,48 +495,6 @@ const HomePage = () => {
 
       const events = await ndk.fetchEvents(filter);
 
-      const processMediaEvent = (ev: NDKEvent): MediaItem | null => {
-        if (ev.kind === 1063) {
-          const url = ev.tags.find((t) => t[0] === 'url')?.[1];
-          const mime = ev.tags.find((t) => t[0] === 'm')?.[1] || '';
-          const thumb = ev.tags.find((t) => t[0] === 'thumb' || t[0] === 'image')?.[1];
-          if (url) {
-            return {
-              id: ev.id,
-              url,
-              type: (mime.startsWith('video') ? 'video' : 'image') as 'image' | 'video',
-              created_at: ev.created_at || 0,
-              originalEvent: ev,
-              thumb,
-            };
-          }
-        } else if (ev.kind === 1) {
-          const imgRegex = /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp))/i;
-          const videoRegex = /(https?:\/\/\S+\.(?:mp4|mov|webm))/i;
-          const imgMatch = ev.content.match(imgRegex);
-          if (imgMatch) {
-            return {
-              id: ev.id + '-img',
-              url: imgMatch[0],
-              type: 'image' as const,
-              created_at: ev.created_at || 0,
-              originalEvent: ev,
-            };
-          }
-          const vidMatch = ev.content.match(videoRegex);
-          if (vidMatch) {
-            return {
-              id: ev.id + '-vid',
-              url: vidMatch[0],
-              type: 'video' as const,
-              created_at: ev.created_at || 0,
-              originalEvent: ev,
-            };
-          }
-        }
-        return null;
-      };
-
       const newItems = Array.from(events)
         .map(processMediaEvent)
         .filter((i): i is MediaItem => i !== null);
@@ -311,11 +504,7 @@ const HomePage = () => {
         return;
       }
 
-      setMediaItems((prev) => {
-        const combined = [...prev, ...newItems];
-        const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-        return unique.sort((a, b) => b.created_at - a.created_at).slice(0, 150);
-      });
+      addMediaItems(newItems);
 
       const oldest = newItems.sort((a, b) => a.created_at - b.created_at)[0];
       if (oldest?.created_at) setMediaUntil(oldest.created_at - 1);
@@ -359,7 +548,28 @@ const HomePage = () => {
         });
       };
 
+      let mediaEventBuffer: MediaItem[] = [];
+      let mediaFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+      const flushMediaBuffer = () => {
+        if (mediaEventBuffer.length === 0) return;
+        const currentMBuffer = [...mediaEventBuffer];
+        mediaEventBuffer = [];
+        addMediaItems(currentMBuffer);
+      };
+
       sub.on('event', (apiEvent: NDKEvent) => {
+        // 1. Process for media (Feed -> Media Integration)
+        const mediaItem = processMediaEvent(apiEvent);
+        if (mediaItem) {
+          mediaEventBuffer.push(mediaItem);
+          if (!mediaFlushTimeout) {
+            mediaFlushTimeout = setTimeout(() => {
+              flushMediaBuffer();
+              mediaFlushTimeout = null;
+            }, 500);
+          }
+        }
+
         if (apiEvent.kind === 1 && apiEvent.tags.some((t) => t[0] === 'e')) return;
 
         const isNewPost =
@@ -413,130 +623,8 @@ const HomePage = () => {
         closeOnEose: false,
         cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
       });
-      const processMediaEvent = (ev: NDKEvent): MediaItem | null => {
-        if (ev.kind === 1063) {
-          const url = ev.tags.find((t) => t[0] === 'url')?.[1];
-          const mime = ev.tags.find((t) => t[0] === 'm')?.[1] || '';
-          const thumb = ev.tags.find((t) => t[0] === 'thumb' || t[0] === 'image')?.[1];
-          if (url) {
-            return {
-              id: ev.id,
-              url,
-              type: (mime.startsWith('video') ? 'video' : 'image') as 'image' | 'video',
-              created_at: ev.created_at || 0,
-              originalEvent: ev,
-              thumb,
-            };
-          }
-        } else if (ev.kind === 1) {
-          const content = ev.content;
-          const imgRegex = /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp))/i;
-          const videoRegex = /(https?:\/\/\S+\.(?:mp4|mov|webm|avi|mkv|m3u8))/i;
+      /* Removed redundant logic */
 
-          // Check for images first
-          const imgMatch = content.match(imgRegex);
-          if (imgMatch) {
-            return {
-              id: ev.id + '-img',
-              url: imgMatch[0],
-              type: 'image' as const,
-              created_at: ev.created_at || 0,
-              originalEvent: ev,
-            };
-          }
-
-          // Helper to extract thumbnail from imeta tags and event tags
-          const extractVideoThumb = (event: NDKEvent, videoUrl: string): string | undefined => {
-            // Check thumb/image tags
-            const thumb =
-              event.getMatchingTags('thumb')[0]?.[1] || event.getMatchingTags('image')[0]?.[1];
-            if (thumb) return thumb;
-
-            // Check imeta tags for image URLs
-            const imetaTags = event.getMatchingTags('imeta');
-            for (const tag of imetaTags) {
-              let tagUrl: string | undefined;
-              let tagMime: string | undefined;
-              for (let i = 1; i < tag.length; i++) {
-                const part = tag[i];
-                if (part === 'url') tagUrl = tag[i + 1];
-                else if (part.startsWith('url ')) tagUrl = part.slice(4);
-                else if (part === 'm') tagMime = tag[i + 1];
-                else if (part.startsWith('m ')) tagMime = part.slice(2);
-              }
-              if (tagUrl && tagMime?.startsWith('image/')) {
-                return tagUrl;
-              }
-            }
-
-            // Fallback: extract any image URL from content that isn't the video URL
-            const imgMatches = content.match(
-              /https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)(\?[^\s]*)?/gi
-            );
-            if (imgMatches) {
-              return imgMatches.find((m) => m !== videoUrl);
-            }
-
-            return undefined;
-          };
-
-          // Check for direct video files
-          const vidMatch = content.match(videoRegex);
-          if (vidMatch) {
-            return {
-              id: ev.id + '-vid',
-              url: vidMatch[0],
-              type: 'video' as const,
-              created_at: ev.created_at || 0,
-              originalEvent: ev,
-              thumb: extractVideoThumb(ev, vidMatch[0]),
-            };
-          }
-
-          // Check for YouTube
-          const youtubeMatch = content.match(
-            /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
-          );
-          if (youtubeMatch) {
-            const videoId = youtubeMatch[1];
-            return {
-              id: ev.id + '-yt',
-              url: `https://www.youtube.com/watch?v=${videoId}`,
-              type: 'video' as const,
-              created_at: ev.created_at || 0,
-              originalEvent: ev,
-              thumb: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-            };
-          }
-
-          // Check for Vimeo
-          const vimeoMatch = content.match(/vimeo\.com\/(\d+)/);
-          if (vimeoMatch) {
-            return {
-              id: ev.id + '-vm',
-              url: `https://vimeo.com/${vimeoMatch[1]}`,
-              type: 'video' as const,
-              created_at: ev.created_at || 0,
-              originalEvent: ev,
-              thumb: extractVideoThumb(ev, `https://vimeo.com/${vimeoMatch[1]}`),
-            };
-          }
-
-          // Check for Streamable
-          const streamableMatch = content.match(/streamable\.com\/([a-zA-Z0-9]+)/);
-          if (streamableMatch) {
-            return {
-              id: ev.id + '-st',
-              url: `https://streamable.com/${streamableMatch[1]}`,
-              type: 'video' as const,
-              created_at: ev.created_at || 0,
-              originalEvent: ev,
-              thumb: extractVideoThumb(ev, `https://streamable.com/${streamableMatch[1]}`),
-            };
-          }
-        }
-        return null;
-      };
       let mBuffer: MediaItem[] = [];
       let mFlushTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -544,12 +632,7 @@ const HomePage = () => {
         if (mBuffer.length === 0) return;
         const currentBuffer = [...mBuffer];
         mBuffer = [];
-        setMediaItems((prev) => {
-          const combined = [...currentBuffer, ...prev];
-          const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-          const next = unique.sort((a, b) => b.created_at - a.created_at);
-          return next.slice(0, 100);
-        });
+        addMediaItems(currentBuffer);
       };
 
       sub.on('event', (ev: NDKEvent) => {
@@ -561,25 +644,6 @@ const HomePage = () => {
               flushMBuffer();
               mFlushTimeout = null;
             }, 400);
-          }
-
-          // Generate thumbnail only if it's the first few or we want to keep it simple
-          // For now, let's keep the logic but it's risky if mBuffer is huge.
-          // Actually, let's only generate if it's not already in cache.
-          if (
-            newItem.type === 'video' &&
-            !newItem.thumb &&
-            !newItem.url.includes('youtube') &&
-            !newItem.url.includes('vimeo') &&
-            !newItem.url.includes('streamable')
-          ) {
-            if (thumbnailCache[newItem.url]) {
-              // This is fast
-            } else {
-              // Throttle thumbnail generation?
-              // For now, just firing it is what was there.
-              // But removing the state update from here and doing it in flushMBuffer or later would be better.
-            }
           }
         }
       });
@@ -601,6 +665,43 @@ const HomePage = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ndk, user, viewMode, getFollows]);
+
+  // Thumbnail generation effect
+  useEffect(() => {
+    if (viewMode !== 'media' || mediaItems.length === 0) return;
+
+    const generateMissingThumbnails = async () => {
+      const videosToProcess = mediaItems.filter(
+        (item) =>
+          item.type === 'video' &&
+          !item.thumb &&
+          !item.url.includes('youtube') &&
+          !item.url.includes('vimeo') &&
+          !item.url.includes('streamable')
+      );
+
+      for (const item of videosToProcess) {
+        if (thumbnailCache[item.url]) {
+          setMediaItems((prev) =>
+            prev.map((v) => (v.id === item.id ? { ...v, thumb: thumbnailCache[item.url] } : v))
+          );
+        } else {
+          try {
+            const thumb = await generateThumbnail(item.url);
+            if (thumb) {
+              thumbnailCache[item.url] = thumb;
+              setMediaItems((prev) => prev.map((v) => (v.id === item.id ? { ...v, thumb } : v)));
+            }
+          } catch (e) {
+            console.error('Failed to generate thumbnail for', item.url, e);
+          }
+        }
+      }
+    };
+
+    generateMissingThumbnails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, mediaItems.length]);
 
   // Blogs and Streams
   useEffect(() => {
@@ -677,7 +778,7 @@ const HomePage = () => {
           return next.slice(0, 50);
         });
         // Pre-fetch author profile for the notification
-        ev.author.fetchProfile().catch(() => {});
+        ev.author.fetchProfile().catch(() => { });
       });
     };
 
@@ -1130,52 +1231,97 @@ const HomePage = () => {
                 )}
 
                 {viewMode === 'media' && (
-                  <div className="media-gallery">
-                    {mediaLoading && mediaItems.length === 0 && (
-                      <div style={{ padding: '20px' }}>Loading Media...</div>
-                    )}
-                    {mediaItems.map((item) => {
-                      const ytMatch = item.url.match(
-                        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
-                      );
-                      const isExpanded = expandedVideoId === item.id;
-                      return (
-                        <div key={item.id} className="gallery-item">
-                          {item.type === 'image' ? (
-                            <img src={item.url} alt="" loading="lazy" />
-                          ) : isExpanded ? (
-                            ytMatch ? (
-                              <iframe
-                                src={`https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`}
-                                title="YouTube video"
-                                frameBorder="0"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                                style={{ width: '100%', height: '100%', border: 'none' }}
-                              />
-                            ) : (
-                              <video src={item.url} controls autoPlay preload="metadata" />
-                            )
-                          ) : (
-                            <div
-                              className="gallery-video-thumb"
-                              onClick={() => setExpandedVideoId(item.id)}
-                            >
-                              {item.thumb ? (
-                                <img src={item.thumb} alt="" loading="lazy" />
-                              ) : (
-                                <div className="gallery-video-placeholder" />
-                              )}
-                              <div className="gallery-play-overlay">
-                                <span className="gallery-play-icon">▶</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <div style={{ background: 'white' }}>
+                    <div className="media-gallery" style={{ paddingBottom: 0 }}>
+                      {mediaLoading && mediaItems.length === 0 && (
+                        <div style={{ padding: '20px', width: '100%' }}>Loading Media...</div>
+                      )}
+                      {(() => {
+                        const columns: MediaItem[][] = Array.from({ length: columnCount }, () => []);
+                        mediaItems.forEach((item, index) => {
+                          columns[index % columnCount].push(item);
+                        });
+
+                        return columns.map((colItems, colIndex) => (
+                          <div key={colIndex} className="media-gallery-column">
+                            {colItems.map((item) => {
+                              const ytMatch = item.url.match(
+                                /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
+                              );
+                              const vimeoMatch = item.url.match(/vimeo\.com\/(\d+)/);
+                              const streamableMatch = item.url.match(
+                                /streamable\.com\/([a-zA-Z0-9]+)/
+                              );
+                              const isExpanded = expandedVideoId === item.id;
+
+                              return (
+                                <div
+                                  key={item.id}
+                                  className="gallery-item"
+                                  style={{ aspectRatio: isExpanded ? '16/9' : 'auto' }}
+                                >
+                                  {item.type === 'image' ? (
+                                    <img src={item.url} alt="" loading="lazy" />
+                                  ) : isExpanded ? (
+                                    ytMatch ? (
+                                      <iframe
+                                        src={`https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`}
+                                        title="YouTube video"
+                                        frameBorder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                        style={{ width: '100%', height: '100%', border: 'none' }}
+                                      />
+                                    ) : vimeoMatch ? (
+                                      <iframe
+                                        src={`https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`}
+                                        title="Vimeo video"
+                                        frameBorder="0"
+                                        allow="autoplay; fullscreen; picture-in-picture"
+                                        allowFullScreen
+                                        style={{ width: '100%', height: '100%', border: 'none' }}
+                                      />
+                                    ) : streamableMatch ? (
+                                      <iframe
+                                        src={`https://streamable.com/e/${streamableMatch[1]}?autoplay=1`}
+                                        title="Streamable video"
+                                        frameBorder="0"
+                                        allowFullScreen
+                                        style={{ width: '100%', height: '100%', border: 'none' }}
+                                      />
+                                    ) : (
+                                      <video src={item.url} controls autoPlay preload="metadata" />
+                                    )
+                                  ) : (
+                                    <div
+                                      className="gallery-video-thumb"
+                                      onClick={() => setExpandedVideoId(item.id)}
+                                    >
+                                      {item.thumb ? (
+                                        <img src={item.thumb} alt="" loading="lazy" />
+                                      ) : (
+                                        <div className="gallery-video-placeholder">
+                                          <span className="gallery-play-icon">▶</span>
+                                        </div>
+                                      )}
+                                      <div className="gallery-play-overlay">
+                                        {ytMatch ? (
+                                          <div className="youtube-symbol" title="YouTube" />
+                                        ) : (
+                                          <span className="gallery-play-icon">▶</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ));
+                      })()}
+                    </div>
                     {hasMoreMedia && mediaItems.length > 0 && (
-                      <div style={{ padding: '15px', textAlign: 'center', gridColumn: '1 / -1' }}>
+                      <div style={{ padding: '15px', textAlign: 'center' }}>
                         <button
                           className="post-status-btn"
                           onClick={loadMoreMedia}
@@ -1267,7 +1413,7 @@ const HomePage = () => {
       <BlogEditor
         isOpen={isBlogModalOpen}
         onClose={() => setIsBlogModalOpen(false)}
-        onPostComplete={() => {}}
+        onPostComplete={() => { }}
       />
     </div>
   );

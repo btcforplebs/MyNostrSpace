@@ -4,9 +4,15 @@ import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { RichTextRenderer } from './RichTextRenderer';
 import { InteractionBar } from './InteractionBar';
 import { useNostr } from '../../context/NostrContext';
-import { useEffect, useCallback } from 'react';
+import { uploadToBlossom } from '../../services/blossom';
+import { useEffect, useCallback, useRef } from 'react';
 import { useProfile } from '../../hooks/useProfile';
 import { Avatar } from './Avatar';
+
+interface ThreadNode {
+  event: NDKEvent;
+  children: ThreadNode[];
+}
 
 interface FeedItemProps {
   event: NDKEvent;
@@ -14,16 +20,159 @@ interface FeedItemProps {
 }
 
 export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = false }) => {
+  // ... (existing hooks) ...
   const { ndk, user, login } = useNostr();
   const { profile } = useProfile(event.pubkey);
+  // ... (existing state) ...
   const [showCommentForm, setShowCommentForm] = useState(false);
   const [showThread, setShowThread] = useState(false);
   const [comments, setComments] = useState<NDKEvent[]>([]);
+  // ...
+
+  // Helper to build thread tree from flat comments
+  const buildTree = useCallback((events: NDKEvent[]): ThreadNode[] => {
+    const buildNode = (parentId: string): ThreadNode[] => {
+      const children = events
+        .filter((ev) => {
+          const eTags = ev.tags.filter((t) => t[0] === 'e');
+          const replyMarker = eTags.find((t) => t[3] === 'reply');
+          const rootMarker = eTags.find((t) => t[3] === 'root');
+
+          // Determine direct parent
+          let directParentId = null;
+          if (replyMarker) {
+            directParentId = replyMarker[1];
+          } else if (rootMarker) {
+            // If only root marker exists, and it's not this event (which would be weird for a child),
+            // check if there are other e tags.
+            // Standard NIP-10: root is the thread root. If there's no reply marker, the last e-tag is usually the parent (deprecated positional).
+            // MyNostrSpace clients add 'reply' markers.
+            // Fallback to last e-tag if no marker
+            const otherTags = eTags.filter(t => t[3] !== 'root');
+            if (otherTags.length > 0) directParentId = otherTags[otherTags.length - 1][1];
+            else directParentId = rootMarker[1]; // Direct reply to root
+          } else {
+            // No markers, use last e tag
+            if (eTags.length > 0) directParentId = eTags[eTags.length - 1][1];
+          }
+
+          return directParentId === parentId;
+        })
+        .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+
+      return children.map((child) => ({
+        event: child,
+        children: buildNode(child.id),
+      }));
+    };
+
+    return buildNode(event.id);
+  }, [event.id]);
+
+  const renderThread = (nodes: ThreadNode[], depth: number = 0) => {
+    return nodes.map((node) => (
+      <div key={node.event.id} style={{ marginBottom: '10px' }}>
+        <div
+          style={{
+            marginLeft: depth > 0 ? '20px' : '0',
+            borderLeft: depth > 0 ? '2px solid #ddd' : 'none',
+            paddingLeft: depth > 0 ? '10px' : '0',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+            <Avatar
+              pubkey={node.event.pubkey}
+              src={node.event.author.profile?.picture}
+              size={30}
+              style={{ flexShrink: 0 }}
+            />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 'bold' }}>
+                <Link
+                  to={`/p/${node.event.pubkey}`}
+                  style={{ color: '#003399', textDecoration: 'none' }}
+                >
+                  {node.event.author.profile?.name ||
+                    node.event.author.profile?.displayName ||
+                    node.event.author.profile?.display_name ||
+                    node.event.pubkey.slice(0, 8)}
+                </Link>
+              </div>
+              <div style={{ color: '#333' }}>
+                <RichTextRenderer content={node.event.content} />
+              </div>
+
+              <InteractionBar
+                event={node.event}
+                onCommentClick={() => setActiveReplyId(activeReplyId === node.event.id ? null : node.event.id)}
+              />
+
+              {activeReplyId === node.event.id && (
+                <div
+                  className="reply-form"
+                  style={{ marginTop: '10px', background: '#f0f0f0', padding: '8px' }}
+                >
+                  <textarea
+                    className="nostr-input"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        handlePostComment(node.event, replyText, false);
+                      }
+                    }}
+                    placeholder={`Reply to ${node.event.author.profile?.name || 'user'}...`}
+                  />
+                  <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => triggerUpload('reply')}
+                      disabled={isUploading || isSubmitting}
+                      style={{
+                        fontSize: '8pt',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#003399',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      Add Photo
+                    </button>
+                    <button
+                      onClick={() => handlePostComment(node.event, replyText, false)}
+                      disabled={isSubmitting || isUploading}
+                      style={{
+                        fontSize: '8pt',
+                        backgroundColor: '#003399',
+                        color: 'white',
+                        border: '1px solid #003366',
+                        borderRadius: '3px',
+                        padding: '3px 8px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Post Reply
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {node.children.length > 0 && renderThread(node.children, depth + 1)}
+      </div>
+    ));
+  };
+
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadTarget, setUploadTarget] = useState<'comment' | 'reply' | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   // Parse embedded repost content synchronously to avoid "Loading..." flash
   const [repostEvent, setRepostEvent] = useState<NDKEvent | null>(() => {
     if (event.kind === 6 && ndk && event.content) {
@@ -42,7 +191,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
   useEffect(() => {
     // Only fetch from relay if embedded content wasn't available
     if (event.kind === 6 && ndk && !repostEvent) {
-      const targetId = event.tags.find((t) => t[0] === 'e')?.[1];
+      const targetId = event.tags.find((t: string[]) => t[0] === 'e')?.[1];
       if (!targetId) return;
       ndk
         .fetchEvent(targetId)
@@ -87,7 +236,36 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
   const displayContent = moodMatch ? event.content.replace(/^Mood: (.*?)\n\n/, '') : event.content;
   const displayMood = moodMatch
     ? moodMatch[1]
-    : event.tags.find((t) => t[0] === 'mood')?.[1] || null;
+    : event.tags.find((t: string[]) => t[0] === 'mood')?.[1] || null;
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !ndk) return;
+
+    setIsUploading(true);
+    try {
+      const result = await uploadToBlossom(ndk, file);
+      const url = result.url;
+
+      if (uploadTarget === 'comment') {
+        setCommentText((prev) => (prev ? `${prev}\n${url}` : url));
+      } else if (uploadTarget === 'reply') {
+        setReplyText((prev) => (prev ? `${prev}\n${url}` : url));
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload image');
+    } finally {
+      setIsUploading(false);
+      setUploadTarget(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const triggerUpload = (target: 'comment' | 'reply') => {
+    setUploadTarget(target);
+    fileInputRef.current?.click();
+  };
 
   const handlePostComment = async (parentEvent: NDKEvent, text: string, isTopLevel: boolean) => {
     if (!ndk || !user) {
@@ -126,9 +304,10 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
       }
 
       // Add to local state so it appears immediately
+      // Explicitly set the author to the current user so profile data is available immediately
+      reply.author = user;
       setComments((prev) => [...prev, reply]);
       setShowThread(true);
-      alert('Comment posted!');
     } catch (error) {
       console.error('Failed to post comment:', error);
       alert('Failed to post comment');
@@ -150,7 +329,12 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
             gap: '5px',
           }}
         >
-          <span style={{ fontSize: '10pt' }}>🔄</span>
+          <Avatar
+            pubkey={event.pubkey}
+            src={profile?.picture}
+            size={16}
+            style={{ width: '16px', height: '16px', border: 'none' }}
+          />
           <Link
             to={`/p/${event.pubkey}`}
             style={{ color: '#666', fontWeight: 'bold', textDecoration: 'none' }}
@@ -222,6 +406,16 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
             >
               {showThread ? 'Collapse thread' : 'Show thread'}
             </a>
+            {showThread && (
+              <span style={{ marginLeft: '10px' }}>
+                <Link
+                  to={`/thread/${event.id}`}
+                  style={{ fontSize: '7.5pt', color: '#003399' }}
+                >
+                  View full thread
+                </Link>
+              </span>
+            )}
           </div>
         )}
 
@@ -237,69 +431,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
             {loadingThread && (
               <div style={{ fontSize: '7.5pt', fontStyle: 'italic' }}>Loading thread...</div>
             )}
-            {comments.map((c) => (
-              <div
-                key={c.id}
-                style={{
-                  marginBottom: '15px',
-                  borderBottom: '1px dotted #ccc',
-                  paddingBottom: '10px',
-                }}
-              >
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                  <Avatar
-                    pubkey={c.pubkey}
-                    src={c.author.profile?.picture}
-                    size={30}
-                    style={{ flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 'bold' }}>
-                      <Link
-                        to={`/p/${c.pubkey}`}
-                        style={{ color: '#003399', textDecoration: 'none' }}
-                      >
-                        {c.author.profile?.name ||
-                          c.author.profile?.displayName ||
-                          c.author.profile?.display_name ||
-                          c.pubkey.slice(0, 8)}
-                      </Link>
-                    </div>
-                    <div style={{ color: '#333' }}>
-                      <RichTextRenderer content={c.content} />
-                    </div>
-
-                    <InteractionBar
-                      event={c}
-                      onCommentClick={() => setActiveReplyId(activeReplyId === c.id ? null : c.id)}
-                    />
-
-                    {activeReplyId === c.id && (
-                      <div
-                        className="reply-form"
-                        style={{ marginTop: '10px', background: '#f0f0f0', padding: '8px' }}
-                      >
-                        <textarea
-                          className="nostr-input"
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          placeholder={`Reply to ${c.author.profile?.name || 'user'}...`}
-                        />
-                        <div style={{ textAlign: 'right' }}>
-                          <button
-                            onClick={() => handlePostComment(c, replyText, false)}
-                            disabled={isSubmitting}
-                            style={{ fontSize: '8pt' }}
-                          >
-                            Post Reply
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {renderThread(buildTree(comments))}
           </div>
         )}
 
@@ -317,13 +449,41 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
               className="nostr-input"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  handlePostComment(event, commentText, true);
+                }
+              }}
               placeholder="Write a comment..."
             />
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => triggerUpload('comment')}
+                disabled={isUploading || isSubmitting}
+                style={{
+                  fontSize: '8pt',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#003399',
+                  textDecoration: 'underline',
+                }}
+              >
+                Add Photo
+              </button>
               <button
                 onClick={() => handlePostComment(event, commentText, true)}
-                disabled={isSubmitting}
-                style={{ fontSize: '8pt', padding: '2px 8px', cursor: 'pointer' }}
+                disabled={isSubmitting || isUploading}
+                style={{
+                  fontSize: '8pt',
+                  padding: '4px 10px',
+                  cursor: 'pointer',
+                  backgroundColor: '#003399',
+                  color: 'white',
+                  border: '1px solid #003366',
+                  borderRadius: '10px',
+                }}
               >
                 {isSubmitting ? 'Posting...' : 'Post Comment'}
               </button>
@@ -331,6 +491,13 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
           </div>
         )}
       </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        style={{ display: 'none' }}
+      />
     </div>
   );
 };

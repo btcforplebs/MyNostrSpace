@@ -4,7 +4,36 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 ## [Unreleased] - 2026-02-05
 
+### 🚀 Major Features
+
+#### **Blossom Integration for Comments**
+- **Authenticated Image Uploads**:
+  - Integrated **Blossom** media protocol into both `CommentWall` and `FeedItem` components.
+  - Added "Add Photo" text links (replacing icons) for a cleaner, retro-inspired UI.
+  - Automated URL injection: Uploaded image links are automatically appended to comment/reply text.
+- **Improved UX**:
+  - Implemented `Cmd + Enter` (Mac) and `Ctrl + Enter` (Windows/Linux) keyboard shortcuts for direct post submission.
+  - Removed intrusive "Comment posted" alert notifications for a more seamless experience.
+
+#### **Nested Threaded Conversations**
+- **In-Feed Threading**:
+  - Extended the recursively threaded reply structure from the thread page into individual homepage feed items.
+  - Implemented visual hierarchy with progressive indentation (20px per level) and blue left-border connectors for deep conversations.
+  - Added toggleable "Show thread" / "Collapse thread" functionality.
+  - Added "View full thread" links next to expanded threads for dedicated page navigation.
+
 ### ⚡ Performance Improvements
+
+#### **Wait-to-Render Threading**
+- Refactored `FeedItem` to use a dedicated sub-component for threaded comments.
+- **Lazy Tree Calculation**: Thread trees are now only calculated using `useMemo` when a user specifically clicks "Show thread," eliminating homepage mount lag.
+
+#### **Network & UI Optimization**
+- **Notification Efficiency**: Removed aggressive profile pre-fetching in the notification subscription loop; profiles now lazy-load via the `useProfile` hook only when viewed.
+- **Scroll Smoothness**: Added 150ms debounce to the Intersection Observer logic in `HomePage.tsx` to prevent scroll-blocking state updates.
+- **Media Processing Fast-Path**: 
+  - Optimized `processMediaEvent` regex logic with early returns for short content.
+  - Added direct tag parsing for Kind 1063 events to bypass expensive regex matches.
 
 #### **Virtual Scrolling Implementation**
 - **Homepage Feed Tab**:
@@ -29,6 +58,10 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 ### 🎨 UI/UX Enhancements
 
+#### **Repost Identity**
+- Replaced the generic 🔄 (Kind 6) icon with a tiny (16px) **Avatar of the reposter**.
+- Makes it immediately clear "who" is sharing content at a glance without cluttering the feed.
+
 #### **Modern Tab Design** (`HomePage.css`)
 - Completely redesigned view mode tabs (Feed, Media, Blog, Music, Live) with modern aesthetics:
   - Added rounded top corners (8px border-radius).
@@ -40,6 +73,7 @@ All notable changes to the MyNostrSpace project will be documented in this file.
   - Added smooth transitions (0.2s ease) for all interactive states.
 
 #### **Stream Listings Redesign**
+- Created new card-style design for stream items with orange accent borders and refined typography.
 - Created new `.stream-item` CSS class with card-style design:
   - Added border with orange left accent (3px solid).
   - Implemented hover effects (blue border + shadow).

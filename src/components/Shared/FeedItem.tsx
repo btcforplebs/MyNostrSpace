@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { RichTextRenderer } from './RichTextRenderer';
@@ -14,60 +14,70 @@ interface ThreadNode {
   children: ThreadNode[];
 }
 
-interface FeedItemProps {
-  event: NDKEvent;
-  hideThreadButton?: boolean;
+interface ThreadedCommentsProps {
+  rootEvent: NDKEvent;
+  comments: NDKEvent[];
+  loadingThread: boolean;
+  activeReplyId: string | null;
+  setActiveReplyId: (id: string | null) => void;
+  replyText: string;
+  setReplyText: (text: string) => void;
+  triggerUpload: (target: 'reply') => void;
+  handlePostComment: (parent: NDKEvent, text: string, isTopLevel: boolean) => Promise<void>;
+  isUploading: boolean;
+  isSubmitting: boolean;
 }
 
-export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = false }) => {
-  // ... (existing hooks) ...
-  const { ndk, user, login } = useNostr();
-  const { profile } = useProfile(event.pubkey);
-  // ... (existing state) ...
-  const [showCommentForm, setShowCommentForm] = useState(false);
-  const [showThread, setShowThread] = useState(false);
-  const [comments, setComments] = useState<NDKEvent[]>([]);
-  // ...
+const ThreadedComments: React.FC<ThreadedCommentsProps> = ({
+  rootEvent,
+  comments,
+  loadingThread,
+  activeReplyId,
+  setActiveReplyId,
+  replyText,
+  setReplyText,
+  triggerUpload,
+  handlePostComment,
+  isUploading,
+  isSubmitting,
+}) => {
+  // Build tree only when comments change
+  const buildTree = useCallback(
+    (events: NDKEvent[]): ThreadNode[] => {
+      const buildNode = (parentId: string): ThreadNode[] => {
+        const children = events
+          .filter((ev) => {
+            const eTags = ev.tags.filter((t: string[]) => t[0] === 'e');
+            const replyMarker = eTags.find((t: string[]) => t[3] === 'reply');
+            const rootMarker = eTags.find((t: string[]) => t[3] === 'root');
 
-  // Helper to build thread tree from flat comments
-  const buildTree = useCallback((events: NDKEvent[]): ThreadNode[] => {
-    const buildNode = (parentId: string): ThreadNode[] => {
-      const children = events
-        .filter((ev) => {
-          const eTags = ev.tags.filter((t) => t[0] === 'e');
-          const replyMarker = eTags.find((t) => t[3] === 'reply');
-          const rootMarker = eTags.find((t) => t[3] === 'root');
+            let directParentId = null;
+            if (replyMarker) {
+              directParentId = replyMarker[1];
+            } else if (rootMarker) {
+              const otherTags = eTags.filter((t: string[]) => t[3] !== 'root');
+              if (otherTags.length > 0) directParentId = otherTags[otherTags.length - 1][1];
+              else directParentId = rootMarker[1];
+            } else {
+              if (eTags.length > 0) directParentId = eTags[eTags.length - 1][1];
+            }
 
-          // Determine direct parent
-          let directParentId = null;
-          if (replyMarker) {
-            directParentId = replyMarker[1];
-          } else if (rootMarker) {
-            // If only root marker exists, and it's not this event (which would be weird for a child),
-            // check if there are other e tags.
-            // Standard NIP-10: root is the thread root. If there's no reply marker, the last e-tag is usually the parent (deprecated positional).
-            // MyNostrSpace clients add 'reply' markers.
-            // Fallback to last e-tag if no marker
-            const otherTags = eTags.filter(t => t[3] !== 'root');
-            if (otherTags.length > 0) directParentId = otherTags[otherTags.length - 1][1];
-            else directParentId = rootMarker[1]; // Direct reply to root
-          } else {
-            // No markers, use last e tag
-            if (eTags.length > 0) directParentId = eTags[eTags.length - 1][1];
-          }
+            return directParentId === parentId;
+          })
+          .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
 
-          return directParentId === parentId;
-        })
-        .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+        return children.map((child) => ({
+          event: child,
+          children: buildNode(child.id),
+        }));
+      };
 
-      return children.map((child) => ({
-        event: child,
-        children: buildNode(child.id),
-      }));
-    };
+      return buildNode(rootEvent.id);
+    },
+    [rootEvent.id]
+  );
 
-    return buildNode(event.id);
-  }, [event.id]);
+  const threadTree = useMemo(() => buildTree(comments), [comments, buildTree]);
 
   const renderThread = (nodes: ThreadNode[], depth: number = 0) => {
     return nodes.map((node) => (
@@ -104,7 +114,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
 
               <InteractionBar
                 event={node.event}
-                onCommentClick={() => setActiveReplyId(activeReplyId === node.event.id ? null : node.event.id)}
+                onCommentClick={() =>
+                  setActiveReplyId(activeReplyId === node.event.id ? null : node.event.id)
+                }
               />
 
               {activeReplyId === node.event.id && (
@@ -123,7 +135,14 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
                     }}
                     placeholder={`Reply to ${node.event.author.profile?.name || 'user'}...`}
                   />
-                  <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <div
+                    style={{
+                      textAlign: 'right',
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      gap: '10px',
+                    }}
+                  >
                     <button
                       type="button"
                       onClick={() => triggerUpload('reply')}
@@ -165,6 +184,34 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
     ));
   };
 
+  return (
+    <div
+      className="comment-thread"
+      style={{
+        marginTop: '10px',
+        paddingLeft: '15px',
+        borderLeft: '1px solid #ddd',
+      }}
+    >
+      {loadingThread && (
+        <div style={{ fontSize: '7.5pt', fontStyle: 'italic' }}>Loading thread...</div>
+      )}
+      {renderThread(threadTree)}
+    </div>
+  );
+};
+
+interface FeedItemProps {
+  event: NDKEvent;
+  hideThreadButton?: boolean;
+}
+
+export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = false }) => {
+  const { ndk, user, login } = useNostr();
+  const { profile } = useProfile(event.pubkey);
+  const [showCommentForm, setShowCommentForm] = useState(false);
+  const [showThread, setShowThread] = useState(false);
+  const [comments, setComments] = useState<NDKEvent[]>([]);
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -173,6 +220,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTarget, setUploadTarget] = useState<'comment' | 'reply' | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
   // Parse embedded repost content synchronously to avoid "Loading..." flash
   const [repostEvent, setRepostEvent] = useState<NDKEvent | null>(() => {
     if (event.kind === 6 && ndk && event.content) {
@@ -408,10 +456,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
             </a>
             {showThread && (
               <span style={{ marginLeft: '10px' }}>
-                <Link
-                  to={`/thread/${event.id}`}
-                  style={{ fontSize: '7.5pt', color: '#003399' }}
-                >
+                <Link to={`/thread/${event.id}`} style={{ fontSize: '7.5pt', color: '#003399' }}>
                   View full thread
                 </Link>
               </span>
@@ -420,19 +465,19 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
         )}
 
         {showThread && (
-          <div
-            className="comment-thread"
-            style={{
-              marginTop: '10px',
-              paddingLeft: '15px',
-              borderLeft: '1px solid #ddd',
-            }}
-          >
-            {loadingThread && (
-              <div style={{ fontSize: '7.5pt', fontStyle: 'italic' }}>Loading thread...</div>
-            )}
-            {renderThread(buildTree(comments))}
-          </div>
+          <ThreadedComments
+            rootEvent={event}
+            comments={comments}
+            loadingThread={loadingThread}
+            activeReplyId={activeReplyId}
+            setActiveReplyId={setActiveReplyId}
+            replyText={replyText}
+            setReplyText={setReplyText}
+            triggerUpload={triggerUpload}
+            handlePostComment={handlePostComment}
+            isUploading={isUploading}
+            isSubmitting={isSubmitting}
+          />
         )}
 
         {showCommentForm && (
@@ -456,7 +501,14 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
               }}
               placeholder="Write a comment..."
             />
-            <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div
+              style={{
+                textAlign: 'right',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+              }}
+            >
               <button
                 type="button"
                 onClick={() => triggerUpload('comment')}

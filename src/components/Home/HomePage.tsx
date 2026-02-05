@@ -196,22 +196,29 @@ const HomePage = () => {
   };
 
   const processMediaEvent = useCallback((ev: NDKEvent): MediaItem | null => {
+    // Fast path for Kind 1063 - URL is in tags, no regex needed
     if (ev.kind === 1063) {
       const url = ev.tags.find((t) => t[0] === 'url')?.[1];
+      if (!url) return null; // Early return if no URL
+
       const mime = ev.tags.find((t) => t[0] === 'm')?.[1] || '';
       const thumb = ev.tags.find((t) => t[0] === 'thumb' || t[0] === 'image')?.[1];
-      if (url) {
-        return {
-          id: ev.id,
-          url,
-          type: (mime.startsWith('video') ? 'video' : 'image') as 'image' | 'video',
-          created_at: ev.created_at || 0,
-          originalEvent: ev,
-          thumb,
-        };
-      }
-    } else if (ev.kind === 1) {
+      return {
+        id: ev.id,
+        url,
+        type: (mime.startsWith('video') ? 'video' : 'image') as 'image' | 'video',
+        created_at: ev.created_at || 0,
+        originalEvent: ev,
+        thumb,
+      };
+    }
+
+    if (ev.kind === 1) {
       const content = ev.content;
+
+      // Early return for empty or very short content
+      if (!content || content.length < 10) return null;
+
       const imgRegex = /(https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp))/i;
       const videoRegex = /(https?:\/\/\S+\.(?:mp4|mov|webm|avi|mkv|m3u8))/i;
 
@@ -252,9 +259,7 @@ const HomePage = () => {
         }
 
         // Fallback: extract any image URL from content that isn't the video URL
-        const imgMatches = content.match(
-          /https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)(\?[^\s]*)?/gi
-        );
+        const imgMatches = content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)(\?[^\s]*)?/gi);
         if (imgMatches) {
           return imgMatches.find((m) => m !== videoUrl);
         }
@@ -276,9 +281,7 @@ const HomePage = () => {
       }
 
       // Check for YouTube
-      const youtubeMatch = content.match(
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
-      );
+      const youtubeMatch = content.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
       if (youtubeMatch) {
         const videoId = youtubeMatch[1];
         return {
@@ -777,8 +780,7 @@ const HomePage = () => {
           const next = [ev, ...prev].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
           return next.slice(0, 50);
         });
-        // Pre-fetch author profile for the notification
-        ev.author.fetchProfile().catch(() => { });
+        // Profile will lazy-load when notification is viewed via useProfile hook
       });
     };
 
@@ -792,18 +794,25 @@ const HomePage = () => {
   useEffect(() => {
     if (viewMode !== 'feed') return;
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     const observer = new IntersectionObserver(
       (entries) => {
         const target = entries[0];
         if (target.isIntersecting) {
-          // Load more displayed items from existing feed
-          if (displayedFeedCount < feed.length) {
-            setDisplayedFeedCount((prev) => Math.min(prev + 20, feed.length));
-          }
-          // If we've displayed all items and there's more to fetch
-          else if (hasMoreFeed && !isLoadingMoreFeed) {
-            loadMoreFeed();
-          }
+          // Debounce to prevent rapid state updates during scroll
+          if (debounceTimer) clearTimeout(debounceTimer);
+
+          debounceTimer = setTimeout(() => {
+            // Load more displayed items from existing feed
+            if (displayedFeedCount < feed.length) {
+              setDisplayedFeedCount((prev) => Math.min(prev + 20, feed.length));
+            }
+            // If we've displayed all items and there's more to fetch
+            else if (hasMoreFeed && !isLoadingMoreFeed) {
+              loadMoreFeed();
+            }
+          }, 150); // 150ms debounce
         }
       },
       { threshold: 0.1, rootMargin: '100px' }
@@ -813,7 +822,10 @@ const HomePage = () => {
       observer.observe(loadMoreTriggerRef.current);
     }
 
-    return () => observer.disconnect();
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      observer.disconnect();
+    };
   }, [viewMode, displayedFeedCount, feed.length, hasMoreFeed, isLoadingMoreFeed, loadMoreFeed]);
 
   // Reset displayed count when feed changes significantly
@@ -1237,7 +1249,10 @@ const HomePage = () => {
                         <div style={{ padding: '20px', width: '100%' }}>Loading Media...</div>
                       )}
                       {(() => {
-                        const columns: MediaItem[][] = Array.from({ length: columnCount }, () => []);
+                        const columns: MediaItem[][] = Array.from(
+                          { length: columnCount },
+                          () => []
+                        );
                         mediaItems.forEach((item, index) => {
                           columns[index % columnCount].push(item);
                         });
@@ -1413,7 +1428,7 @@ const HomePage = () => {
       <BlogEditor
         isOpen={isBlogModalOpen}
         onClose={() => setIsBlogModalOpen(false)}
-        onPostComplete={() => { }}
+        onPostComplete={() => {}}
       />
     </div>
   );

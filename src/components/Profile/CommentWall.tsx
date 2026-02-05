@@ -65,7 +65,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
           .then(() => {
             setComments((prev) => [...prev]); // Trigger re-render
           })
-          .catch(() => { });
+          .catch(() => {});
       });
     } catch (err) {
       console.error('Failed to fetch comments:', err);
@@ -226,7 +226,15 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
               }}
               placeholder={`Reply to ${comment.author?.profile?.name || 'user'}...`}
             />
-            <div style={{ textAlign: 'right', marginTop: '5px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div
+              style={{
+                textAlign: 'right',
+                marginTop: '5px',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+              }}
+            >
               <button
                 type="button"
                 onClick={() => triggerUpload('reply')}
@@ -295,7 +303,14 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
                 }}
                 placeholder="Leave a comment..."
               />
-              <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <div
+                style={{
+                  textAlign: 'right',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                }}
+              >
                 <button
                   type="button"
                   onClick={() => triggerUpload('comment')}

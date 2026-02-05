@@ -136,9 +136,7 @@ export const ThreadPage = () => {
             <FeedItem event={rootEvent} hideThreadButton={true} />
 
             {threadTree.length > 0 && (
-              <div style={{ marginTop: '15px' }}>
-                {renderThread(threadTree)}
-              </div>
+              <div style={{ marginTop: '15px' }}>{renderThread(threadTree)}</div>
             )}
 
             {threadTree.length === 0 && (

@@ -18,6 +18,12 @@
   color: #003399;
 }
 
+/* Navbar links should be white on blue background */
+.myspace-container .navbar-container a,
+.myspace-container .navbar-header a {
+  color: white !important;
+}
+
 .myspace-container {
   min-height: 100vh;
   font-family: Arial, Helvetica, sans-serif;

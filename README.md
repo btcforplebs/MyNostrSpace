@@ -15,8 +15,18 @@ Welcome to **mynostrspace.com**, the ultimate fusion of 2005 social media nostal
 - **🎵 Music Player**: Integrated with **Wavlake** to bring your favorite tracks to your page. Retro player skin? Included.
 - **🖼️ Photo Lightbox**: High-performance image viewing with a simple click.
 - **💬 Comment Wall**: Leave notes for your friends, just like the old days, but signed with your Nostr keys.
+- **📺 Live Streams**: Watch and host live streams with HLS support. Integrated chat for real-time interaction.
+- **🎬 Videos & Films**: Dedicated pages for video content discovery. Parse video links from posts, YouTube, Vimeo, and more.
+- **📝 Long-form Blogs**: Read and write long-form articles (Kind 30023) with the built-in blog editor.
+- **🛒 Marketplace**: Browse products and listings from the Nostr marketplace (Kind 30017/30018).
+- **📅 Calendar View**: Visualize your posts and articles in a monthly calendar format.
 - **🌩️ Blossom Support**: Seamlessly upload background images and media using the Blossom media protocol.
 - **📱 Mobile Optimized**: A responsive experience that feels native on your phone while keeping that desktop-retro vibe.
+- **⚡ Performance Optimized**: 
+  - **Virtual Scrolling**: Smart lazy-loading on feeds and streams - only renders what you see, dramatically improving page speed.
+  - **Threaded Conversations**: Proper nested reply structure in thread view with visual hierarchy.
+  - **Progressive Loading**: Intersection Observer-based infinite scroll for smooth, fast browsing.
+  - **Batched Updates**: Optimized event handling prevents UI lag even with hundreds of posts.
 
 ---
 

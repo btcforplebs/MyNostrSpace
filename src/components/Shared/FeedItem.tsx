@@ -10,9 +10,10 @@ import { Avatar } from './Avatar';
 
 interface FeedItemProps {
   event: NDKEvent;
+  hideThreadButton?: boolean;
 }
 
-export const FeedItem: React.FC<FeedItemProps> = ({ event }) => {
+export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = false }) => {
   const { ndk, user, login } = useNostr();
   const { profile } = useProfile(event.pubkey);
   const [showCommentForm, setShowCommentForm] = useState(false);
@@ -209,18 +210,20 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event }) => {
 
         <InteractionBar event={event} onCommentClick={() => setShowCommentForm(!showCommentForm)} />
 
-        <div style={{ marginTop: '5px' }}>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              setShowThread(!showThread);
-            }}
-            style={{ fontSize: '7.5pt', color: '#003399' }}
-          >
-            {showThread ? 'Collapse thread' : 'Show thread'}
-          </a>
-        </div>
+        {!hideThreadButton && (
+          <div style={{ marginTop: '5px' }}>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowThread(!showThread);
+              }}
+              style={{ fontSize: '7.5pt', color: '#003399' }}
+            >
+              {showThread ? 'Collapse thread' : 'Show thread'}
+            </a>
+          </div>
+        )}
 
         {showThread && (
           <div

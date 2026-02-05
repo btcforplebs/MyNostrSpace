@@ -11,7 +11,6 @@ async function main() {
       'wss://nos.lol',
       'wss://relay.damus.io',
       'wss://relay.highlighter.com',
-      'wss://relay.nostr.band',
     ],
   });
 

@@ -4,8 +4,6 @@ import 'websocket-polyfill';
 const npub = 'npub16ucdkrgndlnpa8aupwc8rs9j2nltpu5n6mejkzjd2wtqwajd6xuqvqe3qq';
 const { data: pubkey } = nip19.decode(npub);
 
-const relays = ['wss://relay.nostr.band', 'wss://relay.damus.io'];
-
 async function main() {
   const pool = new SimplePool();
 

@@ -2,12 +2,7 @@ import NDK, { NDKEvent } from '@nostr-dev-kit/ndk';
 import 'websocket-polyfill';
 
 const npub = 'npub16ucdkrgndlnpa8aupwc8rs9j2nltpu5n6mejkzjd2wtqwajd6xuqvqe3qq';
-const relays = [
-  'wss://relay.damus.io',
-  'wss://relay.nostr.band',
-  'wss://nos.lol',
-  'wss://relay.snort.social',
-];
+const relays = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.snort.social'];
 
 async function main() {
   const ndk = new NDK({ explicitRelayUrls: relays });

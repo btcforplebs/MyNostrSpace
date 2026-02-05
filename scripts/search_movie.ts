@@ -1,8 +1,6 @@
 import { SimplePool } from 'nostr-tools';
 import 'websocket-polyfill';
 
-const relays = ['wss://relay.nostr.band', 'wss://search.nos.lol', 'wss://relay.damus.io'];
-
 async function main() {
   const pool = new SimplePool();
   console.log('Searching for "The Chronicles Of Riddick"...');

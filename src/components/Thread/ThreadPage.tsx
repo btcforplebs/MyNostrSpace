@@ -5,11 +5,16 @@ import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
 import { FeedItem } from '../Shared/FeedItem';
 
+interface ThreadNode {
+  event: NDKEvent;
+  children: ThreadNode[];
+}
+
 export const ThreadPage = () => {
   const { eventId } = useParams();
   const { ndk } = useNostr();
   const [rootEvent, setRootEvent] = useState<NDKEvent | null>(null);
-  const [replies, setReplies] = useState<NDKEvent[]>([]);
+  const [threadTree, setThreadTree] = useState<ThreadNode[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,34 +23,53 @@ export const ThreadPage = () => {
     const fetchThread = async () => {
       setLoading(true);
       try {
-        // 1. Fetch the specific event requested
+        // 1. Fetch the root event
         const event = await ndk.fetchEvent(eventId);
         if (!event) {
           setLoading(false);
           return;
         }
         await event.author.fetchProfile();
-
-        // 2. Identify the true root of the thread if this is a reply
-        // Check 'e' tags with 'root' marker, or first 'e' tag if no markers
-        // For simplicity in this "View Thread" context, let's treat the clicked event as the focal point
-        // But ideally we want to show the context (parents) and replies (children).
-
-        // Let's just fetch the event and its direct children for now.
         setRootEvent(event);
 
+        // 2. Fetch ALL replies to this event
         const replyFilter: NDKFilter = {
           kinds: [1],
           '#e': [event.id],
         };
 
         const replyEvents = await ndk.fetchEvents(replyFilter);
-        const sortedReplies = Array.from(replyEvents).sort(
-          (a, b) => (a.created_at || 0) - (b.created_at || 0)
-        );
+        const allReplies = Array.from(replyEvents);
 
-        await Promise.all(sortedReplies.map((r) => r.author.fetchProfile()));
-        setReplies(sortedReplies);
+        // Fetch profiles for all replies
+        await Promise.all(allReplies.map((r) => r.author.fetchProfile()));
+
+        // 3. Build a tree structure
+        const buildTree = (parentId: string): ThreadNode[] => {
+          const children = allReplies.filter((reply) => {
+            const eTags = reply.tags.filter((t) => t[0] === 'e');
+
+            // Find the direct parent (reply marker or last e-tag)
+            const replyMarkerTag = eTags.find((t) => t[3] === 'reply');
+            const directParentId = replyMarkerTag
+              ? replyMarkerTag[1]
+              : eTags.length > 0
+                ? eTags[eTags.length - 1][1]
+                : null;
+
+            return directParentId === parentId;
+          });
+
+          return children
+            .sort((a, b) => (a.created_at || 0) - (b.created_at || 0))
+            .map((child) => ({
+              event: child,
+              children: buildTree(child.id),
+            }));
+        };
+
+        const tree = buildTree(event.id);
+        setThreadTree(tree);
       } catch (err) {
         console.error('Error fetching thread:', err);
       } finally {
@@ -55,6 +79,23 @@ export const ThreadPage = () => {
 
     fetchThread();
   }, [ndk, eventId]);
+
+  const renderThread = (nodes: ThreadNode[], depth: number = 0) => {
+    return nodes.map((node) => (
+      <div key={node.event.id} style={{ marginBottom: '10px' }}>
+        <div
+          style={{
+            marginLeft: depth > 0 ? '30px' : '0',
+            borderLeft: depth > 0 ? '2px solid #6699cc' : 'none',
+            paddingLeft: depth > 0 ? '10px' : '0',
+          }}
+        >
+          <FeedItem event={node.event} hideThreadButton={true} />
+        </div>
+        {node.children.length > 0 && renderThread(node.children, depth + 1)}
+      </div>
+    ));
+  };
 
   return (
     <div className="thread-page-container">
@@ -81,71 +122,54 @@ export const ThreadPage = () => {
             padding: '3px 5px',
             fontSize: '10pt',
             fontWeight: 'bold',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
           }}
         >
-          <span>Thread View</span>
+          Thread View
         </div>
 
-        {loading && <div>Loading thread...</div>}
+        {loading && <div style={{ padding: '20px' }}>Loading thread...</div>}
 
-        {!loading && !rootEvent && <div>Event not found.</div>}
+        {!loading && !rootEvent && <div style={{ padding: '20px' }}>Event not found.</div>}
 
         {!loading && rootEvent && (
-          <div className="thread-root">
-            <FeedItem event={rootEvent} />
+          <div className="thread-root" style={{ marginTop: '10px' }}>
+            <FeedItem event={rootEvent} hideThreadButton={true} />
 
-            <div
-              className="thread-replies"
-              style={{
-                marginLeft: '20px',
-                marginTop: '20px',
-                borderLeft: '1px solid #ddd',
-                paddingLeft: '10px',
-              }}
-            >
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '10pt', color: '#666' }}>Replies</h4>
-              {replies.length === 0 && (
-                <div style={{ color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
-                  No replies yet.
-                </div>
-              )}
-              {replies.map((reply) => (
-                <div key={reply.id} style={{ marginBottom: '15px' }}>
-                  <FeedItem event={reply} />
-                </div>
-              ))}
-            </div>
+            {threadTree.length > 0 && (
+              <div style={{ marginTop: '15px' }}>
+                {renderThread(threadTree)}
+              </div>
+            )}
+
+            {threadTree.length === 0 && (
+              <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
+                No replies yet.
+              </div>
+            )}
           </div>
         )}
       </div>
 
       <style>{`
-                .thread-page-container {
-                    background-color: #e5e5e5;
-                    min-height: 100vh;
-                    font-family: verdana, arial, sans-serif, helvetica;
-                    padding: 10px 0;
-                }
-                .thread-content {
-                    max-width: 800px;
-                    margin: 0 auto;
-                    padding: 10px;
-                    background-color: white;
-                    border: 1px solid #ccc;
-                    margin-top: 10px;
-                    color: black;
-                }
-                .thread-root {
-                    border: 1px solid #6699cc;
-                    margin-top: 10px;
-                }
-                .thread-replies {
-                    margin-top: 20px;
-                }
-            `}</style>
+        .thread-page-container {
+          background-color: #e5e5e5;
+          min-height: 100vh;
+          font-family: verdana, arial, sans-serif, helvetica;
+          padding: 10px 0;
+        }
+        .thread-content {
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 10px;
+          background-color: white;
+          border: 1px solid #ccc;
+          margin-top: 10px;
+          color: black;
+        }
+        .thread-root {
+          padding: 10px;
+        }
+      `}</style>
     </div>
   );
 };

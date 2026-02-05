@@ -48,6 +48,17 @@ All notable changes to the MyNostrSpace project will be documented in this file.
   - Smooth transitions on hover (0.2s ease).
   - Consistent with MySpace aesthetic while feeling modern.
 
+#### **Thread View Improvements** (`ThreadPage.tsx`)
+- Completely redesigned thread view with proper nested conversation structure:
+  - Implemented tree-based reply hierarchy where replies are indented under their parent comments.
+  - Replies to a specific comment now appear directly beneath that comment with visual indentation.
+  - Added blue left border (2px solid #6699cc) for nested replies to show conversation depth.
+  - Progressive indentation (30px per level) for multi-level conversations.
+  - Removed redundant "Show thread" buttons when already in thread view.
+  - Added `hideThreadButton` prop to FeedItem component for context-aware UI.
+  - Follows NIP-10 conventions for reply detection (reply marker or last e-tag).
+  - Maintains feed-like styling for consistency across the application.
+
 ### 🛠 Technical Implementation
 
 - **State Management**:

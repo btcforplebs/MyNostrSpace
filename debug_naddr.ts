@@ -27,7 +27,6 @@ async function main() {
                 'wss://nos.lol',
                 'wss://relay.damus.io',
                 'wss://relay.snort.social',
-                'wss://relay.nostr.band',
                 'wss://purplepag.es',
                 'wss://relay.primal.net',
                 'wss://relay.current.fyi',

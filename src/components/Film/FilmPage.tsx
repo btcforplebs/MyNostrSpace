@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import type { NDKEvent, NDKFilter } from '@nostr-dev-kit/ndk';
 import NDK from '@nostr-dev-kit/ndk';
 import ReactPlayer from 'react-player';
@@ -7,6 +7,14 @@ import './FilmPage.css';
 
 // Castr Movie Curator NPUB
 const MOVIE_PUBKEY = '5cd5f8052c6791e4879f0e4db913465d711d5f5fe0c0ab99049c6064c5a395a2';
+
+// Specific relays for movie content - relay.nostr.band is critical!
+const FILM_RELAYS = [
+    'wss://relay.nostr.band',
+    'wss://relay.damus.io',
+    'wss://nos.lol',
+    'wss://relay.snort.social',
+];
 
 interface Movie {
     id: string;
@@ -17,99 +25,158 @@ interface Movie {
     event: NDKEvent;
 }
 
-const RELAYS = [
-    'wss://relay.nostr.band',
-    'wss://relay.damus.io',
-    'wss://nos.lol',
-    'wss://relay.snort.social'
-];
+const cleanVideoUrl = (url: string): string => {
+    try {
+        // eslint-disable-next-line no-control-regex
+        const decoded = decodeURIComponent(url).replace(/\u0000/g, '');
+        return encodeURI(decoded);
+    } catch {
+        console.warn('Failed to clean video URL:', url);
+        return encodeURI(url);
+    }
+};
+
+const parseMovieEvent = (event: NDKEvent): Movie | null => {
+    const content = event.content;
+
+    // Relaxed regex to match more formats, but still look for Title (Year) pattern
+    // roughly match start of line, some text, then (Year)
+    const titleMatch = content.match(/^(.*?)\s*\((\d{4})\)/m);
+
+    if (!titleMatch) return null;
+
+    const title = titleMatch[1].trim();
+    const year = titleMatch[2];
+
+    let poster = '';
+    // Look for image extensions
+    const imgMatch = content.match(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp)/i);
+    if (imgMatch) {
+        poster = imgMatch[0];
+    }
+
+    let videoUrl = '';
+    // Priority 1: 'r' tags with .mp4 or archive.org
+    const rTags = event.tags.filter((t) => t[0] === 'r');
+    const videoTag = rTags.find((t) => t[1].endsWith('.mp4') || t[1].includes('archive.org'));
+
+    if (videoTag) {
+        videoUrl = videoTag[1];
+    } else {
+        // Priority 2: In-content link
+        const vidMatch = content.match(/https?:\/\/\S+\.(?:mp4|m3u8)/i);
+        if (vidMatch) {
+            videoUrl = vidMatch[0];
+        }
+    }
+
+    if (!videoUrl) return null;
+
+    return {
+        id: event.id,
+        title,
+        year,
+        poster,
+        videoUrl: cleanVideoUrl(videoUrl),
+        event,
+    };
+};
 
 export const FilmPage = () => {
     const [movies, setMovies] = useState<Movie[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
     const ndkRef = useRef<NDK | null>(null);
+    const mountedRef = useRef(true);
 
-    useEffect(() => {
-        const initNDK = async () => {
-            const ndk = new NDK({ explicitRelayUrls: RELAYS });
-            ndkRef.current = ndk;
-            await ndk.connect();
-            fetchMovies(ndk);
-        };
+    // Use a ref for movies to check duplicates without dependency issues
+    const moviesRef = useRef<Set<string>>(new Set());
 
-        if (!ndkRef.current) {
-            initNDK();
-        }
-    }, []);
-
-    const fetchMovies = async (ndk: NDK) => {
+    const fetchMovies = useCallback((ndk: NDK) => {
         const filter: NDKFilter = {
             authors: [MOVIE_PUBKEY],
             kinds: [1], // Text notes containing movie info
-            limit: 50
+            limit: 2000, // Significantly increased limit
         };
 
-        const events = await ndk.fetchEvents(filter);
-        const processedMovies: Movie[] = [];
+        const sub = ndk.subscribe(filter, { closeOnEose: false });
 
-        for (const event of events) {
+        // Batch updates to prevent UI freezing
+        let eventBuffer: Movie[] = [];
+        let isUpdatePending = false;
+
+        const flushBuffer = () => {
+            if (!mountedRef.current) return;
+            if (eventBuffer.length === 0) {
+                if (loading) setLoading(false); // Ensure loading stops eventually
+                return;
+            }
+
+            setMovies((prev) => {
+                const newMovies = [...prev];
+                let added = false;
+
+                for (const movie of eventBuffer) {
+                    if (!moviesRef.current.has(movie.id)) {
+                        newMovies.push(movie);
+                        moviesRef.current.add(movie.id);
+                        added = true;
+                    }
+                }
+
+                if (!added) return prev;
+
+                return newMovies.sort((a, b) => {
+                    return (b.event.created_at || 0) - (a.event.created_at || 0);
+                });
+            });
+
+            setLoading(false); // First batch received, stop loading spinner
+            eventBuffer = [];
+            isUpdatePending = false;
+        };
+
+        sub.on('event', (event: NDKEvent) => {
             const movie = parseMovieEvent(event);
             if (movie) {
-                processedMovies.push(movie);
+                eventBuffer.push(movie);
+                if (!isUpdatePending) {
+                    isUpdatePending = true;
+                    setTimeout(flushBuffer, 500); // Debounce updates
+                }
             }
-        }
+        });
 
-        setMovies(processedMovies);
-        setLoading(false);
-    };
+        sub.on('eose', () => {
+            flushBuffer();
+        });
+    }, [loading]);
 
-    const parseMovieEvent = (event: NDKEvent): Movie | null => {
-        const content = event.content;
+    useEffect(() => {
+        mountedRef.current = true;
 
-        // Extract Title and Year (usually first line: "Title (Year)")
-        const lines = content.split('\n');
-        const titleLine = lines[0] || '';
-        const titleMatch = titleLine.match(/^(.*?)\s*\((\d{4})\)/);
+        const initNDK = async () => {
+            if (ndkRef.current) return; // Already initialized
 
-        const title = titleMatch ? titleMatch[1] : titleLine;
-        const year = titleMatch ? titleMatch[2] : '';
-
-        // Extract Poster (look for images in content or tags)
-        let poster = '';
-        const imgMatch = content.match(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp)/i);
-        if (imgMatch) {
-            poster = imgMatch[0];
-        }
-
-        // Extract Video URL (look for archive.org mp4 or other video/r tags)
-        let videoUrl = '';
-
-        // Priority 1: 'r' tags which are often used for citations/links
-        const rTags = event.tags.filter(t => t[0] === 'r');
-        const videoTag = rTags.find(t => t[1].endsWith('.mp4') || t[1].includes('archive.org'));
-
-        if (videoTag) {
-            videoUrl = videoTag[1];
-        } else {
-            // Priority 2: In-content link
-            const vidMatch = content.match(/https?:\/\/\S+\.(?:mp4|m3u8)/i);
-            if (vidMatch) {
-                videoUrl = vidMatch[0];
+            const ndk = new NDK({ explicitRelayUrls: FILM_RELAYS });
+            ndkRef.current = ndk;
+            try {
+                await ndk.connect();
+                if (mountedRef.current) {
+                    fetchMovies(ndk);
+                }
+            } catch (err) {
+                console.error("Failed to connect to film relays", err);
+                setLoading(false);
             }
-        }
-
-        if (!videoUrl) return null; // Only show if we have a playable video
-
-        return {
-            id: event.id,
-            title,
-            year,
-            poster,
-            videoUrl,
-            event
         };
-    };
+
+        initNDK();
+
+        return () => {
+            mountedRef.current = false;
+        };
+    }, [fetchMovies]);
 
     return (
         <div className="film-page-container">
@@ -118,16 +185,34 @@ export const FilmPage = () => {
             </div>
 
             <div className="film-content">
-                <h2 className="section-header">My Private Movie Collection</h2>
+                <div className="fp-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 className="section-header">My Private Movie Collection</h2>
+                    {!loading && <div style={{ color: '#666' }}>Found {movies.length} films</div>}
+                </div>
 
-                {loading ? (
+                {loading && movies.length === 0 ? (
                     <div className="loading-spiral">Loading latest films...</div>
                 ) : (
                     <div className="film-grid">
-                        {movies.map(movie => (
+                        {movies.map((movie) => (
                             <div key={movie.id} className="film-card" onClick={() => setSelectedMovie(movie)}>
                                 <div className="film-poster-wrapper">
-                                    <img src={movie.poster} alt={movie.title} className="film-poster" loading="lazy" />
+                                    {movie.poster ? (
+                                        <img
+                                            src={movie.poster}
+                                            alt={movie.title}
+                                            className="film-poster"
+                                            loading="lazy"
+                                            onError={(e) => {
+                                                // Fallback for broken images
+                                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x450?text=No+Poster';
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="film-poster-placeholder">
+                                            <span>{movie.title}</span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="film-info">
                                     <h3 className="film-title">{movie.title}</h3>
@@ -141,21 +226,49 @@ export const FilmPage = () => {
 
             {selectedMovie && (
                 <div className="film-modal-overlay" onClick={() => setSelectedMovie(null)}>
-                    <div className="film-modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="film-modal-content" onClick={(e) => e.stopPropagation()}>
                         <div className="film-modal-header">
-                            <h3>{selectedMovie.title} ({selectedMovie.year})</h3>
-                            <button className="close-modal-btn" onClick={() => setSelectedMovie(null)}>×</button>
+                            <h3>
+                                {selectedMovie.title} ({selectedMovie.year})
+                            </h3>
+                            <button className="close-modal-btn" onClick={() => setSelectedMovie(null)}>
+                                ×
+                            </button>
                         </div>
                         <div className="film-player-wrapper">
-                            <ReactPlayer
-                                // @ts-expect-error ReactPlayer types are notoriously tricky with strict mode
-                                url={selectedMovie.videoUrl}
-                                className="film-player"
-                                width="100%"
-                                height="100%"
-                                controls
-                                playing
-                            />
+                            {selectedMovie.videoUrl.match(/\.(mp4|webm|ogg)$/i) ? (
+                                <video
+                                    src={selectedMovie.videoUrl}
+                                    className="film-player"
+                                    width="100%"
+                                    height="100%"
+                                    controls
+                                    autoPlay
+                                    playsInline
+                                >
+                                    Your browser does not support the video tag.
+                                </video>
+                            ) : selectedMovie.videoUrl.includes('archive.org') && !selectedMovie.videoUrl.match(/\.mp4$/) ? (
+                                <iframe
+                                    src={selectedMovie.videoUrl.replace('/details/', '/embed/')}
+                                    className="film-player"
+                                    width="100%"
+                                    height="100%"
+                                    frameBorder="0"
+                                    allowFullScreen
+                                    title={selectedMovie.title}
+                                />
+                            ) : (
+                                <ReactPlayer
+                                    // @ts-expect-error ReactPlayer types are notoriously tricky with strict mode
+                                    url={selectedMovie.videoUrl}
+                                    className="film-player"
+                                    width="100%"
+                                    height="100%"
+                                    controls
+                                    playing
+                                />
+                            )}
                         </div>
                         <div className="film-details">
                             <p className="film-meta">Event ID: {selectedMovie.id}</p>

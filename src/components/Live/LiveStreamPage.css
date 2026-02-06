@@ -1,4 +1,4 @@
-.myspace-container {
+.home-page-container {
   background-color: #e5e5e5;
   color: #000;
 }
@@ -36,18 +36,16 @@
 }
 
 .myspace-body {
-  width: 95%;
-  /* Use percentage to ensure margins don't cause overflow */
+  width: 100%;
   max-width: 992px;
-  /* Increased from 960px for larger video */
-  margin: 20px auto;
+  margin: 0 auto;
   background-color: white;
   display: flex;
   gap: 20px;
   padding: 20px;
-  border: 1px solid #6699cc;
+  border-left: 1px solid #6699cc;
+  border-right: 1px solid #6699cc;
   box-sizing: border-box;
-  /* Explicit check */
 }
 
 .col-left {
@@ -163,10 +161,10 @@
 
 /* Chat Box */
 .chat-window {
-  height: 300px;
+  height: 400px;
   overflow-y: auto;
   padding: 10px;
-  background-color: #f9f9f9;
+  background-color: #ffffff;
   border-bottom: 1px solid #ccc;
 }
 
@@ -198,7 +196,7 @@
   padding: 10px;
   display: flex;
   gap: 10px;
-  background-color: #eee;
+  background-color: #ffffff;
 }
 
 .chat-input-area input {
@@ -236,9 +234,9 @@
   color: #666;
   font-size: 0.8rem;
   background-color: white;
-  width: 95%;
+  width: 100%;
   max-width: 992px;
-  margin: 0 auto 20px auto;
+  margin: 0 auto;
   border: 1px solid #6699cc;
   border-top: none;
   box-sizing: border-box;

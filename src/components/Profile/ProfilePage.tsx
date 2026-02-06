@@ -762,6 +762,137 @@ const ProfileLivestreams = ({ pubkey }: { pubkey: string }) => {
   );
 };
 
+// --- ProfileBadges ---
+
+interface BadgeDisplay {
+  id: string;
+  dTag: string;
+  name: string;
+  description: string;
+  image: string;
+  issuerPubkey: string;
+  issuerName?: string;
+}
+
+const ProfileBadges = ({ pubkey }: { pubkey: string }) => {
+  const { ndk } = useNostr();
+  const [badges, setBadges] = useState<BadgeDisplay[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!ndk || !pubkey) return;
+
+    const fetchBadges = async () => {
+      // Fetch user's profile badges (Kind 30008 with d=profile_badges)
+      const profileBadgesEvent = await ndk.fetchEvent({
+        kinds: [30008 as number],
+        authors: [pubkey],
+        '#d': ['profile_badges'],
+      });
+
+      if (!profileBadgesEvent) {
+        setLoading(false);
+        return;
+      }
+
+      // Parse badge references from profile badges event
+      const badgeRefs: { aTag: string; eTag: string }[] = [];
+      const tags = profileBadgesEvent.tags;
+      for (let i = 0; i < tags.length; i++) {
+        if (tags[i][0] === 'a' && tags[i + 1]?.[0] === 'e') {
+          badgeRefs.push({ aTag: tags[i][1], eTag: tags[i + 1][1] });
+          i++; // Skip the e tag
+        }
+      }
+
+      // Fetch badge definitions for each reference
+      const badgeDisplays: BadgeDisplay[] = [];
+      for (const ref of badgeRefs) {
+        // Parse a tag: 30009:pubkey:d-tag
+        const [, issuerPubkey, dTag] = ref.aTag.split(':');
+        if (!issuerPubkey || !dTag) continue;
+
+        const defEvent = await ndk.fetchEvent({
+          kinds: [30009 as number],
+          authors: [issuerPubkey],
+          '#d': [dTag],
+        });
+
+        if (defEvent) {
+          const name = defEvent.getMatchingTags('name')[0]?.[1] || dTag;
+          const description = defEvent.getMatchingTags('description')[0]?.[1] || '';
+          const image = defEvent.getMatchingTags('image')[0]?.[1] || '';
+          const thumb = defEvent.getMatchingTags('thumb')[0]?.[1];
+
+          if (image) {
+            badgeDisplays.push({
+              id: defEvent.id,
+              dTag,
+              name,
+              description,
+              image: thumb || image,
+              issuerPubkey,
+            });
+          }
+        }
+      }
+
+      // Fetch issuer profiles
+      for (const badge of badgeDisplays) {
+        try {
+          const profile = await ndk.getUser({ pubkey: badge.issuerPubkey }).fetchProfile();
+          if (profile) {
+            badge.issuerName = profile.name || profile.displayName || badge.issuerPubkey.slice(0, 8);
+          }
+        } catch {
+          badge.issuerName = badge.issuerPubkey.slice(0, 8);
+        }
+      }
+
+      setBadges(badgeDisplays);
+      setLoading(false);
+    };
+
+    fetchBadges();
+  }, [ndk, pubkey]);
+
+  if (loading) return null;
+  if (badges.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '8px',
+        padding: '10px',
+        background: '#f9f9f9',
+        border: '1px solid #ccc',
+        marginBottom: '15px',
+      }}
+    >
+      {badges.map((badge) => (
+        <div
+          key={badge.id}
+          title={`${badge.name}${badge.description ? ` - ${badge.description}` : ''}`}
+          style={{
+            width: '40px',
+            height: '40px',
+            cursor: 'pointer',
+          }}
+        >
+          <img
+            src={badge.image}
+            alt={badge.name}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }}
+            loading="lazy"
+          />
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // --- Main ProfilePage ---
 
 const ProfilePage = () => {
@@ -1125,6 +1256,12 @@ const ProfilePage = () => {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Badges Display - Icons */}
+          <div className="badges-box">
+            <h3 className="section-header">Badges</h3>
+            <ProfileBadges pubkey={hexPubkey || ''} />
           </div>
 
           {/* Pass the dynamic music URL or Playlist */}

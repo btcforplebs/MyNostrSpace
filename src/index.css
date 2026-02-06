@@ -63,6 +63,7 @@ button {
 }
 
 @media (max-width: 768px) {
+
   input,
   textarea,
   select {
@@ -114,7 +115,7 @@ button:focus-visible {
 
 /* Retro Loading Screen, styled like old MySpace login */
 .loading-screen {
-  background-color: #e5e5e5;
+  background-color: white;
   height: 100vh;
   height: 100dvh;
   width: 100vw;

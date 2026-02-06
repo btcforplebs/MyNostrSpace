@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
-import './BrowsePage.css';
+import '../Landing/LandingPage.css'; // Reuse Landing Page CSS directly
+import './BrowsePage.css'; // Additional overrides if needed
 
 interface BrowseProfile {
   pubkey: string;
@@ -25,6 +26,21 @@ const POPULAR_SITES: ExternalLink[] = [
   { name: 'Nostr.watch', url: 'https://nostr.watch' },
 ];
 
+const CATEGORIES = [
+  { name: 'Videos', link: '/videos', icon: '📺' },
+  { name: 'Audio Rooms', link: '/audio-rooms', icon: '🎙️' },
+  { name: 'Music', link: '/music', icon: '🎵' },
+  { name: 'Marketplace', link: '/marketplace', icon: '🛍️' },
+  { name: 'Livestreams', link: '/livestreams', icon: '🔴' },
+  { name: 'Blogs', link: '/blogs', icon: '📝' },
+  { name: 'Recipes', link: '/recipes', icon: '🍳' },
+  { name: 'Photos', link: '/photos', icon: '📸' },
+  { name: 'Badges', link: '/badges', icon: '🏅' },
+  { name: 'Search', link: '/search', icon: '🔍' },
+  { name: 'Calendar', link: '/calendar', icon: '📅' },
+  { name: 'Film', link: '/film', icon: '📽️' },
+];
+
 const NoteMedia = ({ content }: { content: string }) => {
   // Simple regex to find the first URL
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -42,7 +58,7 @@ const NoteMedia = ({ content }: { content: string }) => {
         <img
           src={url}
           alt="Note Attachment"
-          style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain' }}
+          style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain', border: '1px solid #ccc' }}
         />
       </div>
     );
@@ -125,15 +141,13 @@ export const BrowsePage = () => {
         setProfiles(processedProfiles);
 
         // 2. Fetch "Popular" Notes (Kind 1, filtered for top-level)
-        // Fetch more initially to allow for filtering
         const noteFilter: NDKFilter = { kinds: [1], limit: 100 };
         const noteEvents = await ndk.fetchEvents(noteFilter);
 
-        // Filter out replies (events with 'e' tags) and sort new to old
         const notesArray = Array.from(noteEvents)
           .filter((event) => !event.tags.some((tag) => tag[0] === 'e'))
           .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
-          .slice(0, 20); // Take top 20 recent top-level posts
+          .slice(0, 20);
 
         await Promise.all(notesArray.map((n) => n.author.fetchProfile()));
 
@@ -149,83 +163,95 @@ export const BrowsePage = () => {
   }, [ndk]);
 
   return (
-    <div className="browse-page-container">
-      <div className="browse-header-area">
+    <div className="landing-container">
+      <div className="landing-nav-wrapper">
         <Navbar />
       </div>
-      <div className="browse-layout">
-        {/* Left Column: People to Friend & Popular Sites */}
-        <div className="browse-left-column">
-          <h2 className="section-header">People to Friend</h2>
-          <div className="browse-people-grid" style={{ marginBottom: '20px' }}>
-            {profiles.map((profile) => (
-              <div key={profile.pubkey} className="browse-profile-card">
-                <Link to={`/p/${profile.pubkey}`}>
-                  {profile.picture ? (
-                    <img src={profile.picture} alt={profile.name} className="browse-profile-pic" />
-                  ) : (
-                    <div
-                      className="browse-profile-pic"
-                      style={{
-                        background: '#eee',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      ?
-                    </div>
-                  )}
+
+      <div className="landing-body">
+        {/* Sidebar (Left Column) */}
+        <div className="landing-sidebar">
+          {/* Categories */}
+          <div className="content-box">
+            <div className="content-box-header">Browse Categories</div>
+            <div className="galaxy-grid">
+              {CATEGORIES.map((cat) => (
+                <Link key={cat.name} to={cat.link} className="galaxy-item">
+                  <span style={{ fontSize: '24px' }}>{cat.icon}</span>
+                  <span>{cat.name}</span>
                 </Link>
-                <Link to={`/p/${profile.pubkey}`} className="browse-profile-name">
-                  {profile.name || 'User'}
-                </Link>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          <h2 className="section-header">Popular Nostr Sites</h2>
-          <ul className="popular-sites-list">
-            {POPULAR_SITES.map((site) => (
-              <li key={site.url}>
-                <a href={site.url} target="_blank" rel="noopener noreferrer">
-                  {site.name}
+          {/* Popular Sites */}
+          <div className="content-box">
+            <div className="content-box-header">Popular Sites</div>
+            <div className="galaxy-grid" style={{ gridTemplateColumns: '1fr' }}>
+              {POPULAR_SITES.map((site) => (
+                <a key={site.url} href={site.url} target="_blank" rel="noopener noreferrer" className="galaxy-item" style={{ flexDirection: 'row', justifyContent: 'center' }}>
+                  <span>{site.name}</span>
                 </a>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Right Column: Popular Notes */}
-        <div className="browse-right-column">
-          <h2 className="section-header">Popular Notes</h2>
-          {loading && <div>Loading stream...</div>}
+        {/* Main Content (Right Column) */}
+        <div className="landing-main">
+          {/* People to Friend */}
+          <div className="content-box">
+            <div className="content-box-header">People to Friend</div>
+            <div className="people-grid">
+              {profiles.length > 0
+                ? profiles.map((profile) => (
+                  <div key={profile.pubkey} className="person-item">
+                    <Link to={`/p/${profile.pubkey}`} className="person-link">
+                      <div className="person-name">
+                        {profile.name || 'User'}
+                      </div>
+                      <div className="person-pic">
+                        <img
+                          src={profile.picture || `https://robohash.org/${profile.pubkey}?set=set4`}
+                          alt=""
+                        />
+                      </div>
+                    </Link>
+                  </div>
+                ))
+                : [...Array(8)].map((_, i) => (
+                  <div key={i} className="person-item">
+                    <div className="skeleton skeleton-name"></div>
+                    <div className="person-pic">
+                      <div className="skeleton skeleton-pic"></div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
 
-          <div className="browse-notes-list">
-            {recentNotes.map((note) => (
-              <div key={note.id} className="browse-note-item">
-                <div className="browse-note-header">
-                  <Link to={`/p/${note.pubkey}`} style={{ color: '#003399' }}>
-                    {note.author.profile?.name || note.pubkey.slice(0, 8)}
-                  </Link>
-                  <span
-                    style={{
-                      fontWeight: 'normal',
-                      marginLeft: '5px',
-                      fontSize: '8pt',
-                      color: '#666',
-                    }}
-                  >
-                    {new Date((note.created_at || 0) * 1000).toLocaleDateString()}
-                  </span>
+          {/* Global Feed */}
+          <div className="content-box">
+            <div className="content-box-header">Global Feed</div>
+            <div className="global-feed-list" style={{ maxHeight: '600px' }}>
+              {recentNotes.map((note) => (
+                <div key={note.id} className="feed-item" style={{ flexDirection: 'column', gap: '5px' }}>
+                  <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                    <span className="feed-time">
+                      {new Date((note.created_at || 0) * 1000).toLocaleDateString()}
+                    </span>
+                    <Link to={`/p/${note.pubkey}`} className="feed-author">
+                      {note.author.profile?.name || note.pubkey.slice(0, 8)}
+                    </Link>
+                  </div>
+                  <div className="feed-content">
+                    {note.content.length > 280 ? note.content.slice(0, 280) + '...' : note.content}
+                    <NoteMedia content={note.content} />
+                  </div>
                 </div>
-                <div className="browse-note-content">
-                  {note.content.length > 280 ? note.content.slice(0, 280) + '...' : note.content}
-                  <NoteMedia content={note.content} />
-                </div>
-              </div>
-            ))}
-            {!loading && recentNotes.length === 0 && <div>No notes found.</div>}
+              ))}
+              {!loading && recentNotes.length === 0 && <div style={{ padding: '10px' }}>No notes found.</div>}
+            </div>
           </div>
         </div>
       </div>

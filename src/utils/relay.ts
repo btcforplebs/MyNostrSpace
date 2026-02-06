@@ -43,6 +43,12 @@ export const APP_RELAYS = {
     'wss://nos.lol',
     'wss://relay.snort.social',
   ],
+  STREAMING: [
+    'wss://relay.zap.stream',
+    'wss://nos.lol',
+    'wss://relay.damus.io',
+    'wss://relay.primal.net',
+  ],
 };
 
 // Unified list for global NDK initialization

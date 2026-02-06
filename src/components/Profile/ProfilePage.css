@@ -246,6 +246,16 @@ h3,
   .personal-text p {
     margin: 2px 0;
   }
+
+  /* Profile tabs - smaller on mobile */
+  .profile-tabs {
+    flex-wrap: wrap;
+  }
+
+  .profile-tabs button {
+    padding: 4px 8px !important;
+    font-size: 8pt !important;
+  }
 }
 
 .profile-details-grid {

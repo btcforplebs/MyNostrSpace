@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useNostr } from '../../context/NostrContext';
 import type { NDKEvent, NDKFilter } from '@nostr-dev-kit/ndk';
 import NDK from '@nostr-dev-kit/ndk';
 import ReactPlayer from 'react-player';
@@ -8,12 +9,11 @@ import './FilmPage.css';
 // Castr Movie Curator NPUB
 const MOVIE_PUBKEY = '5cd5f8052c6791e4879f0e4db913465d711d5f5fe0c0ab99049c6064c5a395a2';
 
-// Specific relays for movie content - relay.nostr.band is critical!
+// Critical relays for movie content
 const FILM_RELAYS = [
-  'wss://relay.nostr.band',
-  'wss://relay.damus.io',
+  'wss://nostr.mom',
   'wss://nos.lol',
-  'wss://relay.snort.social',
+  'wss://relay.damus.io',
 ];
 
 interface Movie {
@@ -83,10 +83,10 @@ const parseMovieEvent = (event: NDKEvent): Movie | null => {
 };
 
 export const FilmPage = () => {
+  const { ndk } = useNostr();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
-  const ndkRef = useRef<NDK | null>(null);
   const mountedRef = useRef(true);
 
   // Use a ref for movies to check duplicates without dependency issues
@@ -100,6 +100,10 @@ export const FilmPage = () => {
         limit: 2000, // Significantly increased limit
       };
 
+      // Use the global pool. If we needed specific relays, we could try to add them, 
+      // but explicitRelayUrls on NDK constructor is the cleanest way for isolated instances.
+      // Since we are using the global one, we trust its pool.
+      // However, we might want to ensure we have coverage.
       const sub = ndk.subscribe(filter, { closeOnEose: false });
 
       // Batch updates to prevent UI freezing
@@ -109,7 +113,11 @@ export const FilmPage = () => {
       const flushBuffer = () => {
         if (!mountedRef.current) return;
         if (eventBuffer.length === 0) {
-          if (loading) setLoading(false); // Ensure loading stops eventually
+          // If we have some movies, we are good. If 0, we might still be loading or have none.
+          // But we don't want to spin forever if EOSE happened.
+          // We handle loading state in EOSE or via checking buffer length.
+          // But here flushBuffer is called on EOSE too.
+          if (loading) setLoading(false);
           return;
         }
 
@@ -138,6 +146,7 @@ export const FilmPage = () => {
       };
 
       sub.on('event', (event: NDKEvent) => {
+        // console.log('DEBUG: Event received', event.id);
         const movie = parseMovieEvent(event);
         if (movie) {
           eventBuffer.push(movie);
@@ -150,36 +159,39 @@ export const FilmPage = () => {
 
       sub.on('eose', () => {
         flushBuffer();
+        // Force loading off on EOSE if we haven't found anything yet? 
+        // flushBuffer handles it.
       });
     },
-    [loading]
+    [loading] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   useEffect(() => {
     mountedRef.current = true;
 
-    const initNDK = async () => {
-      if (ndkRef.current) return; // Already initialized
-
-      const ndk = new NDK({ explicitRelayUrls: FILM_RELAYS });
-      ndkRef.current = ndk;
-      try {
-        await ndk.connect();
-        if (mountedRef.current) {
-          fetchMovies(ndk);
+    if (ndk) {
+      // Ensure we are connected to the film relays
+      FILM_RELAYS.forEach((url) => {
+        try {
+          ndk.addExplicitRelay(url, undefined);
+        } catch (e) {
+          console.warn(`Failed to add relay ${url}:`, e);
         }
-      } catch (err) {
-        console.error('Failed to connect to film relays', err);
-        setLoading(false);
-      }
-    };
+      });
 
-    initNDK();
+      // Debug logs
+      setTimeout(() => {
+        console.log('DEBUG: Connected relays:', ndk.pool.connectedRelays().map(r => r.url));
+        console.log('DEBUG: FILM_RELAYS:', FILM_RELAYS);
+      }, 2000);
+
+      fetchMovies(ndk);
+    }
 
     return () => {
       mountedRef.current = false;
     };
-  }, [fetchMovies]);
+  }, [fetchMovies, ndk]);
 
   return (
     <div className="film-page-container">

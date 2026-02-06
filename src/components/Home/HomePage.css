@@ -320,6 +320,15 @@
   background: var(--myspace-light-blue);
   padding: 3px 6px;
   margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.feed-header-names {
+  display: flex;
+  align-items: center;
+  gap: 0;
 }
 
 .feed-user-name {
@@ -327,6 +336,13 @@
   font-weight: bold;
   text-decoration: none;
   font-size: 10pt;
+}
+
+.feed-wall-arrow {
+  color: #666;
+  font-size: 0.85em;
+  margin: 0 4px;
+  font-weight: bold;
 }
 
 .feed-mood {

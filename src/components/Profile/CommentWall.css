@@ -56,11 +56,25 @@
   align-items: center;
 }
 
+.comment-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  /* Gap is handled by arrow margins */
+}
+
 .comment-author-name {
   font-weight: bold;
   font-size: 10pt;
   color: #003399;
   text-decoration: none;
+}
+
+.comment-wall-arrow {
+  color: #666;
+  font-size: 0.8em;
+  margin: 0 5px;
+  font-weight: bold;
 }
 
 .comment-author-name:hover {

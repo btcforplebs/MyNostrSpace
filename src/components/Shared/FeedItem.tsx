@@ -209,6 +209,20 @@ interface FeedItemProps {
 const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = false }) => {
   const { ndk, user, login } = useNostr();
   const { profile } = useProfile(event.pubkey);
+
+  const wallRecipientTag = useMemo(() => {
+    const pTags = event.tags.filter((t: string[]) => t[0] === 'p');
+    const eTags = event.tags.filter((t: string[]) => t[0] === 'e');
+    // Wall post: Kind 1, No e-tags, exactly 1 p-tag (standard wall post pattern in this client)
+    // Only show if the recipient is NOT the author
+    if (event.kind === 1 && eTags.length === 0 && pTags.length === 1 && pTags[0][1] !== event.pubkey) {
+      return pTags[0][1];
+    }
+    return null;
+  }, [event]);
+
+  const { profile: recipientProfile } = useProfile(wallRecipientTag || undefined);
+
   const [showCommentForm, setShowCommentForm] = useState(false);
   const [showThread, setShowThread] = useState(false);
   const [comments, setComments] = useState<NDKEvent[]>([]);
@@ -420,12 +434,25 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
       </Link>
       <div className="feed-content">
         <div className="feed-header-line">
-          <Link to={`/p/${event.pubkey}`} className="feed-user-name">
-            {profile?.name ||
-              profile?.displayName ||
-              profile?.display_name ||
-              event.pubkey.slice(0, 8)}
-          </Link>
+          <div className="feed-header-names">
+            <Link to={`/p/${event.pubkey}`} className="feed-user-name">
+              {profile?.name ||
+                profile?.displayName ||
+                profile?.display_name ||
+                event.pubkey.slice(0, 8)}
+            </Link>
+            {wallRecipientTag && (
+              <>
+                <span className="feed-wall-arrow"> -&gt; </span>
+                <Link to={`/p/${wallRecipientTag}`} className="feed-user-name">
+                  {recipientProfile?.name ||
+                    recipientProfile?.displayName ||
+                    recipientProfile?.display_name ||
+                    wallRecipientTag.slice(0, 8)}
+                </Link>
+              </>
+            )}
+          </div>
           {displayMood && (
             <span className="feed-mood">
               {' '}

@@ -50,6 +50,16 @@ export const LivestreamsPage = () => {
         const statusTag = event.getMatchingTags('status')[0];
         const status = statusTag ? statusTag[1].toLowerCase() : undefined;
         const streamingTag = event.getMatchingTags('streaming')[0];
+        const streamingUrl = streamingTag?.[1]?.toLowerCase() || '';
+
+        // Exclude Corny Chat and Nostr Nests - they go to Audio Rooms page
+        const isAudioRoom =
+          streamingUrl.includes('cornychat') ||
+          streamingUrl.includes('nostrnests');
+
+        if (isAudioRoom) {
+          return; // Skip audio rooms - they belong on Audio Rooms page
+        }
 
         // Simple, clear live check
         const isLive =
@@ -96,7 +106,7 @@ export const LivestreamsPage = () => {
                 setActiveProfiles((curr) => ({ ...curr, [hostPubkey]: profile }));
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       });
 
@@ -116,59 +126,58 @@ export const LivestreamsPage = () => {
   }, [ndk, activeProfiles]);
 
   return (
-    <div className="livestreams-page-container">
+    <div className="home-page-container livestreams-page-container">
       <SEO title="Livestreams" description="Watch live streams on MyNostrSpace" />
-      <div className="livestreams-header">
+      <div className="home-wrapper livestreams-wrapper">
         <Navbar />
-      </div>
 
-      <div className="livestreams-content">
-        <h2 className="section-header">Live Now</h2>
+        <div className="home-content livestreams-content">
+          <h2 className="section-header">Live Now</h2>
 
-        {loading && <div style={{ padding: '20px' }}>Loading streams...</div>}
+          {loading && <div style={{ padding: '20px' }}>Loading streams...</div>}
 
-        <div className="streams-grid">
-          {liveStreams.length === 0 && !loading && (
-            <div style={{ padding: '20px' }}>
-              No active livestreams found right now. Check back later!
-            </div>
-          )}
+          <div className="streams-grid">
+            {liveStreams.length === 0 && !loading && (
+              <div style={{ padding: '20px' }}>
+                No active livestreams found right now. Check back later!
+              </div>
+            )}
 
-          {liveStreams.map((stream) => {
-            const title = stream.getMatchingTags('title')[0]?.[1] || 'Untitled Stream';
-            const image = stream.getMatchingTags('image')[0]?.[1];
-            const dTag = stream.getMatchingTags('d')[0]?.[1];
-            const hostPubkey = stream.getMatchingTags('p')[0]?.[1] || stream.pubkey;
-            const url = `/live/${hostPubkey}/${dTag}`;
-            const profile = activeProfiles[hostPubkey];
+            {liveStreams.map((stream) => {
+              const title = stream.getMatchingTags('title')[0]?.[1] || 'Untitled Stream';
+              const image = stream.getMatchingTags('image')[0]?.[1];
+              const dTag = stream.getMatchingTags('d')[0]?.[1];
+              const hostPubkey = stream.getMatchingTags('p')[0]?.[1] || stream.pubkey;
+              const url = `/live/${hostPubkey}/${dTag}`;
+              const profile = activeProfiles[hostPubkey];
 
-            return (
-              <Link key={stream.id} to={url} className="stream-card">
-                <div className="stream-card-thumb">
-                  {image && !brokenImages.has(stream.id) ? (
-                    <img
-                      src={image}
-                      alt={title}
-                      onError={() => setBrokenImages((prev) => new Set(prev).add(stream.id))}
-                    />
-                  ) : (
-                    <div className="stream-no-image">LIVE</div>
-                  )}
-                  <div className="live-badge">LIVE</div>
-                </div>
-                <div className="stream-card-info">
-                  <div className="stream-card-title">{title}</div>
-                  <div className="stream-card-host">
-                    Host: {profile?.name || profile?.display_name || hostPubkey.slice(0, 8)}
+              return (
+                <Link key={stream.id} to={url} className="stream-card">
+                  <div className="stream-card-thumb">
+                    {image && !brokenImages.has(stream.id) ? (
+                      <img
+                        src={image}
+                        alt={title}
+                        onError={() => setBrokenImages((prev) => new Set(prev).add(stream.id))}
+                      />
+                    ) : (
+                      <div className="stream-no-image">LIVE</div>
+                    )}
+                    <div className="live-badge">LIVE</div>
                   </div>
-                </div>
-              </Link>
-            );
-          })}
+                  <div className="stream-card-info">
+                    <div className="stream-card-title">{title}</div>
+                    <div className="stream-card-host">
+                      Host: {profile?.name || profile?.display_name || hostPubkey.slice(0, 8)}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      <style>{`
+        <style>{`
         .livestreams-page-container {
             width: 100%;
             max-width: 992px;
@@ -258,6 +267,7 @@ export const LivestreamsPage = () => {
             }
         }
       `}</style>
+      </div>
     </div>
   );
 };

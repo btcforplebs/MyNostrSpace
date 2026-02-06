@@ -6,6 +6,7 @@ import { Navbar } from '../Shared/Navbar';
 // ReactPlayer removed in favor of native hls.js implementation
 import Hls from 'hls.js';
 import { ChatMessage } from './ChatMessage';
+import { APP_RELAYS } from '../../utils/relay';
 import './LiveStreamPage.css';
 
 const CONNECTION_TIMEOUT = 10000;
@@ -124,12 +125,36 @@ export const LiveStreamPage = () => {
       }
 
       // Subscribe to chat
-      const aTag = `30311:${pubkey}:${dTag}`;
+      // Use stream event author's pubkey for the a tag filter (this is how chat messages are tagged)
+      const streamAuthor = event.pubkey;
+      const streamDTag = event.getMatchingTags('d')[0]?.[1] || dTag;
+      const aTag = `30311:${streamAuthor}:${streamDTag}`;
       const chatFilter: NDKFilter = {
-        kinds: [1311 as NDKKind],
+        kinds: [1311 as NDKKind, 9735 as NDKKind],
         '#a': [aTag],
-        limit: 50,
+        limit: 100,
       };
+
+      // Ensure streaming relays are connected for cross-platform chat
+      const relayPromises: Promise<void>[] = [];
+      for (const relayUrl of APP_RELAYS.STREAMING) {
+        try {
+          if (!ndk.pool.relays.has(relayUrl)) {
+            const relay = ndk.addExplicitRelay(relayUrl);
+            if (relay && typeof relay.connect === 'function') {
+              relayPromises.push(relay.connect().catch(() => { }));
+            }
+          }
+        } catch {
+          // Silently ignore relay add failures
+        }
+      }
+
+      // Wait a bit for relays to connect before subscribing
+      await Promise.race([
+        Promise.all(relayPromises),
+        new Promise(r => setTimeout(r, 2000))
+      ]);
 
       const sub = ndk.subscribe(chatFilter, { closeOnEose: false });
       sub.on('event', (msg: NDKEvent) => {
@@ -159,7 +184,7 @@ export const LiveStreamPage = () => {
   }, [chatMessages]);
 
   const handleSendMessage = async () => {
-    if (!ndk || !chatInput.trim() || !pubkey || !dTag) return;
+    if (!ndk || !chatInput.trim() || !streamEvent) return;
 
     if (!user) {
       login();
@@ -168,16 +193,32 @@ export const LiveStreamPage = () => {
 
     setSending(true);
     try {
+      // Use stream event author's pubkey and d-tag (matches how other platforms tag chat)
+      const streamAuthor = streamEvent.pubkey;
+      const streamDTag = streamEvent.getMatchingTags('d')[0]?.[1] || '';
+
       const event = new NDKEvent(ndk);
       event.kind = 1311;
       event.content = chatInput;
       event.tags = [
-        ['a', `30311:${pubkey}:${dTag}`, ''],
+        ['a', `30311:${streamAuthor}:${streamDTag}`, 'wss://relay.zap.stream'],
         ['client', 'MyNostrSpace'],
       ];
+
+      // Ensure streaming relays are connected before publishing
+      for (const relayUrl of APP_RELAYS.STREAMING) {
+        try {
+          if (!ndk.pool.relays.has(relayUrl)) {
+            ndk.addExplicitRelay(relayUrl);
+          }
+        } catch {
+          // Silently ignore relay add failures
+        }
+      }
+
+      // Sign and publish to all connected relays including streaming relays
       await event.publish();
 
-      // Optimistic update handled by subscription mostly, but we can clear input immediately
       setChatInput('');
     } catch (e) {
       console.error('Failed to send message', e);
@@ -207,12 +248,11 @@ export const LiveStreamPage = () => {
         return;
       }
 
-      const streamer = ndk.getUser({ pubkey: streamEvent.pubkey });
-      if (!streamer.profile) {
-        await streamer.fetchProfile();
-      }
+      const hostPubkey = streamEvent.getMatchingTags('p')[0]?.[1] || streamEvent.pubkey;
+      const streamer = ndk.getUser({ pubkey: hostPubkey });
 
-      const profile = streamer.profile;
+      // Use existing streamerProfile if we have it, otherwise fetch
+      const profile = streamerProfile || (await streamer.fetchProfile());
       const lud16 = profile?.lud16 || profile?.lud06;
 
       if (!lud16) {
@@ -241,17 +281,28 @@ export const LiveStreamPage = () => {
       const zapRequest = new NDKEvent(ndk);
       zapRequest.kind = 9734;
       zapRequest.content = 'Zap from MyNostrSpace';
+
+      const streamDTag = streamEvent.getMatchingTags('d')[0]?.[1] || dTag;
+      const zapRelays = [...ndk.pool.relays.keys()];
+      if (!zapRelays.includes('wss://relay.zap.stream')) {
+        zapRelays.push('wss://relay.zap.stream');
+      }
+
       zapRequest.tags = [
-        ['relays', ...ndk.pool.relays.keys()],
+        ['relays', ...zapRelays],
         ['amount', amountInMSats.toString()],
         ['lnurl', lud16],
-        ['p', streamer.pubkey],
+        ['p', hostPubkey],
         ['e', streamEvent.id],
-        ['a', `30311:${streamEvent.pubkey}:${dTag}`],
+        ['a', `30311:${streamEvent.pubkey}:${streamDTag}`, 'wss://relay.zap.stream'],
         ['client', 'MyNostrSpace'],
       ];
 
       await zapRequest.sign();
+
+      // Explicitly publish the zap request so other platforms see it immediately
+      zapRequest.publish().catch(e => console.warn('Failed to publish zap request', e));
+
       const zapRequestJson = JSON.stringify(zapRequest.rawEvent());
 
       const cbUrl = new URL(callback);
@@ -415,213 +466,213 @@ export const LiveStreamPage = () => {
   const status = streamEvent.getMatchingTags('status')[0]?.[1];
 
   return (
-    <div className="myspace-container">
+    <div className="home-page-container livestream-page-container">
       {/* Header */}
-      <div style={{ maxWidth: '992px', margin: '0 auto', width: '95%' }}>
+      <div className="home-wrapper livestream-wrapper">
         <Navbar />
-      </div>
 
-      {/* Main Content Table Layout */}
-      <div className="myspace-body">
-        <div className="col-left">
-          <div className="profile-box">
-            <h3>{streamerProfile?.name || streamerProfile?.display_name || 'Broadcaster'}</h3>
-            <div className="profile-pic">
-              <Link to={`/p/${pubkey}`}>
-                <img
-                  src={streamerProfile?.picture || `https://robohash.org/${pubkey}`}
-                  alt="Streamer"
-                />
-              </Link>
+        {/* Main Content Table Layout */}
+        <div className="myspace-body">
+          <div className="col-left">
+            <div className="profile-box">
+              <h3>{streamerProfile?.name || streamerProfile?.display_name || 'Broadcaster'}</h3>
+              <div className="profile-pic">
+                <Link to={`/p/${pubkey}`}>
+                  <img
+                    src={streamerProfile?.picture || `https://robohash.org/${pubkey}`}
+                    alt="Streamer"
+                  />
+                </Link>
+              </div>
+              <div className="profile-details">
+                <p>{streamerProfile?.about}</p>
+                <div className="online-status">
+                  {status === 'live' ? (
+                    <span className="status-badge live">ONLINE NOW!</span>
+                  ) : (
+                    <span className="status-badge offline">OFFLINE</span>
+                  )}
+                </div>
+                <div className="contact-links">
+                  <Link to={`/p/${pubkey}`}>View Profile</Link>
+                </div>
+              </div>
             </div>
-            <div className="profile-details">
-              <p>{streamerProfile?.about}</p>
-              <div className="online-status">
-                {status === 'live' ? (
-                  <span className="status-badge live">ONLINE NOW!</span>
+          </div>
+
+          <div className="col-right">
+            <div className="content-box video-box">
+              <div className="box-header">
+                <h2>{title}</h2>
+              </div>
+              <div className="video-player-wrapper">
+                {streamUrl ? (
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: 'auto',
+                      maxHeight: '80vh',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      backgroundColor: 'black',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {!isVideoReady && (
+                      <div className="skeleton-loader">
+                        <div className="skeleton-spinner"></div>
+                      </div>
+                    )}
+                    <video
+                      ref={videoRef}
+                      controls
+                      autoPlay
+                      muted
+                      playsInline
+                      className="react-player"
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '80vh',
+                        width: 'auto',
+                        height: 'auto',
+                        display: 'block',
+                      }}
+                      onLoadedMetadata={() => setIsVideoReady(true)}
+                    />
+                  </div>
                 ) : (
-                  <span className="status-badge offline">OFFLINE</span>
+                  <div className="no-stream">Stream URL not found</div>
                 )}
               </div>
-              <div className="contact-links">
-                <Link to={`/p/${pubkey}`}>View Profile</Link>
+
+              <div className="stream-summary">
+                <p>{summary}</p>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="col-right">
-          <div className="content-box video-box">
-            <div className="box-header">
-              <h2>{title}</h2>
-            </div>
-            <div className="video-player-wrapper">
-              {streamUrl ? (
-                <div
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    height: 'auto',
-                    maxHeight: '80vh',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    backgroundColor: 'black',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {!isVideoReady && (
-                    <div className="skeleton-loader">
-                      <div className="skeleton-spinner"></div>
-                    </div>
-                  )}
-                  <video
-                    ref={videoRef}
-                    controls
-                    autoPlay
-                    muted
-                    playsInline
-                    className="react-player"
-                    style={{
-                      maxWidth: '100%',
-                      maxHeight: '80vh',
-                      width: 'auto',
-                      height: 'auto',
-                      display: 'block',
-                    }}
-                    onLoadedMetadata={() => setIsVideoReady(true)}
-                  />
-                </div>
-              ) : (
-                <div className="no-stream">Stream URL not found</div>
-              )}
-            </div>
-
-            <div className="stream-summary">
-              <p>{summary}</p>
-            </div>
-          </div>
-
-          <div className="content-box chat-box">
-            <div className="box-header">
-              <h2>Live Chat</h2>
-            </div>
-            <div className="chat-window" ref={chatWindowRef}>
-              {chatMessages.length === 0 ? (
-                <div className="empty-chat">No messages yet. Say hello!</div>
-              ) : (
-                chatMessages.map((msg) => <ChatMessage key={msg.id} msg={msg} />)
-              )}
-              <div ref={chatBottomRef} />
-            </div>
-            <div className="chat-input-area">
-              {user ? (
-                <>
-                  <input
-                    className="nostr-input"
-                    type="text"
-                    placeholder="Say something..."
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    disabled={sending}
-                  />
-                  <button
-                    className="post-button zap-button"
-                    onClick={handleZap}
-                    disabled={isZapping}
-                  >
-                    {isZapping ? '...' : '⚡ Zap'}
+            <div className="content-box chat-box">
+              <div className="box-header">
+                <h2>Live Chat</h2>
+              </div>
+              <div className="chat-window" ref={chatWindowRef}>
+                {chatMessages.length === 0 ? (
+                  <div className="empty-chat">No messages yet. Say hello!</div>
+                ) : (
+                  chatMessages.map((msg) => <ChatMessage key={msg.id} msg={msg} />)
+                )}
+                <div ref={chatBottomRef} />
+              </div>
+              <div className="chat-input-area">
+                {user ? (
+                  <>
+                    <input
+                      className="nostr-input"
+                      type="text"
+                      placeholder="Say something..."
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                      disabled={sending}
+                    />
+                    <button
+                      className="post-button zap-button"
+                      onClick={handleZap}
+                      disabled={isZapping}
+                    >
+                      {isZapping ? '...' : '⚡ Zap'}
+                    </button>
+                    <button
+                      className="post-button"
+                      onClick={handleSendMessage}
+                      disabled={sending || !chatInput.trim()}
+                    >
+                      {sending ? '...' : 'Post'}
+                    </button>
+                  </>
+                ) : (
+                  <button className="post-button" onClick={() => login()} style={{ width: '100%' }}>
+                    Login to Chat
                   </button>
-                  <button
-                    className="post-button"
-                    onClick={handleSendMessage}
-                    disabled={sending || !chatInput.trim()}
-                  >
-                    {sending ? '...' : 'Post'}
-                  </button>
-                </>
-              ) : (
-                <button className="post-button" onClick={() => login()} style={{ width: '100%' }}>
-                  Login to Chat
-                </button>
-              )}
-            </div>
-            {zapInvoice && (
-              <div
-                className="zap-modal"
-                style={{
-                  position: 'fixed',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  background: 'white',
-                  padding: '20px',
-                  border: '1px solid #ccc',
-                  boxShadow: '10px 10px 0px rgba(0,0,0,0.2)',
-                  zIndex: 1000,
-                  textAlign: 'center',
-                  maxWidth: '90vw',
-                  color: 'black',
-                }}
-              >
-                <h3
-                  style={{
-                    margin: '0 0 10px 0',
-                    background: '#ffcc99',
-                    color: '#ff6600',
-                    padding: '5px',
-                  }}
-                >
-                  Scan to Zap
-                </h3>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${zapInvoice}`}
-                  alt="Zap QR Code"
-                  style={{ border: '1px solid #ccc', marginBottom: '10px' }}
-                />
+                )}
+              </div>
+              {zapInvoice && (
                 <div
+                  className="zap-modal"
                   style={{
-                    fontSize: '8pt',
-                    marginBottom: '15px',
-                    wordBreak: 'break-all',
-                    maxHeight: '100px',
-                    overflowY: 'auto',
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'white',
+                    padding: '20px',
                     border: '1px solid #ccc',
-                    padding: '5px',
-                    textAlign: 'left',
+                    boxShadow: '10px 10px 0px rgba(0,0,0,0.2)',
+                    zIndex: 1000,
+                    textAlign: 'center',
+                    maxWidth: '90vw',
+                    color: 'black',
                   }}
                 >
-                  <code>{zapInvoice}</code>
-                </div>
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(zapInvoice);
-                      alert('Invoice copied!');
+                  <h3
+                    style={{
+                      margin: '0 0 10px 0',
+                      background: '#ffcc99',
+                      color: '#ff6600',
+                      padding: '5px',
                     }}
-                    className="post-button"
                   >
-                    Copy
-                  </button>
-                  <button
-                    onClick={() => setZapInvoice(null)}
-                    className="post-button"
-                    style={{ background: '#ccc' }}
+                    Scan to Zap
+                  </h3>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${zapInvoice}`}
+                    alt="Zap QR Code"
+                    style={{ border: '1px solid #ccc', marginBottom: '10px' }}
+                  />
+                  <div
+                    style={{
+                      fontSize: '8pt',
+                      marginBottom: '15px',
+                      wordBreak: 'break-all',
+                      maxHeight: '100px',
+                      overflowY: 'auto',
+                      border: '1px solid #ccc',
+                      padding: '5px',
+                      textAlign: 'left',
+                    }}
                   >
-                    Close
-                  </button>
+                    <code>{zapInvoice}</code>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(zapInvoice);
+                        alert('Invoice copied!');
+                      }}
+                      className="post-button"
+                    >
+                      Copy
+                    </button>
+                    <button
+                      onClick={() => setZapInvoice(null)}
+                      className="post-button"
+                      style={{ background: '#ccc' }}
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      <footer className="myspace-footer">
-        <a href="#">About</a> | <a href="#">FAQ</a> | <a href="#">Terms</a> |{' '}
-        <a href="#">Privacy</a>
-        <br />© 2003-2026 mynostrspace.com
-      </footer>
+        <footer className="myspace-footer">
+          <a href="#">About</a> | <a href="#">FAQ</a> | <a href="#">Terms</a> |{' '}
+          <a href="#">Privacy</a>
+          <br />© 2003-2026 mynostrspace.com
+        </footer>
+      </div>
     </div>
   );
 };

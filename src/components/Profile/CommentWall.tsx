@@ -7,11 +7,24 @@ import { useRef } from 'react';
 import { RichTextRenderer } from '../Shared/RichTextRenderer';
 import { InteractionBar } from '../Shared/InteractionBar';
 import { Avatar } from '../Shared/Avatar';
+import { useProfile } from '../../hooks/useProfile';
 import './CommentWall.css';
 
 interface CommentWallProps {
   pubkey: string;
 }
+
+const WallRecipient = ({ recipientPubkey }: { recipientPubkey: string }) => {
+  const { profile } = useProfile(recipientPubkey);
+  return (
+    <>
+      <span className="comment-wall-arrow"> -&gt; </span>
+      <Link to={`/p/${recipientPubkey}`} className="comment-author-name">
+        {profile?.name || recipientPubkey.slice(0, 10)}
+      </Link>
+    </>
+  );
+};
 
 export const CommentWall = ({ pubkey }: CommentWallProps) => {
   const { ndk, user, login } = useNostr();
@@ -119,7 +132,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
             .then(() => {
               // force update? - usually handled by store
             })
-            .catch(() => {});
+            .catch(() => { });
         });
       } catch (err) {
         console.error('Failed to fetch comments:', err);
@@ -264,9 +277,23 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
       </div>
       <div className="comment-right">
         <div className="comment-header-line">
-          <Link to={`/p/${comment.pubkey}`} className="comment-author-name">
-            {comment.author?.profile?.name || comment.pubkey.slice(0, 8)}
-          </Link>
+          <div className="comment-header-left">
+            <Link to={`/p/${comment.pubkey}`} className="comment-author-name">
+              {comment.author?.profile?.name || comment.pubkey.slice(0, 8)}
+            </Link>
+
+            {!isReply && (
+              (() => {
+                const pTags = comment.tags.filter((t) => t[0] === 'p');
+                const eTags = comment.tags.filter((t) => t[0] === 'e');
+                if (pTags.length === 1 && eTags.length === 0 && pTags[0][1] !== comment.pubkey) {
+                  return <WallRecipient recipientPubkey={pTags[0][1]} />;
+                }
+                return null;
+              })()
+            )}
+          </div>
+
           <span className="comment-date">
             {new Date((comment.created_at || 0) * 1000).toLocaleString()}
           </span>

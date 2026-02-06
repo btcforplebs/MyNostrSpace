@@ -2,6 +2,88 @@
 
 All notable changes to the MyNostrSpace project will be documented in this file.
 
+## [Unreleased] - 2026-02-06
+
+### 🚀 New Features
+
+#### **Browse Page Redesign**
+- Complete refactor to use shared LandingPage.css styling for consistency
+- Added **Categories Grid** with 12 content categories (Videos, Audio Rooms, Music, Marketplace, Livestreams, Blogs, Recipes, Photos, Badges, Search, Calendar, Film)
+- Reorganized layout: sidebar with categories + popular sites, main content with people grid + global feed
+- Added skeleton loading states for people grid during data fetching
+- Simplified CSS (170+ lines → ~5 lines, inheriting from LandingPage.css)
+
+#### **Profile Badges Display**
+- Added **ProfileBadges** component to display user's Nostr badges (NIP-58)
+- Fetches Kind 30008 (profile_badges) and Kind 30009 (badge definitions)
+- Displays badges as 40x40px icons with hover tooltips showing name and description
+- Automatically fetches and displays issuer information
+- Only renders when user has badges to show
+
+#### **Wall Post Recipient Display**
+- Added visual indicator for wall posts showing "Author → Recipient"
+- Implemented in both feed items and comment walls
+- Uses new `WallRecipient` component with arrow styling
+- Helps distinguish wall posts from regular notes and replies
+- Only shows for non-reply Kind 1 events with exactly 1 p-tag
+
+### 🎨 UI/UX Enhancements
+
+#### **Livestream Page Improvements**
+- Complete layout restructure using home-page-container wrapper for consistency
+- Increased chat window height (300px → 400px) for better readability
+- Changed chat background to white for cleaner appearance
+- Improved width/margin handling (100% width with max-width constraint)
+- Better container structure with proper border handling
+
+#### **Cross-Platform Livestream Chat**
+- Enhanced chat functionality to work across different Nostr streaming platforms
+- Explicitly connects to streaming relays before subscribing and publishing
+- Uses stream author's pubkey and d-tag for proper cross-platform tagging
+- Improved zap request handling with explicit relay publishing
+- Better host detection using p-tag when available
+- Increased chat limit from 50 → 100 messages for better history
+
+#### **Film Page Relay Management**
+- Switched from isolated NDK instance to global NDK pool
+- Explicitly adds film relays (nostr.mom, nos.lol, relay.damus.io) to connection pool
+- Added debug logging for relay connectivity troubleshooting
+- Better loading state handling with flush buffer logic
+
+#### **Audio Room Filtering**
+- Livestreams page now filters out audio rooms (Corny Chat, Nostr Nests)
+- Audio rooms are properly categorized for the Audio Rooms page
+- Prevents duplicate listings across different sections
+
+### 🛠 Technical Improvements
+
+#### **Layout Consistency**
+- Livestreams page now uses home-page-container wrapper
+- Consistent structure across Live, Livestream, and Profile pages
+- Better responsive design with unified CSS approach
+
+#### **CSS Cleanup**
+- Browse page CSS reduced from 175 lines to 5 lines
+- Reuses LandingPage.css for consistent styling
+- Removed duplicate styles across components
+
+#### **Navbar Updates**
+- Added links for Badges (`/badges`)
+- Added links for Audio Rooms (`/rooms`)
+- Added links for Video Rooms (`/videorooms`)
+
+#### **Mobile Responsive**
+- Added responsive styles for profile tabs on mobile
+- Smaller padding and font sizes for better mobile experience
+- Flex-wrap support for tab overflow
+
+### 🐛 Bug Fixes
+
+- Fixed feed header layout with proper flex display
+- Fixed comment wall header alignment
+- Improved wall post detection logic (checks for non-reply, single p-tag)
+- Better error handling in relay connection logic
+
 ## [Unreleased] - 2026-02-05
 
 ### 🚀 New Features

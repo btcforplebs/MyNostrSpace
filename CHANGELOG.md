@@ -52,7 +52,6 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 #### **Audio Room Filtering**
 - Livestreams page now filters out audio rooms (Corny Chat, Nostr Nests)
-- Audio rooms are properly categorized for the Audio Rooms page
 - Prevents duplicate listings across different sections
 
 ### 🛠 Technical Improvements

@@ -4,6 +4,44 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 ## [Unreleased] - 2026-02-05
 
+### 🚀 New Features
+
+#### **Recipes Page**
+- New `/recipes` page displaying community recipes from Nostr
+- Fetches Kind 30040 (specialized recipes), Kind 30023 (Zap.cooking long-form), and Kind 35000 (gated content)
+- Supports markdown template parsing for Zap.cooking recipe format
+- Grid layout with recipe cards showing title, author, and preview
+
+#### **Profile Page Tabs**
+- Added dynamic content tabs to profile pages: Photos, Videos, Recipes, Livestreams, Blog
+- Tabs only appear when user has content of that type
+- Lazy loading for each tab to improve performance
+- Recipes tab fetches user's Zap.cooking entries
+
+#### **All Friends Page Redesign**
+- Reduced page size from 100 → 24 profiles per page for 4x faster loading
+- Added skeleton loading placeholders with shimmer animation
+- Implemented CSS Grid layout for consistent, responsive card sizing
+- Added styled friend cards with hover effects (lift + shadow)
+- Improved pagination controls with gradient buttons
+- Mobile-responsive design (3-column grid on smaller screens)
+- Consistent MySpace-themed styling
+
+#### **Profile Videos Tab Fix**
+- Added `imeta` tag parsing for video detection (used by Primal, Damus, etc.)
+- Fixed video URL regex to match URLs with query parameters (e.g., `video.mp4?token=xxx`)
+- Videos from Kind 1 posts now properly detected via both imeta tags and content regex
+
+### 🐛 Bug Fixes
+
+- **Quote Post Box**: Fixed sizing issues - quote form now takes full width with proper text area dimensions
+- **Threaded Comments**: Fixed text size inconsistency - comments now match main post styling (9pt, line-height 1.4)
+- **Profile Videos Pagination**: Fixed infinite loop bug where `until` timestamp wasn't updated for batches without videos
+
+---
+
+## [Previous] - 2026-02-05
+
 ### 🚀 Major Features
 
 #### **Blossom Integration for Comments**

@@ -15,6 +15,7 @@ import { MediaUpload } from './MediaUpload';
 import { BlogEditor } from './BlogEditor';
 import { WavlakePlayer } from '../Music/WavlakePlayer';
 import { Avatar } from '../Shared/Avatar';
+import { Virtuoso } from 'react-virtuoso';
 import './HomePage.css';
 
 interface MusicTrack {
@@ -163,6 +164,8 @@ const HomePage = () => {
   const fetchingRef = useRef(false);
   const feedEoseRef = useRef(false);
   const eoseTimestampRef = useRef(0);
+  const followsCacheRef = useRef<string[]>([]);
+  const followsFetchedRef = useRef(false);
   const [pendingPosts, setPendingPosts] = useState<NDKEvent[]>([]);
   const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
   const [thumbnailCache] = useState<Record<string, string>>({});
@@ -429,6 +432,12 @@ const HomePage = () => {
 
   const getFollows = useCallback(async () => {
     if (!ndk || !user) return [];
+
+    // Return cached immediately if available for instant load
+    if (followsFetchedRef.current && followsCacheRef.current.length > 0) {
+      return followsCacheRef.current;
+    }
+
     const activeUser = ndk.getUser({ pubkey: user.pubkey });
     const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
       return Promise.race([
@@ -444,6 +453,11 @@ const HomePage = () => {
     );
     const followPubkeys = Array.from(followedUsersSet || new Set()).map((u) => u.pubkey);
     if (!followPubkeys.includes(user.pubkey)) followPubkeys.push(user.pubkey);
+
+    // Cache the result
+    followsCacheRef.current = followPubkeys;
+    followsFetchedRef.current = true;
+
     return followPubkeys;
   }, [ndk, user]);
 
@@ -602,6 +616,16 @@ const HomePage = () => {
           if (prev.length > 0) {
             const oldest = prev[prev.length - 1];
             if (oldest.created_at) setFeedUntil(oldest.created_at - 1);
+
+            // Batch pre-fetch profiles for visible authors (fire-and-forget)
+            const uniqueAuthors = [...new Set(prev.slice(0, 20).map((e) => e.pubkey))];
+            Promise.all(
+              uniqueAuthors.map((pk) =>
+                ndk?.getUser({ pubkey: pk }).fetchProfile({
+                  cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+                }).catch(() => { })
+              )
+            );
           }
           return prev;
         });
@@ -775,12 +799,14 @@ const HomePage = () => {
       sub = ndk.subscribe(filter, { closeOnEose: false });
 
       sub.on('event', (ev: NDKEvent) => {
+        // Fetch author profile so name displays instead of pubkey
+        ev.author.fetchProfile({ cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }).catch(() => { });
+
         setNotifications((prev) => {
           if (prev.find((e) => e.id === ev.id)) return prev;
           const next = [ev, ...prev].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
           return next.slice(0, 50);
         });
-        // Profile will lazy-load when notification is viewed via useProfile hook
       });
     };
 
@@ -1215,28 +1241,24 @@ const HomePage = () => {
                         to show
                       </div>
                     )}
-                    {feed.slice(0, displayedFeedCount).map((event) => (
-                      <FeedItem key={event.id} event={event} />
-                    ))}
-                    {/* Intersection observer trigger */}
-                    <div ref={loadMoreTriggerRef} style={{ height: '20px', margin: '10px 0' }} />
-                    {(displayedFeedCount < feed.length || (hasMoreFeed && feed.length > 0)) && (
+                    <Virtuoso
+                      data={feed.slice(0, displayedFeedCount)}
+                      overscan={5}
+                      useWindowScroll
+                      itemContent={(_index, event) => (
+                        <FeedItem key={event.id} event={event} />
+                      )}
+                      endReached={() => {
+                        if (feed.length > displayedFeedCount) {
+                          setDisplayedFeedCount((c) => c + 15);
+                        } else if (hasMoreFeed && !isLoadingMoreFeed) {
+                          loadMoreFeed();
+                        }
+                      }}
+                    />
+                    {isLoadingMoreFeed && (
                       <div style={{ padding: '15px', textAlign: 'center' }}>
-                        {isLoadingMoreFeed ? (
-                          <div>Loading more posts...</div>
-                        ) : displayedFeedCount < feed.length ? (
-                          <div style={{ color: '#666', fontSize: '14px' }}>
-                            Showing {displayedFeedCount} of {feed.length} posts
-                          </div>
-                        ) : (
-                          <button
-                            className="post-status-btn"
-                            onClick={loadMoreFeed}
-                            disabled={isLoadingMoreFeed}
-                          >
-                            Load More Posts
-                          </button>
-                        )}
+                        Loading more posts...
                       </div>
                     )}
                   </div>
@@ -1428,7 +1450,7 @@ const HomePage = () => {
       <BlogEditor
         isOpen={isBlogModalOpen}
         onClose={() => setIsBlogModalOpen(false)}
-        onPostComplete={() => {}}
+        onPostComplete={() => { }}
       />
     </div>
   );

@@ -47,11 +47,17 @@ const BlogsPage = lazy(() =>
 const VideosPage = lazy(() =>
   import('./components/Video/VideosPage').then((m) => ({ default: m.VideosPage }))
 );
+const PhotosPage = lazy(() =>
+  import('./components/Photos/PhotosPage').then((m) => ({ default: m.PhotosPage }))
+);
 const MarketplacePage = lazy(() =>
   import('./components/Marketplace/MarketplacePage').then((m) => ({ default: m.MarketplacePage }))
 );
 const CalendarPage = lazy(() =>
   import('./components/Calendar/CalendarPage').then((m) => ({ default: m.CalendarPage }))
+);
+const RecipesPage = lazy(() =>
+  import('./components/Recipe/RecipesPage').then((m) => ({ default: m.RecipesPage }))
 );
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 
@@ -107,10 +113,12 @@ function App() {
                 <Route path="/livestreams" element={<LivestreamsPage />} />
                 <Route path="/blogs" element={<BlogsPage />} />
                 <Route path="/videos" element={<VideosPage />} />
+                <Route path="/photos" element={<PhotosPage />} />
                 <Route path="/marketplace" element={<MarketplacePage />} />
                 <Route path="/music" element={<MusicPage />} />
                 <Route path="/film" element={<FilmPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/recipes" element={<RecipesPage />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>

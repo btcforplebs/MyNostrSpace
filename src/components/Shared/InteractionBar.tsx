@@ -286,6 +286,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         marginTop: '10px',
         fontSize: '8.5pt',
         display: 'flex',
+        flexWrap: 'wrap',
         gap: '10px',
         color: '#666',
       }}
@@ -337,10 +338,12 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       {showQuoteForm && (
         <div
           style={{
+            flexBasis: '100%',
             marginTop: '8px',
             padding: '8px',
             background: '#f9f9f9',
             border: '1px solid #ccc',
+            minWidth: '300px',
           }}
         >
           <textarea
@@ -348,7 +351,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
             value={quoteText}
             onChange={(e) => setQuoteText(e.target.value)}
             placeholder="Add your thoughts..."
-            style={{ width: '100%', minHeight: '60px', fontSize: '9pt' }}
+            style={{ width: '100%', minHeight: '80px', fontSize: '9pt', boxSizing: 'border-box' }}
           />
           <div style={{ textAlign: 'right', marginTop: '5px' }}>
             <button

@@ -88,31 +88,9 @@ export const Navbar = () => {
       <nav className="navbar-container">
         <div className="navbar-container-inner">
           <Link to="/">Home</Link> | <Link to="/browse">Browse</Link> | <Link to="/film">Film</Link>{' '}
-          |{' '}
-          <a href="#" onClick={(e) => e.preventDefault()}>
-            Mail
-          </a>{' '}
           | <Link to="/blogs">Blog</Link> | <Link to="/calendar">Calendar</Link> |{' '}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              alert('Coming Soon');
-            }}
-          >
-            Groups
-          </a>{' '}
-          |{' '}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              alert('Coming Soon');
-            }}
-          >
-            Events
-          </a>{' '}
-          | <Link to="/videos">Videos</Link> | <Link to="/music">Music</Link> |{' '}
+          <Link to="/videos">Videos</Link> | <Link to="/photos">Photos</Link> |{' '}
+          <Link to="/music">Music</Link> | <Link to="/recipes">Recipes</Link> |{' '}
           <Link to="/marketplace">Marketplace</Link> | <Link to="/livestreams">Livestreams</Link>
           {user && (
             <>

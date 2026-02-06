@@ -17,6 +17,11 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
   const { ndk, user, login } = useNostr();
   const [comments, setComments] = useState<NDKEvent[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [until, setUntil] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Missing state restored
   const [loading, setLoading] = useState(true);
   const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -25,61 +30,123 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
   const [uploadTarget, setUploadTarget] = useState<'comment' | 'reply' | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const fetchComments = useCallback(async () => {
-    if (!ndk || !pubkey) return;
-    setLoading(true);
-    try {
-      // 1. Fetch mentions/comments (tagged with p: [pubkey])
-      const mentionFilter: NDKFilter = { kinds: [1], '#p': [pubkey], limit: 40 };
-      const mentions = await ndk.fetchEvents(mentionFilter);
+  const fetchComments = useCallback(
+    async (untilTimestamp?: number) => {
+      if (!ndk || !pubkey) return;
 
-      // 2. Fetch personal posts (authored by [pubkey])
-      const authorFilter: NDKFilter = { kinds: [1], authors: [pubkey], limit: 40 };
-      const posts = await ndk.fetchEvents(authorFilter);
-
-      // Combine arrays
-      const eventsArray = [...Array.from(mentions), ...Array.from(posts)];
-
-      // 3. Fetch replies to these events (e-tags)
-      if (eventsArray.length > 0) {
-        const eventIds = eventsArray.map((e) => e.id);
-        const replyFilter: NDKFilter = { kinds: [1], '#e': eventIds };
-        const replies = await ndk.fetchEvents(replyFilter);
-        eventsArray.push(...Array.from(replies));
+      if (untilTimestamp) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
       }
 
-      // De-duplicate and sort (newest first)
-      const uniqueEvents = Array.from(new Map(eventsArray.map((e) => [e.id, e])).values()).sort(
-        (a, b) => (b.created_at || 0) - (a.created_at || 0)
-      );
+      try {
+        const limit = 20;
+        // 1. Fetch mentions/comments (tagged with p: [pubkey])
+        const mentionFilter: NDKFilter = { kinds: [1], '#p': [pubkey], limit };
 
-      setComments(uniqueEvents);
-      setLoading(false);
+        // 2. Fetch personal posts (authored by [pubkey])
+        const authorFilter: NDKFilter = { kinds: [1], authors: [pubkey], limit };
 
-      // Background profile resolution
-      uniqueEvents.forEach((event) => {
-        Promise.race([
-          event.author.fetchProfile(),
-          new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000)),
-        ])
-          .then(() => {
-            setComments((prev) => [...prev]); // Trigger re-render
-          })
-          .catch(() => {});
-      });
-    } catch (err) {
-      console.error('Failed to fetch comments:', err);
-      setLoading(false);
+        if (untilTimestamp) {
+          mentionFilter.until = untilTimestamp;
+          authorFilter.until = untilTimestamp;
+        }
+
+        const [mentions, posts] = await Promise.all([
+          ndk.fetchEvents(mentionFilter),
+          ndk.fetchEvents(authorFilter),
+        ]);
+
+        // Combine arrays
+        const eventsArray = [...Array.from(mentions), ...Array.from(posts)];
+
+        if (eventsArray.length === 0) {
+          setHasMore(false);
+          setLoading(false);
+          setLoadingMore(false);
+          return;
+        }
+
+        // 3. Fetch replies to these events (e-tags) - we don't paginate these strictly, we just get them for context
+        // This part is tricky with pagination. Ideally we'd fetch replies for the new batch.
+        if (eventsArray.length > 0) {
+          const eventIds = eventsArray.map((e) => e.id);
+          // We might want to limit this too, but for threaded view it's good to have context.
+          // Let's keep it simple for now and fetch replies for these specific events.
+          const replyFilter: NDKFilter = { kinds: [1], '#e': eventIds };
+          const replies = await ndk.fetchEvents(replyFilter);
+          eventsArray.push(...Array.from(replies));
+        }
+
+        // De-duplicate and sort (newest first)
+        const uniqueEvents = Array.from(new Map(eventsArray.map((e) => [e.id, e])).values()).sort(
+          (a, b) => (b.created_at || 0) - (a.created_at || 0)
+        );
+
+        // determine 'until' for next page from the MAIN feed items (mentions/posts), ignoring replies which might be older/newer
+        /* const mainFeedEvents = uniqueEvents.filter(e =>
+        (e.tags.some(t => t[0] === 'p' && t[1] === pubkey) || e.pubkey === pubkey) &&
+        !e.tags.some(t => t[0] === 'e') // top level-ish preference for pagination cursor?
+      ); */
+
+        // Fallback: use the oldest event timestamp from the fetched batch
+        const oldestEvent = uniqueEvents[uniqueEvents.length - 1];
+        if (oldestEvent && oldestEvent.created_at) {
+          setUntil(oldestEvent.created_at - 1);
+        }
+
+        if (uniqueEvents.length < 5) {
+          // Arbitrary low threshold to stop
+          setHasMore(false);
+        }
+
+        setComments((prev) => {
+          const combined = untilTimestamp ? [...prev, ...uniqueEvents] : uniqueEvents;
+          // Re-dedupe just in case
+          return Array.from(new Map(combined.map((e) => [e.id, e])).values()).sort(
+            (a, b) => (b.created_at || 0) - (a.created_at || 0)
+          );
+        });
+
+        setLoading(false);
+        setLoadingMore(false);
+
+        // Background profile resolution
+        uniqueEvents.forEach((event) => {
+          event.author
+            .fetchProfile()
+            .then(() => {
+              // force update? - usually handled by store
+            })
+            .catch(() => {});
+        });
+      } catch (err) {
+        console.error('Failed to fetch comments:', err);
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [ndk, pubkey]
+  );
+
+  useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore && until) {
+      fetchComments(until);
     }
-  }, [ndk, pubkey]);
+  };
+
+  const activeReplyInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
-
-  useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+    if (activeReplyId && activeReplyInputRef.current) {
+      activeReplyInputRef.current.focus();
+    }
+  }, [activeReplyId]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -358,16 +425,14 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
           {topLevelComments.map((comment) => renderComment(comment))}
         </div>
 
-        <div style={{ textAlign: 'right', marginTop: '10px', fontSize: '8pt' }}>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              fetchComments();
-            }}
-          >
-            Refresh Comments
-          </a>
+        <div style={{ textAlign: 'center', marginTop: '15px' }}>
+          {hasMore ? (
+            <button onClick={handleLoadMore} disabled={loadingMore} className="post-comment-btn">
+              {loadingMore ? 'Loading more...' : 'Load More Comments'}
+            </button>
+          ) : (
+            <div style={{ fontSize: '0.9em', color: '#666' }}>No more comments to load.</div>
+          )}
         </div>
       </div>
       <input

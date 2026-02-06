@@ -108,7 +108,7 @@ const ThreadedComments: React.FC<ThreadedCommentsProps> = ({
                     node.event.pubkey.slice(0, 8)}
                 </Link>
               </div>
-              <div style={{ color: '#333' }}>
+              <div style={{ color: '#333', fontSize: '9pt', lineHeight: 1.4 }}>
                 <RichTextRenderer content={node.event.content} />
               </div>
 
@@ -206,7 +206,7 @@ interface FeedItemProps {
   hideThreadButton?: boolean;
 }
 
-export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = false }) => {
+const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = false }) => {
   const { ndk, user, login } = useNostr();
   const { profile } = useProfile(event.pubkey);
   const [showCommentForm, setShowCommentForm] = useState(false);
@@ -553,3 +553,8 @@ export const FeedItem: React.FC<FeedItemProps> = ({ event, hideThreadButton = fa
     </div>
   );
 };
+
+// Memoize to prevent re-renders when parent state changes but event is same
+export const FeedItem = React.memo(FeedItemInner, (prev, next) => {
+  return prev.event.id === next.event.id && prev.hideThreadButton === next.hideThreadButton;
+});

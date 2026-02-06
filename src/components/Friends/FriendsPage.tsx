@@ -7,7 +7,7 @@ import { NDKUser } from '@nostr-dev-kit/ndk';
 import { useResolvedPubkey } from '../../hooks/useResolvedPubkey';
 import { Avatar } from '../Shared/Avatar';
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 24; // Smaller batch for faster loading
 
 const FriendsPage = () => {
   const { pubkey: identifier } = useParams<{ pubkey: string }>();
@@ -55,102 +55,270 @@ const FriendsPage = () => {
     );
   }
 
+  const displayName = profile?.name || profile?.displayName || 'User';
+
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', background: 'white' }}>
+    <div className="friends-page-container">
       <Navbar />
 
-      <div style={{ padding: 20 }}>
-        <div style={{ borderBottom: '1px solid #000', marginBottom: 15, paddingBottom: 5 }}>
-          <h2 style={{ margin: 0 }}>
-            {profile?.name || 'User'}'s Friends
-            <span style={{ fontSize: '12pt', fontWeight: 'normal', marginLeft: 10 }}>
-              ({friendPubkeys.length})
-            </span>
+      <div className="friends-page-content">
+        <div className="friends-page-header">
+          <h2>
+            {displayName}'s Friends
+            <span className="friend-count">({friendPubkeys.length})</span>
           </h2>
-          <div style={{ marginTop: 5 }}>
-            <Link to={`/p/${hexPubkey}`}>&laquo; Back to Profile</Link>
-          </div>
+          <Link to={`/p/${hexPubkey}`} className="back-link">
+            &laquo; Back to Profile
+          </Link>
         </div>
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="pagination" style={{ margin: '10px 0', textAlign: 'right' }}>
-            Page {currentPage + 1} of {totalPages}{' '}
-            <button disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}>
-              &laquo; Prev
-            </button>{' '}
-            <button
-              disabled={currentPage >= totalPages - 1}
-              onClick={() => setCurrentPage((p) => p + 1)}
-            >
-              Next &raquo;
-            </button>
+          <div className="pagination-controls">
+            <span className="page-info">
+              Page {currentPage + 1} of {totalPages}
+            </span>
+            <div className="pagination-buttons">
+              <button
+                disabled={currentPage === 0}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="pagination-btn"
+              >
+                &laquo; Prev
+              </button>
+              <button
+                disabled={currentPage >= totalPages - 1}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="pagination-btn"
+              >
+                Next &raquo;
+              </button>
+            </div>
           </div>
         )}
 
         {pageLoading ? (
-          <div>Loading profiles for page {currentPage + 1}...</div>
+          <div className="friends-grid">
+            {/* Loading skeletons */}
+            {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+              <div key={i} className="friend-card skeleton">
+                <div className="skeleton-avatar"></div>
+                <div className="skeleton-name"></div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="friends-grid">
             {currentProfiles.map((friend) => (
-              <div
+              <Link
                 key={friend.pubkey}
+                to={`/p/${friend.npub}`}
                 className="friend-card"
-                style={{
-                  width: 100,
-                  textAlign: 'center',
-                  marginBottom: 20,
-                  fontSize: '10pt',
-                }}
               >
-                <div style={{ marginBottom: 5 }}>
-                  <Link
-                    to={`/p/${friend.npub}`}
-                    style={{ fontWeight: 'bold', textDecoration: 'none' }}
-                  >
-                    {friend.profile?.displayName || friend.profile?.name || 'Friend'}
-                  </Link>
+                <Avatar
+                  pubkey={friend.pubkey}
+                  src={friend.profile?.image}
+                  size={70}
+                  className="friend-avatar"
+                />
+                <div className="friend-name">
+                  {friend.profile?.displayName || friend.profile?.name || 'Friend'}
                 </div>
-                <Link to={`/p/${friend.npub}`}>
-                  <Avatar
-                    pubkey={friend.pubkey}
-                    src={friend.profile?.image}
-                    size={80}
-                    style={{ border: '1px solid #ccc' }}
-                  />
-                </Link>
-              </div>
+              </Link>
             ))}
           </div>
         )}
 
         {/* Bottom Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="pagination" style={{ margin: '20px 0', textAlign: 'right' }}>
-            Page {currentPage + 1} of {totalPages}{' '}
-            <button disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}>
-              &laquo; Prev
-            </button>{' '}
-            <button
-              disabled={currentPage >= totalPages - 1}
-              onClick={() => setCurrentPage((p) => p + 1)}
-            >
-              Next &raquo;
-            </button>
+        {totalPages > 1 && !pageLoading && (
+          <div className="pagination-controls bottom">
+            <span className="page-info">
+              Page {currentPage + 1} of {totalPages}
+            </span>
+            <div className="pagination-buttons">
+              <button
+                disabled={currentPage === 0}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="pagination-btn"
+              >
+                &laquo; Prev
+              </button>
+              <button
+                disabled={currentPage >= totalPages - 1}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="pagination-btn"
+              >
+                Next &raquo;
+              </button>
+            </div>
           </div>
         )}
       </div>
 
       <style>{`
-                .friends-grid {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 15px;
-                }
-                .friend-card:hover {
-                    background-color: #f0f0f0;
-                }
-            `}</style>
+        .friends-page-container {
+          max-width: 900px;
+          margin: 0 auto;
+          background: white;
+          min-height: 100vh;
+          font-family: verdana, arial, sans-serif;
+        }
+        .friends-page-content {
+          padding: 20px;
+        }
+        .friends-page-header {
+          border-bottom: 2px solid #6699cc;
+          margin-bottom: 20px;
+          padding-bottom: 10px;
+        }
+        .friends-page-header h2 {
+          margin: 0 0 8px 0;
+          color: #003399;
+          font-size: 16pt;
+        }
+        .friend-count {
+          font-size: 11pt;
+          font-weight: normal;
+          color: #666;
+          margin-left: 8px;
+        }
+        .back-link {
+          color: #003399;
+          font-size: 9pt;
+          text-decoration: none;
+        }
+        .back-link:hover {
+          text-decoration: underline;
+        }
+        
+        .pagination-controls {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 10px 0;
+          margin-bottom: 15px;
+          border-bottom: 1px solid #eee;
+        }
+        .pagination-controls.bottom {
+          margin-top: 20px;
+          margin-bottom: 0;
+          border-top: 1px solid #eee;
+          border-bottom: none;
+          padding-top: 15px;
+        }
+        .page-info {
+          font-size: 9pt;
+          color: #666;
+        }
+        .pagination-buttons {
+          display: flex;
+          gap: 8px;
+        }
+        .pagination-btn {
+          background: linear-gradient(to bottom, #f5f5f5 0%, #e0e0e0 100%);
+          border: 1px solid #ccc;
+          padding: 6px 14px;
+          font-size: 9pt;
+          cursor: pointer;
+          border-radius: 3px;
+          color: #333;
+          font-weight: bold;
+        }
+        .pagination-btn:hover:not(:disabled) {
+          background: linear-gradient(to bottom, #e8f2fc 0%, #d4e6f8 100%);
+          border-color: #6699cc;
+        }
+        .pagination-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        
+        .friends-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+          gap: 15px;
+        }
+        
+        .friend-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 12px 8px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          text-decoration: none;
+          background: #fcfcfc;
+          transition: all 0.2s ease;
+        }
+        .friend-card:hover {
+          border-color: #6699cc;
+          background: #f0f8ff;
+          transform: translateY(-2px);
+          box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+        }
+        .friend-avatar {
+          border: 2px solid #ccc;
+          border-radius: 50%;
+          margin-bottom: 8px;
+        }
+        .friend-card:hover .friend-avatar {
+          border-color: #6699cc;
+        }
+        .friend-name {
+          font-size: 8pt;
+          color: #003399;
+          font-weight: bold;
+          text-align: center;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          width: 100%;
+        }
+        
+        /* Skeleton loading styles */
+        .friend-card.skeleton {
+          pointer-events: none;
+        }
+        .skeleton-avatar {
+          width: 70px;
+          height: 70px;
+          border-radius: 50%;
+          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+          margin-bottom: 8px;
+        }
+        .skeleton-name {
+          width: 60%;
+          height: 12px;
+          border-radius: 3px;
+          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        
+        @media (max-width: 600px) {
+          .friends-grid {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+          }
+          .friend-card {
+            padding: 8px 4px;
+          }
+          .friend-avatar {
+            width: 50px !important;
+            height: 50px !important;
+          }
+          .skeleton-avatar {
+            width: 50px;
+            height: 50px;
+          }
+        }
+      `}</style>
     </div>
   );
 };

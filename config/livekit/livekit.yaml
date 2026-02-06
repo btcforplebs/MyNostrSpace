@@ -1,0 +1,10 @@
+port: 7880
+rtc:
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: true
+  # IMPORTANT: Set this to your public domain or IP
+  # external_ip: "YOUR_PUBLIC_IP_OR_DOMAIN"
+  # Example: external_ip: "mynostrspace.com"
+keys:
+  mynostrspace: secret123changeme

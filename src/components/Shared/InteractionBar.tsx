@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
+import React, { useEffect, useState, useRef } from 'react';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { nip19 } from 'nostr-tools';
 import { useNostr } from '../../context/NostrContext';
+import { subscribeToStats, updateStats, getStats, type EventStats } from '../../hooks/statsCache';
 
 interface InteractionBarProps {
   event: NDKEvent;
@@ -10,83 +11,51 @@ interface InteractionBarProps {
 
 export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onCommentClick }) => {
   const { ndk, user, login } = useNostr();
-  const [likes, setLikes] = useState(0);
-  const [comments, setComments] = useState(0);
-  const [reposts, setReposts] = useState(0);
-  const [zaps, setZaps] = useState(0);
-  const [isLiked, setIsLiked] = useState(false);
-  const [isReposted, setIsReposted] = useState(false);
+  const [stats, setStats] = useState<EventStats>(() => getStats(event.id) || {
+    likes: 0,
+    comments: 0,
+    reposts: 0,
+    zaps: 0,
+    likedByMe: false,
+    repostedByMe: false,
+  });
   const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [quoteText, setQuoteText] = useState('');
   const [isQuoting, setIsQuoting] = useState(false);
   const [zapInvoice, setZapInvoice] = useState<string | null>(null);
   const [isZapping, setIsZapping] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const elementRef = useRef<HTMLDivElement>(null);
 
-  const [hasFetched, setHasFetched] = useState(false);
-
-  const fetchStats = useCallback(async () => {
-    if (!ndk || hasFetched) return;
-    setHasFetched(true);
-
-    try {
-      const filter: NDKFilter = {
-        '#e': [event.id],
-        kinds: [7, 1, 6, 9735],
-      };
-
-      const relatedEvents = await ndk.fetchEvents(filter);
-
-      let likeCount = 0;
-      let commentCount = 0;
-      let repostCount = 0;
-      let zapTotal = 0;
-      let likedByMe = false;
-      let repostedByMe = false;
-
-      relatedEvents.forEach((e) => {
-        if (e.kind === 7) {
-          likeCount++;
-          if (user && e.pubkey === user.pubkey) likedByMe = true;
-        } else if (e.kind === 6) {
-          repostCount++;
-          if (user && e.pubkey === user.pubkey) repostedByMe = true;
-        } else if (e.kind === 1) {
-          commentCount++;
-        } else if (e.kind === 9735) {
-          zapTotal++;
-        }
-      });
-
-      setLikes(likeCount);
-      setComments(commentCount);
-      setReposts(repostCount);
-      setZaps(zapTotal);
-      setIsLiked(likedByMe);
-      setIsReposted(repostedByMe);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      setHasFetched(false); // Allow retry on failure
-    }
-  }, [ndk, event.id, user, hasFetched]);
-
+  // Visibility detection with IntersectionObserver
   useEffect(() => {
+    const element = elementRef.current;
+    if (!element) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          fetchStats();
+          setIsVisible(true);
           observer.disconnect();
         }
       },
       { rootMargin: '200px' }
     );
 
-    const element = document.getElementById(`interaction-${event.id}`);
-    if (element) {
-      observer.observe(element);
-    }
-
+    observer.observe(element);
     return () => observer.disconnect();
-  }, [fetchStats, event.id]);
+  }, []);
+
+  // Subscribe to batched stats when visible
+  useEffect(() => {
+    if (!isVisible || !ndk) return;
+
+    const unsubscribe = subscribeToStats(event.id, ndk, user?.pubkey, (newStats) => {
+      setStats(newStats);
+    });
+
+    return unsubscribe;
+  }, [isVisible, ndk, event.id, user?.pubkey]);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -94,7 +63,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       await login();
       return;
     }
-    if (isLiked) return; // Already liked
+    if (stats.likedByMe) return;
 
     try {
       const reaction = new NDKEvent(ndk);
@@ -106,8 +75,11 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         ['client', 'MyNostrSpace'],
       ];
       await reaction.publish();
-      setLikes((prev) => prev + 1);
-      setIsLiked(true);
+      updateStats(event.id, (prev) => ({
+        ...prev,
+        likes: prev.likes + 1,
+        likedByMe: true,
+      }));
     } catch (error) {
       console.error('Failed to like:', error);
     }
@@ -119,7 +91,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       await login();
       return;
     }
-    if (isReposted) return;
+    if (stats.repostedByMe) return;
 
     if (!confirm('Repost this note?')) return;
 
@@ -133,8 +105,11 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         ['client', 'MyNostrSpace'],
       ];
       await repost.publish();
-      setReposts((prev) => prev + 1);
-      setIsReposted(true);
+      updateStats(event.id, (prev) => ({
+        ...prev,
+        reposts: prev.reposts + 1,
+        repostedByMe: true,
+      }));
     } catch (error) {
       console.error('Failed to repost:', error);
     }
@@ -206,14 +181,11 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         return;
       }
 
-      // Manual LNURL-Zap Flow
-      // 1. Resolve LNURL/Lud16
       let lnurl = '';
       if (lud16.includes('@')) {
         const [name, domain] = lud16.split('@');
         lnurl = `https://${domain}/.well-known/lnurlp/${name}`;
       } else {
-        // Simplified lud06 decoding (not full spec but common for now)
         lnurl = lud16;
       }
 
@@ -225,14 +197,13 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         throw new Error('No callback found in LNURL data');
       }
 
-      // 2. Create Zap Request (Kind 9734)
       const zapRequest = new NDKEvent(ndk);
       zapRequest.kind = 9734;
       zapRequest.content = 'Zap from MyNostrSpace';
       zapRequest.tags = [
         ['relays', ...ndk.pool.relays.keys()],
         ['amount', amountInMSats.toString()],
-        ['lnurl', lud16], // Lud16 or encoded lnurl
+        ['lnurl', lud16],
         ['p', event.author.pubkey],
         ['e', event.id],
         ['client', 'MyNostrSpace'],
@@ -241,7 +212,6 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       await zapRequest.sign();
       const zapRequestJson = JSON.stringify(zapRequest.rawEvent());
 
-      // 3. Get Invoice
       const cbUrl = new URL(callback);
       cbUrl.searchParams.append('amount', amountInMSats.toString());
       cbUrl.searchParams.append('nostr', zapRequestJson);
@@ -254,17 +224,16 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         setZapInvoice(invoiceData.pr);
         console.log('Zap invoice generated:', invoiceData.pr);
 
-        // Try to pay automatically if window.nostr supports it
         if ((window.nostr as unknown as { zap?: (invoice: string) => Promise<void> | void })?.zap) {
           try {
             await (
               window.nostr as unknown as { zap: (invoice: string) => Promise<void> | void }
             ).zap(invoiceData.pr);
-            setZaps((prev) => prev + 1);
+            updateStats(event.id, (prev) => ({ ...prev, zaps: prev.zaps + 1 }));
             setZapInvoice(null);
             alert('Zap successful!');
-          } catch (e) {
-            console.log('Auto-zap failed, showing QR', e);
+          } catch (err) {
+            console.log('Auto-zap failed, showing QR', err);
           }
         }
       } else {
@@ -280,7 +249,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
 
   return (
     <div
-      id={`interaction-${event.id}`}
+      ref={elementRef}
       className="interaction-bar"
       style={{
         marginTop: '10px',
@@ -294,9 +263,9 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       <a
         href="#"
         onClick={handleLike}
-        style={{ color: isLiked ? '#f04e30' : '#003399', fontWeight: isLiked ? 'bold' : 'normal' }}
+        style={{ color: stats.likedByMe ? '#f04e30' : '#003399', fontWeight: stats.likedByMe ? 'bold' : 'normal' }}
       >
-        {isLiked ? '♥ Liked' : 'like'} ({likes})
+        {stats.likedByMe ? '♥ Liked' : 'like'} ({stats.likes})
       </a>
       <span className="interaction-separator">|</span>
       <a
@@ -307,18 +276,18 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         }}
         style={{ color: '#003399' }}
       >
-        comment ({comments})
+        comment ({stats.comments})
       </a>
       <span className="interaction-separator">|</span>
       <a
         href="#"
         onClick={handleRepost}
         style={{
-          color: isReposted ? '#2e7d32' : '#003399',
-          fontWeight: isReposted ? 'bold' : 'normal',
+          color: stats.repostedByMe ? '#2e7d32' : '#003399',
+          fontWeight: stats.repostedByMe ? 'bold' : 'normal',
         }}
       >
-        {isReposted ? '🔄 reposted' : `repost (${reposts})`}
+        {stats.repostedByMe ? '🔄 reposted' : `repost (${stats.reposts})`}
       </a>
       <span className="interaction-separator">|</span>
       <a
@@ -333,7 +302,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       </a>
       <span className="interaction-separator">|</span>
       <a href="#" onClick={handleZap} style={{ color: '#003399' }}>
-        {isZapping ? 'zapping...' : `zap (${zaps})`}
+        {isZapping ? 'zapping...' : `zap (${stats.zaps})`}
       </a>
       {showQuoteForm && (
         <div

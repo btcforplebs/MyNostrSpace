@@ -188,6 +188,20 @@ const HomePage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Helper to dedupe and sort feed events (used by flushBuffer and pending posts)
+  const dedupAndSortFeed = (
+    newEvents: NDKEvent[],
+    existingEvents: NDKEvent[]
+  ): NDKEvent[] => {
+    const combined = [...newEvents, ...existingEvents];
+    const unique = Array.from(
+      new Map(combined.map((item) => [item.id, item])).values()
+    );
+    return unique
+      .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+      .slice(0, 100);
+  };
+
   const getCanonicalUrl = (url: string) => {
     try {
       const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
@@ -557,12 +571,8 @@ const HomePage = () => {
         const currentBuffer = [...eventBuffer];
         eventBuffer = [];
 
-        setFeed((prev) => {
-          const combined = [...currentBuffer, ...prev];
-          const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-          const next = unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-          return next.slice(0, 100);
-        });
+        // Use functional setState - React batches these efficiently
+        setFeed((prev) => dedupAndSortFeed(currentBuffer, prev));
       };
 
       let mediaEventBuffer: MediaItem[] = [];
@@ -1225,15 +1235,8 @@ const HomePage = () => {
                       <div
                         className="new-posts-banner"
                         onClick={() => {
-                          setFeed((prev) => {
-                            const combined = [...pendingPosts, ...prev];
-                            const unique = Array.from(
-                              new Map(combined.map((item) => [item.id, item])).values()
-                            );
-                            return unique
-                              .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
-                              .slice(0, 100);
-                          });
+                          const sorted = dedupAndSortFeed(pendingPosts, feed);
+                          setFeed(sorted);
                           setPendingPosts([]);
                         }}
                       >

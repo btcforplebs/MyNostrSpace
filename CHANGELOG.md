@@ -76,6 +76,18 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 - Smaller padding and font sizes for better mobile experience
 - Flex-wrap support for tab overflow
 
+### ⚡ Performance
+
+#### **Homepage Feed Optimization**
+- Added shared profile cache with request deduplication (`profileCache.ts`)
+  - Previously: 40+ parallel profile fetches per page load
+  - Now: Deduplicated requests, cached results shared across components
+- Extracted feed deduplication/sort into reusable helper function
+- Added batched stats fetching for InteractionBar (`statsCache.ts`)
+  - Previously: 35 separate `fetchEvents()` calls for visible items
+  - Now: Single batched query with 150ms collection window
+- Memoized `RichTextRenderer` with `React.memo()` to prevent unnecessary re-renders
+
 ### 🐛 Bug Fixes
 
 - Fixed feed header layout with proper flex display

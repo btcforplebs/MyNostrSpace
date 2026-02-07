@@ -33,7 +33,7 @@ interface RichTextRendererProps {
 
 const BLOCKED_KEYWORDS = ['xxx', 'porn'];
 
-export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
+export const RichTextRenderer: React.FC<RichTextRendererProps> = React.memo(({
   content,
   style,
   className,
@@ -202,4 +202,4 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = ({
       ))}
     </div>
   );
-};
+});

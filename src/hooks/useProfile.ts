@@ -1,75 +1,73 @@
-import { useEffect, useState } from 'react';
-import { type NDKUserProfile, NDKSubscriptionCacheUsage, NDKEvent } from '@nostr-dev-kit/ndk';
+import { useEffect, useState, useCallback } from 'react';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { useNostr } from '../context/NostrContext';
+import {
+  subscribeToProfile,
+  updateCachedProfile,
+  getProfile,
+  type ExtendedProfile,
+} from './profileCache';
 
-export interface ExtendedProfile extends NDKUserProfile {
-  website?: string;
-  lud16?: string;
-  banner?: string;
-}
+// Re-export for backward compatibility
+export type { ExtendedProfile } from './profileCache';
 
 export const useProfile = (pubkey?: string) => {
   const { ndk } = useNostr();
-  const [profile, setProfile] = useState<ExtendedProfile | null>(null);
+  const [profile, setProfile] = useState<ExtendedProfile | null>(() => {
+    // Initialize from cache if available
+    if (pubkey && ndk) {
+      return getProfile(pubkey);
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!pubkey || !ndk) return;
+    if (!pubkey || !ndk) {
+      setLoading(false);
+      return;
+    }
 
-    const fetchProfile = async () => {
-      try {
-        let user;
-        if (pubkey.startsWith('npub') || pubkey.startsWith('nprofile')) {
-          user = ndk.getUser({
-            [pubkey.startsWith('npub') ? 'npub' : 'nprofile']: pubkey,
-          });
-        } else {
-          user = ndk.getUser({ pubkey });
-        }
+    // Subscribe to profile updates from the shared cache
+    const unsubscribe = subscribeToProfile(pubkey, ndk, (updatedProfile) => {
+      setProfile(updatedProfile);
+      setLoading(false);
+    });
 
-        // 1. Try to get from NDK object if already there
-        if (user.profile) {
-          setProfile(user.profile as ExtendedProfile);
-          // Don't stop loading yet if we want a fresh fetch
-        }
+    // Set a timeout to stop loading even if no profile found
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 5500);
 
-        // 2. Fetch from relays/cache
-        await Promise.race([
-          user.fetchProfile({ cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000)),
-        ]).catch((err) => {
-          console.warn(`Profile fetch for ${pubkey} timed out or failed:`, err);
-        });
-
-        if (user.profile) {
-          setProfile(user.profile as ExtendedProfile);
-        }
-      } catch (e) {
-        console.error('Error in useProfile hook:', e);
-      } finally {
-        setLoading(false);
-      }
+    return () => {
+      unsubscribe();
+      clearTimeout(timeout);
     };
-
-    fetchProfile();
   }, [ndk, pubkey]);
 
-  const publishProfile = async (newProfile: ExtendedProfile) => {
-    if (!ndk || !pubkey) return;
+  const publishProfile = useCallback(
+    async (newProfile: ExtendedProfile) => {
+      if (!ndk || !pubkey) return;
 
-    try {
-      const event = new NDKEvent(ndk);
-      event.kind = 0;
-      event.content = JSON.stringify(newProfile);
-      event.tags = [['client', 'MyNostrSpace']];
-      await event.publish();
-      setProfile(newProfile);
-      alert('Profile metadata updated!');
-    } catch (error) {
-      console.error('Error publishing profile:', error);
-      alert('Failed to update profile metadata.');
-    }
-  };
+      try {
+        const event = new NDKEvent(ndk);
+        event.kind = 0;
+        event.content = JSON.stringify(newProfile);
+        event.tags = [['client', 'MyNostrSpace']];
+        await event.publish();
+
+        // Update both local state and cache
+        setProfile(newProfile);
+        updateCachedProfile(pubkey, newProfile);
+
+        alert('Profile metadata updated!');
+      } catch (error) {
+        console.error('Error publishing profile:', error);
+        alert('Failed to update profile metadata.');
+      }
+    },
+    [ndk, pubkey]
+  );
 
   return { profile, loading, publishProfile };
 };

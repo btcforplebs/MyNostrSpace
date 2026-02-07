@@ -8,7 +8,7 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 #### **Site-wide Blocked Users & Keywords**
 - Centralized `isBlockedUser` and `hasBlockedKeyword` utilities integrated into **Browse**, **Videos**, **Photos**, **Thread View**, and **Profile** pages.
-- Added site-wide filtering for `BLOCKED_KEYWORDS` (e.g., 'DeFi', 'NewToken', 'memecoin') and `BLOCKED_TAGS` (NSFW tags) defined in `blockedUsers.ts`.
+- Added site-wide filtering for `BLOCKED_KEYWORDS`.
 - Content from blocked pubkeys or containing blocked keywords is automatically hidden from feeds, grids, and replies.
 - Blocked profiles display a "Profile Blocked" notification.
 

@@ -160,6 +160,21 @@
     font-weight: bold;
 }
 
+.badge-card-award-btn {
+    background: var(--myspace-blue, #6699cc);
+    color: white;
+    border: 1px solid #5588bb;
+    padding: 2px 6px;
+    font-size: 8pt;
+    cursor: pointer;
+    font-weight: bold;
+    border-radius: 2px;
+}
+
+.badge-card-award-btn:hover {
+    background: #5588bb;
+}
+
 /* Load More Button */
 .badges-load-more-btn {
     padding: 8px 16px;

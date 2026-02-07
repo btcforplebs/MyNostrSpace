@@ -23,6 +23,8 @@ import {
 import { FeedItem } from '../Shared/FeedItem';
 import './ProfilePage.css';
 import { filterRelays } from '../../utils/relay';
+import { isBlockedUser } from '../../utils/blockedUsers';
+import { AwardBadgeModal } from '../Badges/AwardBadgeModal';
 
 // --- Tab Sub-Components ---
 
@@ -652,7 +654,7 @@ const ProfileVideos = ({ pubkey }: { pubkey: string }) => {
                   style={{ width: '100%', height: '100%' }}
                 />
               ) : (
-                <video src={video.url} controls style={{ width: '100%', height: '100%' }} />
+                <video src={video.url} controls preload="metadata" style={{ width: '100%', height: '100%' }} />
               )}
             </div>
           );
@@ -928,6 +930,8 @@ const ProfilePage = () => {
   const [hasRecipes, setHasRecipes] = useState(false);
   const [hasLivestreams, setHasLivestreams] = useState(false);
   const [hasBlog, setHasBlog] = useState(false);
+  const [isBadgeCreator, setIsBadgeCreator] = useState(false);
+  const [showAwardModal, setShowAwardModal] = useState(false);
 
   // Content Check Effect
   useEffect(() => {
@@ -997,6 +1001,16 @@ const ProfilePage = () => {
         return !tags.includes('zapcooking') && !tags.includes('nostrcooking');
       });
       setHasBlog(hasB);
+
+      // Check if logged-in user is a badge creator
+      if (user?.pubkey) {
+        const myBadges = await ndk.fetchEvents({
+          kinds: [30009 as number],
+          authors: [user.pubkey],
+          limit: 1,
+        });
+        setIsBadgeCreator(myBadges.size > 0);
+      }
     };
 
     checkAll();
@@ -1087,6 +1101,21 @@ const ProfilePage = () => {
           <div className="loading-body">
             <p>Loading Profile...</p>
             <p style={{ fontSize: '8pt' }}>(Please Wait)</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hexPubkey && isBlockedUser(hexPubkey)) {
+    return (
+      <div className="profile-container">
+        <Navbar />
+        <div className="profile-body" style={{ padding: '40px', textAlign: 'center' }}>
+          <h2 className="section-header" style={{ background: '#cc0000', color: 'white' }}>Profile Blocked</h2>
+          <p style={{ marginTop: '20px' }}>Content from this user has been blocked according to your settings.</p>
+          <div style={{ marginTop: '20px' }}>
+            <Link to="/" style={{ color: '#003399', fontWeight: 'bold' }}>&laquo; Back to Home</Link>
           </div>
         </div>
       </div>
@@ -1212,7 +1241,12 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          <ContactBox name={profile?.name || ''} pubkey={hexPubkey || ''} />
+          <ContactBox
+            name={profile?.name || ''}
+            pubkey={hexPubkey || ''}
+            showAwardButton={isBadgeCreator && user?.pubkey !== hexPubkey}
+            onAwardBadge={() => setShowAwardModal(true)}
+          />
 
           <div className="url-box">
             <b>MyNostrSpace URL:</b>
@@ -1465,6 +1499,16 @@ const ProfilePage = () => {
           )}
         </div>
       </div>
+
+      {showAwardModal && hexPubkey && (
+        <AwardBadgeModal
+          recipientPubkey={hexPubkey}
+          onClose={() => setShowAwardModal(false)}
+          onSuccess={() => {
+            // refresh badges or count if needed
+          }}
+        />
+      )}
     </div>
   );
 };

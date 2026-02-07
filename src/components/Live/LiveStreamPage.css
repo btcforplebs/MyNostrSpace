@@ -197,11 +197,15 @@
   display: flex;
   gap: 10px;
   background-color: #ffffff;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .chat-input-area input {
   flex-grow: 1;
   padding: 5px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .chat-input-area button,
@@ -285,6 +289,7 @@
     margin: 0;
     border: none;
     padding: 10px;
+    box-sizing: border-box;
   }
 
   .col-left {

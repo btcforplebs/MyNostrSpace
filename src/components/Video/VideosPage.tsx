@@ -4,7 +4,9 @@ import { useNostr } from '../../context/NostrContext';
 import { type NDKFilter, NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
 import { SEO } from '../Shared/SEO';
+import { VideoThumbnail } from '../Shared/VideoThumbnail';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
+import { isBlockedUser, hasBlockedKeyword } from '../../utils/blockedUsers';
 import './VideosPage.css';
 
 interface VideoFile {
@@ -18,17 +20,6 @@ interface VideoFile {
   created_at: number;
 }
 
-const BLOCKED_KEYWORDS = [
-  'xxx',
-  'porn',
-  'nsfw',
-  'explicit',
-  'sex',
-  'hentai',
-  'p0rn',
-  'adult',
-  'pornography',
-];
 const BLOCKED_TAGS = ['nsfw', 'explicit', 'porn', 'xxx', 'content-warning'];
 
 export const VideosPage = () => {
@@ -39,69 +30,10 @@ export const VideosPage = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [thumbnailCache, setThumbnailCache] = useState<Record<string, string>>({});
   const videoBufferRef = useRef<VideoFile[]>([]);
   const isUpdatePendingRef = useRef(false);
   const fetchingRef = useRef(false);
   const loadTrackerRef = useRef(0);
-
-  const generateThumbnail = (videoUrl: string): Promise<string | null> => {
-    return new Promise((resolve) => {
-      const video = document.createElement('video');
-      video.crossOrigin = 'anonymous';
-      video.src = videoUrl;
-      video.muted = true;
-
-      const cleanup = () => {
-        video.remove();
-      };
-
-      const timeout = setTimeout(() => {
-        cleanup();
-        resolve(null);
-      }, 5000); // 5 second timeout
-
-      video.addEventListener('loadeddata', () => {
-        // Seek to 2 seconds or 25% of duration, whichever is smaller
-        const seekTime = Math.min(2, video.duration * 0.25);
-        video.currentTime = seekTime;
-      });
-
-      video.addEventListener('seeked', () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth || 640;
-          canvas.height = video.videoHeight || 360;
-
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
-            clearTimeout(timeout);
-            cleanup();
-            resolve(thumbnailUrl);
-          } else {
-            clearTimeout(timeout);
-            cleanup();
-            resolve(null);
-          }
-        } catch {
-          clearTimeout(timeout);
-          cleanup();
-          resolve(null);
-        }
-      });
-
-      video.addEventListener('error', () => {
-        clearTimeout(timeout);
-        cleanup();
-        resolve(null);
-      });
-
-      // Start loading
-      video.load();
-    });
-  };
 
   const checkIsNSFW = (event: NDKEvent): boolean => {
     const tags = event.tags.map((t) => t[1]?.toLowerCase());
@@ -115,12 +47,9 @@ export const VideosPage = () => {
       event.getMatchingTags('title')[0]?.[1],
       event.getMatchingTags('description')[0]?.[1],
       event.getMatchingTags('alt')[0]?.[1],
-    ]
-      .join(' ')
-      .toLowerCase();
+    ].join(' ');
 
-    if (BLOCKED_KEYWORDS.some((word) => textToMatch.includes(word))) return true;
-    return false;
+    return hasBlockedKeyword(textToMatch);
   };
 
   const processBuffer = useCallback(() => {
@@ -147,6 +76,7 @@ export const VideosPage = () => {
 
   const handleEvent = useCallback(
     (event: NDKEvent) => {
+      if (isBlockedUser(event.pubkey)) return;
       if (checkIsNSFW(event)) return;
 
       let url: string | undefined;
@@ -306,48 +236,21 @@ export const VideosPage = () => {
               prev.map((v) =>
                 v.pubkey === event.pubkey && !v.authorName
                   ? {
-                      ...v,
-                      authorName:
-                        profile?.name ||
-                        profile?.displayName ||
-                        profile?.nip05 ||
-                        event.pubkey.slice(0, 8),
-                    }
+                    ...v,
+                    authorName:
+                      profile?.name ||
+                      profile?.displayName ||
+                      profile?.nip05 ||
+                      event.pubkey.slice(0, 8),
+                  }
                   : v
               )
             );
           })
-          .catch(() => {});
-
-        // Generate thumbnail for direct video files if none exists
-        if (
-          !thumbnail &&
-          url &&
-          mime &&
-          !mime.includes('youtube') &&
-          !mime.includes('vimeo') &&
-          !mime.includes('streamable')
-        ) {
-          // Check cache first
-          if (thumbnailCache[url]) {
-            setVideos((prev) =>
-              prev.map((v) => (v.id === event.id ? { ...v, thumbnail: thumbnailCache[url] } : v))
-            );
-          } else {
-            // Generate new thumbnail
-            generateThumbnail(url).then((generatedThumb) => {
-              if (generatedThumb) {
-                setThumbnailCache((prev) => ({ ...prev, [url]: generatedThumb }));
-                setVideos((prev) =>
-                  prev.map((v) => (v.id === event.id ? { ...v, thumbnail: generatedThumb } : v))
-                );
-              }
-            });
-          }
-        }
+          .catch(() => { });
       }
     },
-    [ndk, loadingMore, thumbnailCache, processBuffer]
+    [ndk, loadingMore, processBuffer]
   );
 
   useEffect(() => {
@@ -470,9 +373,10 @@ export const VideosPage = () => {
                           loading="lazy"
                         />
                       ) : (
-                        <div className="vp-video-placeholder">
-                          <span className="vp-play-icon">▶</span>
-                        </div>
+                        <VideoThumbnail
+                          src={video.url}
+                          className="vp-video-thumbnail"
+                        />
                       )}
                       <div className="vp-badge">
                         {video.mime?.split('/')[1]?.toUpperCase() || 'MP4'}

@@ -255,3 +255,54 @@
   color: #000;
   font-family: 'Verdana', sans-serif;
 }
+
+@media (max-width: 768px) {
+  .marketplace-modal-content {
+    width: 95%;
+    max-height: 85vh;
+  }
+
+  .marketplace-modal-body {
+    flex-direction: column;
+    padding: 15px;
+    gap: 15px;
+  }
+
+  .modal-image-container {
+    min-width: 0;
+    flex: none;
+  }
+
+  .modal-image {
+    max-height: 35vh;
+    object-fit: contain;
+  }
+
+  .modal-details {
+    min-width: 0;
+    flex: none;
+  }
+
+  .modal-price {
+    font-size: 18px;
+    margin: 5px 0;
+  }
+
+  .modal-description {
+    font-size: 13px;
+    margin-bottom: 15px;
+  }
+
+  .buy-button,
+  .shopstr-button {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  .modal-details>div[style*="display: flex"] {
+    flex-direction: column;
+    gap: 5px !important;
+  }
+}

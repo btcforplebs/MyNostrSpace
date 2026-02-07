@@ -2,6 +2,29 @@
 
 All notable changes to the MyNostrSpace project will be documented in this file.
 
+## [Unreleased] - 2026-02-07
+
+### 🚀 New Features
+
+#### **Site-wide Blocked Users & Keywords**
+- Centralized `isBlockedUser` and `hasBlockedKeyword` utilities integrated into **Browse**, **Videos**, **Photos**, **Thread View**, and **Profile** pages.
+- Added site-wide filtering for `BLOCKED_KEYWORDS` (e.g., 'DeFi', 'NewToken', 'memecoin') and `BLOCKED_TAGS` (NSFW tags) defined in `blockedUsers.ts`.
+- Content from blocked pubkeys or containing blocked keywords is automatically hidden from feeds, grids, and replies.
+- Blocked profiles display a "Profile Blocked" notification.
+
+#### **Badge Awarding (NIP-58)**
+- Added **AwardBadgeModal** for badge creators to award their badges to others.
+- Integrated "Give Badge" option into user profiles for badge creators.
+- Added direct "Award" button to owned badges on the **Badges** page.
+
+### 🎨 UI/UX Enhancements
+
+#### **Marketplace Mobile Optimization**
+- Improved marketplace popup placement on mobile devices to prevent scrolling.
+- Ensured all popup content (images, descriptions, links) fits within the mobile viewport.
+
+---
+
 ## [Unreleased] - 2026-02-06
 
 ### 🚀 New Features
@@ -75,6 +98,19 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 - Added responsive styles for profile tabs on mobile
 - Smaller padding and font sizes for better mobile experience
 - Flex-wrap support for tab overflow
+
+#### **Zap Parsing Fixes**
+- Fixed issue where zaps appeared as 0 sats locally.
+- Implemented dual-parsing for zap receipts and zap requests to ensure accurate amounts.
+- Ensured zap requests are published to relays for synchronization with external platforms like Zap.stream.
+
+#### **Wall Comment UI**
+- Enhanced comment wall headers to show "Commenter → Wall Owner".
+- Improved visual clarity of wall post relationships across the site.
+
+#### **Profile Video Detection**
+- Added `imeta` tag parsing and Kind 1 mp4 detection to profile Video tab.
+- Unified video parsing logic between HomePage and ProfileVideos for consistency.
 
 ### ⚡ Performance
 

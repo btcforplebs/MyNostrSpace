@@ -5,6 +5,7 @@ import { type NDKFilter, NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-
 import { Navbar } from '../Shared/Navbar';
 import { SEO } from '../Shared/SEO';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
+import { isBlockedUser, hasBlockedKeyword, BLOCKED_TAGS } from '../../utils/blockedUsers';
 import './PhotosPage.css';
 
 interface PhotoFile {
@@ -15,19 +16,6 @@ interface PhotoFile {
   authorName?: string;
   created_at: number;
 }
-
-const BLOCKED_KEYWORDS = [
-  'xxx',
-  'porn',
-  'nsfw',
-  'explicit',
-  'sex',
-  'hentai',
-  'p0rn',
-  'adult',
-  'pornography',
-];
-const BLOCKED_TAGS = ['nsfw', 'explicit', 'porn', 'xxx', 'content-warning'];
 
 export const PhotosPage = () => {
   const { ndk, user: loggedInUser } = useNostr();
@@ -58,12 +46,9 @@ export const PhotosPage = () => {
       event.getMatchingTags('title')[0]?.[1],
       event.getMatchingTags('description')[0]?.[1],
       event.getMatchingTags('alt')[0]?.[1],
-    ]
-      .join(' ')
-      .toLowerCase();
+    ].join(' ');
 
-    if (BLOCKED_KEYWORDS.some((word) => textToMatch.includes(word))) return true;
-    return false;
+    return hasBlockedKeyword(textToMatch);
   };
 
   const processBuffer = useCallback(() => {
@@ -90,6 +75,7 @@ export const PhotosPage = () => {
 
   const handleEvent = useCallback(
     (event: NDKEvent) => {
+      if (isBlockedUser(event.pubkey)) return;
       if (checkIsNSFW(event)) return;
 
       let url: string | undefined;
@@ -175,18 +161,18 @@ export const PhotosPage = () => {
                 prev.map((p) =>
                   p.pubkey === event.pubkey && !p.authorName
                     ? {
-                        ...p,
-                        authorName:
-                          profile?.name ||
-                          profile?.displayName ||
-                          profile?.nip05 ||
-                          event.pubkey.slice(0, 8),
-                      }
+                      ...p,
+                      authorName:
+                        profile?.name ||
+                        profile?.displayName ||
+                        profile?.nip05 ||
+                        event.pubkey.slice(0, 8),
+                    }
                     : p
                 )
               );
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       }
     },

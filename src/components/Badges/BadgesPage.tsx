@@ -5,6 +5,7 @@ import { type NDKFilter, NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-
 import { Navbar } from '../Shared/Navbar';
 import { SEO } from '../Shared/SEO';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
+import { AwardBadgeModal } from './AwardBadgeModal';
 import './BadgesPage.css';
 
 interface Badge {
@@ -34,6 +35,7 @@ export const BadgesPage = () => {
     const [badgeName, setBadgeName] = useState('');
     const [badgeDescription, setBadgeDescription] = useState('');
     const [badgeImage, setBadgeImage] = useState('');
+    const [selectedBadgeForAward, setSelectedBadgeForAward] = useState<string | null>(null);
 
     const badgeBufferRef = useRef<Badge[]>([]);
     const isUpdatePendingRef = useRef(false);
@@ -359,6 +361,17 @@ export const BadgesPage = () => {
                                                         By: {badge.creatorName || badge.pubkey.slice(0, 8)}
                                                     </Link>
                                                     {count > 0 && <span className="badge-award-count">🎖️ {count} awarded</span>}
+                                                    {badge.pubkey === loggedInUser?.pubkey && (
+                                                        <button
+                                                            className="badge-card-award-btn"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedBadgeForAward(`30009:${badge.pubkey}:${badge.dTag}`);
+                                                            }}
+                                                        >
+                                                            Award
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -446,6 +459,16 @@ export const BadgesPage = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {selectedBadgeForAward && (
+                <AwardBadgeModal
+                    preSelectedBadgeId={selectedBadgeForAward}
+                    onClose={() => setSelectedBadgeForAward(null)}
+                    onSuccess={() => {
+                        // could re-fetch awards here if needed
+                    }}
+                />
             )}
         </div>
     );

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
+import { isBlockedUser, hasBlockedKeyword } from '../../utils/blockedUsers';
 import '../Landing/LandingPage.css'; // Reuse Landing Page CSS directly
 import './BrowsePage.css'; // Additional overrides if needed
 
@@ -68,7 +69,7 @@ const NoteMedia = ({ content }: { content: string }) => {
   if (['mp4', 'mov', 'webm'].includes(extension || '')) {
     return (
       <div style={{ marginTop: '10px', textAlign: 'center' }}>
-        <video src={url} controls style={{ maxWidth: '100%', maxHeight: '300px' }} />
+        <video src={url} controls preload="metadata" style={{ maxWidth: '100%', maxHeight: '300px' }} />
       </div>
     );
   }
@@ -123,11 +124,12 @@ export const BrowsePage = () => {
         );
 
         for (const event of sortedProfiles) {
-          if (uniquePubkeys.has(event.pubkey)) continue;
+          if (uniquePubkeys.has(event.pubkey) || isBlockedUser(event.pubkey)) continue;
           uniquePubkeys.add(event.pubkey);
           try {
             const content = JSON.parse(event.content);
             if (!content.name && !content.picture && !content.display_name) continue;
+            if (hasBlockedKeyword(content.about || '') || hasBlockedKeyword(content.name || '') || hasBlockedKeyword(content.display_name || '')) continue;
             processedProfiles.push({
               pubkey: event.pubkey,
               name: content.name || content.display_name,
@@ -145,7 +147,7 @@ export const BrowsePage = () => {
         const noteEvents = await ndk.fetchEvents(noteFilter);
 
         const notesArray = Array.from(noteEvents)
-          .filter((event) => !event.tags.some((tag) => tag[0] === 'e'))
+          .filter((event) => !event.tags.some((tag) => tag[0] === 'e') && !isBlockedUser(event.pubkey) && !hasBlockedKeyword(event.content))
           .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
           .slice(0, 20);
 

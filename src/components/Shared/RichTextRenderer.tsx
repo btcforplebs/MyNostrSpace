@@ -102,6 +102,7 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = React.memo(({
                     <video
                       src={url}
                       controls
+                      preload="metadata"
                       style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px' }}
                     />
                   </div>

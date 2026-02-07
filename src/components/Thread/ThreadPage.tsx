@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
-import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
+import { NDKEvent, type NDKFilter, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
 import { FeedItem } from '../Shared/FeedItem';
+import { isBlockedUser } from '../../utils/blockedUsers';
 
 interface ThreadNode {
   event: NDKEvent;
@@ -14,85 +15,112 @@ export const ThreadPage = () => {
   const { eventId } = useParams();
   const { ndk } = useNostr();
   const [rootEvent, setRootEvent] = useState<NDKEvent | null>(null);
-  const [threadTree, setThreadTree] = useState<ThreadNode[]>([]);
+  const [replies, setReplies] = useState<NDKEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingReplies, setLoadingReplies] = useState(false);
+  const repliesRef = useRef<Map<string, NDKEvent>>(new Map());
+
+  // Build tree from flat replies list
+  const buildTree = useCallback((parentId: string, allReplies: NDKEvent[]): ThreadNode[] => {
+    const children = allReplies.filter((reply) => {
+      const eTags = reply.tags.filter((t) => t[0] === 'e');
+      const replyMarkerTag = eTags.find((t) => t[3] === 'reply');
+      const directParentId = replyMarkerTag
+        ? replyMarkerTag[1]
+        : eTags.length > 0
+          ? eTags[eTags.length - 1][1]
+          : null;
+      return directParentId === parentId;
+    });
+
+    return children
+      .sort((a, b) => (a.created_at || 0) - (b.created_at || 0))
+      .map((child) => ({
+        event: child,
+        children: buildTree(child.id, allReplies),
+      }));
+  }, []);
+
+  const threadTree = rootEvent ? buildTree(rootEvent.id, replies) : [];
 
   useEffect(() => {
     if (!ndk || !eventId) return;
 
-    const fetchThread = async () => {
-      setLoading(true);
-      try {
-        // 1. Fetch the root event
-        const event = await ndk.fetchEvent(eventId);
-        if (!event) {
-          setLoading(false);
-          return;
-        }
-        await event.author.fetchProfile();
-        setRootEvent(event);
+    setLoading(true);
+    setRootEvent(null);
+    setReplies([]);
+    repliesRef.current.clear();
 
-        // 2. Fetch ALL replies to this event
-        const replyFilter: NDKFilter = {
-          kinds: [1],
-          '#e': [event.id],
-        };
+    // Fetch root event
+    const rootSub = ndk.subscribe(
+      { ids: [eventId] },
+      { closeOnEose: true, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
+    );
 
-        const replyEvents = await ndk.fetchEvents(replyFilter);
-        const allReplies = Array.from(replyEvents);
+    rootSub.on('event', async (event: NDKEvent) => {
+      // Fetch author profile in background
+      event.author.fetchProfile().catch(() => { });
 
-        // Fetch profiles for all replies
-        await Promise.all(allReplies.map((r) => r.author.fetchProfile()));
-
-        // 3. Build a tree structure
-        const buildTree = (parentId: string): ThreadNode[] => {
-          const children = allReplies.filter((reply) => {
-            const eTags = reply.tags.filter((t) => t[0] === 'e');
-
-            // Find the direct parent (reply marker or last e-tag)
-            const replyMarkerTag = eTags.find((t) => t[3] === 'reply');
-            const directParentId = replyMarkerTag
-              ? replyMarkerTag[1]
-              : eTags.length > 0
-                ? eTags[eTags.length - 1][1]
-                : null;
-
-            return directParentId === parentId;
-          });
-
-          return children
-            .sort((a, b) => (a.created_at || 0) - (b.created_at || 0))
-            .map((child) => ({
-              event: child,
-              children: buildTree(child.id),
-            }));
-        };
-
-        const tree = buildTree(event.id);
-        setThreadTree(tree);
-      } catch (err) {
-        console.error('Error fetching thread:', err);
-      } finally {
+      if (isBlockedUser(event.pubkey)) {
         setLoading(false);
+        return;
       }
-    };
 
-    fetchThread();
+      setRootEvent(event);
+      setLoading(false);
+
+      // Now fetch replies
+      setLoadingReplies(true);
+      const replyFilter: NDKFilter = {
+        kinds: [1],
+        '#e': [event.id],
+      };
+
+      const replySub = ndk.subscribe(
+        replyFilter,
+        { closeOnEose: false, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
+      );
+
+      replySub.on('event', (reply: NDKEvent) => {
+        if (!repliesRef.current.has(reply.id) && !isBlockedUser(reply.pubkey)) {
+          repliesRef.current.set(reply.id, reply);
+          reply.author.fetchProfile().catch(() => { });
+          setReplies(Array.from(repliesRef.current.values()));
+        }
+      });
+
+      replySub.on('eose', () => {
+        setLoadingReplies(false);
+      });
+
+      // Stop listening for new replies after 30 seconds
+      setTimeout(() => {
+        replySub.stop();
+        setLoadingReplies(false);
+      }, 30000);
+    });
+
+    rootSub.on('eose', () => {
+      // If no event found after EOSE, stop loading
+      setTimeout(() => {
+        setLoading(false);
+      }, 1000);
+    });
+
+    return () => {
+      rootSub.stop();
+    };
   }, [ndk, eventId]);
 
   const renderThread = (nodes: ThreadNode[], depth: number = 0) => {
     return nodes.map((node) => (
-      <div key={node.event.id} style={{ marginBottom: '10px' }}>
-        <div
-          style={{
-            marginLeft: depth > 0 ? '30px' : '0',
-            borderLeft: depth > 0 ? '2px solid #6699cc' : 'none',
-            paddingLeft: depth > 0 ? '10px' : '0',
-          }}
-        >
-          <FeedItem event={node.event} hideThreadButton={true} />
-        </div>
-        {node.children.length > 0 && renderThread(node.children, depth + 1)}
+      <div key={node.event.id} className={depth > 0 ? 'nested-reply' : ''}>
+        <FeedItem event={node.event} hideThreadButton={true} />
+        {node.children.length > 0 && (
+          <div className="reply-children">
+            {renderThread(node.children, depth + 1)}
+          </div>
+        )}
       </div>
     ));
   };
@@ -129,7 +157,11 @@ export const ThreadPage = () => {
 
         {loading && <div style={{ padding: '20px' }}>Loading thread...</div>}
 
-        {!loading && !rootEvent && <div style={{ padding: '20px' }}>Event not found.</div>}
+        {!loading && !rootEvent && (
+          <div style={{ padding: '20px' }}>
+            {isBlockedUser(eventId || '') ? 'Content from this user is blocked.' : 'Event not found.'}
+          </div>
+        )}
 
         {!loading && rootEvent && (
           <div className="thread-root" style={{ marginTop: '10px' }}>
@@ -139,9 +171,15 @@ export const ThreadPage = () => {
               <div style={{ marginTop: '15px' }}>{renderThread(threadTree)}</div>
             )}
 
-            {threadTree.length === 0 && (
+            {threadTree.length === 0 && !loadingReplies && (
               <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
                 No replies yet.
+              </div>
+            )}
+
+            {loadingReplies && (
+              <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
+                Loading replies...
               </div>
             )}
           </div>
@@ -166,6 +204,14 @@ export const ThreadPage = () => {
         }
         .thread-root {
           padding: 10px;
+        }
+        .reply-children {
+          margin-left: 20px;
+          padding-left: 10px;
+          border-left: 2px solid #ddd;
+        }
+        .nested-reply {
+          margin-top: 10px;
         }
       `}</style>
     </div>

@@ -67,11 +67,7 @@ import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 function App() {
   const { user, isLoading } = useNostr();
 
-  const hasSavedSession =
-    !!localStorage.getItem('mynostrspace_pubkey') ||
-    !!localStorage.getItem('mynostrspace_semiconnected_bunker');
-
-  if (isLoading && hasSavedSession) {
+  if (isLoading) {
     return (
       <div className="loading-screen">
         <div className="loading-box">

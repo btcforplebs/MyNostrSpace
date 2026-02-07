@@ -67,16 +67,20 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const connect = async () => {
       try {
-        // Wait for connection OR timeout after 1 second (perceived speed)
-        await Promise.race([
-          ndk.connect(1000),
-          new Promise((resolve) => setTimeout(resolve, 1000)),
-        ]);
+        // Wait for relay connections with a reasonable timeout
+        await ndk.connect(5000);
+
+        // Wait a bit for at least one relay to actually connect
+        let attempts = 0;
+        while (ndk.pool.connectedRelays().length === 0 && attempts < 20) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          attempts++;
+        }
+
+        console.log('NDK Connected, relays:', ndk.pool.connectedRelays().length);
       } catch (e) {
         console.warn('NDK connection warning:', e);
       } finally {
-        console.log('NDK Initialized (Connected or Timeout)');
-
         // Only set not loading if we are NOT waiting for auto-login
         // If there's a saved pubkey or bunker config, we let the auth effect handle turning off loading
         if (

@@ -8,6 +8,7 @@ import { uploadToBlossom } from '../../services/blossom';
 import { useEffect, useCallback, useRef } from 'react';
 import { useProfile } from '../../hooks/useProfile';
 import { Avatar } from './Avatar';
+import { isBlockedUser, hasBlockedKeyword } from '../../utils/blockedUsers';
 
 interface ThreadNode {
   event: NDKEvent;
@@ -209,6 +210,12 @@ interface FeedItemProps {
 const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = false }) => {
   const { ndk, user, login } = useNostr();
   const { profile } = useProfile(event.pubkey);
+
+  const isBlocked = useMemo(() => {
+    return isBlockedUser(event.pubkey) || hasBlockedKeyword(event.content);
+  }, [event.pubkey, event.content]);
+
+  if (isBlocked) return null;
 
   const wallRecipientTag = useMemo(() => {
     const pTags = event.tags.filter((t: string[]) => t[0] === 'p');

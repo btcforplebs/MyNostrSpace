@@ -15,6 +15,7 @@ import { MediaUpload } from './MediaUpload';
 import { BlogEditor } from './BlogEditor';
 import { WavlakePlayer } from '../Music/WavlakePlayer';
 import { Avatar } from '../Shared/Avatar';
+import { VideoThumbnail } from '../Shared/VideoThumbnail';
 import { Virtuoso } from 'react-virtuoso';
 import './HomePage.css';
 
@@ -168,7 +169,6 @@ const HomePage = () => {
   const followsFetchedRef = useRef(false);
   const [pendingPosts, setPendingPosts] = useState<NDKEvent[]>([]);
   const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
-  const [thumbnailCache] = useState<Record<string, string>>({});
   const [displayedFeedCount, setDisplayedFeedCount] = useState(20);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const [displayedStreamsCount, setDisplayedStreamsCount] = useState(15);
@@ -367,64 +367,6 @@ const HomePage = () => {
       return result.sort((a, b) => b.created_at - a.created_at).slice(0, 150);
     });
   }, []);
-
-  const generateThumbnail = (videoUrl: string): Promise<string | null> => {
-    return new Promise((resolve) => {
-      const video = document.createElement('video');
-      video.crossOrigin = 'anonymous';
-      video.src = videoUrl;
-      video.muted = true;
-
-      const cleanup = () => {
-        video.remove();
-      };
-
-      const timeout = setTimeout(() => {
-        cleanup();
-        resolve(null);
-      }, 5000); // 5 second timeout
-
-      video.addEventListener('loadeddata', () => {
-        // Seek to 2 seconds or 25% of duration, whichever is smaller
-        const seekTime = Math.min(2, video.duration * 0.25);
-        video.currentTime = seekTime;
-      });
-
-      video.addEventListener('seeked', () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth || 640;
-          canvas.height = video.videoHeight || 360;
-
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
-            clearTimeout(timeout);
-            cleanup();
-            resolve(thumbnailUrl);
-          } else {
-            clearTimeout(timeout);
-            cleanup();
-            resolve(null);
-          }
-        } catch {
-          clearTimeout(timeout);
-          cleanup();
-          resolve(null);
-        }
-      });
-
-      video.addEventListener('error', () => {
-        clearTimeout(timeout);
-        cleanup();
-        resolve(null);
-      });
-
-      // Start loading
-      video.load();
-    });
-  };
 
   const MOODS = [
     'None',
@@ -703,42 +645,6 @@ const HomePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ndk, user, viewMode, getFollows]);
 
-  // Thumbnail generation effect
-  useEffect(() => {
-    if (viewMode !== 'media' || mediaItems.length === 0) return;
-
-    const generateMissingThumbnails = async () => {
-      const videosToProcess = mediaItems.filter(
-        (item) =>
-          item.type === 'video' &&
-          !item.thumb &&
-          !item.url.includes('youtube') &&
-          !item.url.includes('vimeo') &&
-          !item.url.includes('streamable')
-      );
-
-      for (const item of videosToProcess) {
-        if (thumbnailCache[item.url]) {
-          setMediaItems((prev) =>
-            prev.map((v) => (v.id === item.id ? { ...v, thumb: thumbnailCache[item.url] } : v))
-          );
-        } else {
-          try {
-            const thumb = await generateThumbnail(item.url);
-            if (thumb) {
-              thumbnailCache[item.url] = thumb;
-              setMediaItems((prev) => prev.map((v) => (v.id === item.id ? { ...v, thumb } : v)));
-            }
-          } catch (e) {
-            console.error('Failed to generate thumbnail for', item.url, e);
-          }
-        }
-      }
-    };
-
-    generateMissingThumbnails();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, mediaItems.length]);
 
   // Blogs and Streams
   useEffect(() => {
@@ -808,16 +714,45 @@ const HomePage = () => {
 
       sub = ndk.subscribe(filter, { closeOnEose: false });
 
-      sub.on('event', (ev: NDKEvent) => {
-        // Fetch author profile so name displays instead of pubkey
-        ev.author.fetchProfile({ cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }).catch(() => { });
+      // Batch notifications to avoid excessive re-renders
+      let notifBuffer: NDKEvent[] = [];
+      let notifFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+
+      const flushNotifications = () => {
+        if (notifBuffer.length === 0) return;
+        const buffer = [...notifBuffer];
+        notifBuffer = [];
+
+        // Batch fetch profiles for notification authors
+        const uniqueAuthors = [...new Set(buffer.map((e) => e.pubkey))];
+        uniqueAuthors.forEach((pk) => {
+          ndk.getUser({ pubkey: pk }).fetchProfile({
+            cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+          }).catch(() => {});
+        });
 
         setNotifications((prev) => {
-          if (prev.find((e) => e.id === ev.id)) return prev;
-          const next = [ev, ...prev].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-          return next.slice(0, 50);
+          const combined = [...buffer, ...prev];
+          const unique = Array.from(
+            new Map(combined.map((item) => [item.id, item])).values()
+          );
+          return unique
+            .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+            .slice(0, 50);
         });
+      };
+
+      sub.on('event', (ev: NDKEvent) => {
+        notifBuffer.push(ev);
+        if (!notifFlushTimeout) {
+          notifFlushTimeout = setTimeout(() => {
+            flushNotifications();
+            notifFlushTimeout = null;
+          }, 300);
+        }
       });
+
+      sub.on('eose', flushNotifications);
     };
 
     startNotificationSub();
@@ -1246,7 +1181,8 @@ const HomePage = () => {
                     )}
                     <Virtuoso
                       data={feed.slice(0, displayedFeedCount)}
-                      overscan={5}
+                      overscan={200}
+                      increaseViewportBy={{ top: 1000, bottom: 500 }}
                       useWindowScroll
                       itemContent={(_index, event) => (
                         <FeedItem key={event.id} event={event} />
@@ -1340,9 +1276,7 @@ const HomePage = () => {
                                       {item.thumb ? (
                                         <img src={item.thumb} alt="" loading="lazy" />
                                       ) : (
-                                        <div className="gallery-video-placeholder">
-                                          <span className="gallery-play-icon">▶</span>
-                                        </div>
+                                        <VideoThumbnail src={item.url} />
                                       )}
                                       <div className="gallery-play-overlay">
                                         {ytMatch ? (

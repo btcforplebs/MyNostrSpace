@@ -5,9 +5,11 @@ import { useFriends } from '../../hooks/useFriends';
 interface ContactBoxProps {
   name?: string;
   pubkey?: string;
+  onAwardBadge?: () => void;
+  showAwardButton?: boolean;
 }
 
-export const ContactBox = ({ name, pubkey }: ContactBoxProps) => {
+export const ContactBox = ({ name, pubkey, onAwardBadge, showAwardButton }: ContactBoxProps) => {
   const { followUser } = useFriends(pubkey); // We typically pass the Profile owner's pubkey to useFriends to viewing their friends, but here we just need the function.
   // Actually, useFriends(pubkey) fetches THAT pubkey's friends.
   // The followUser function inside useFriends uses `ndk.activeUser`.
@@ -103,18 +105,20 @@ export const ContactBox = ({ name, pubkey }: ContactBoxProps) => {
             Add to Group
           </a>
         </div>
-        <div className="contact-item">
-          <Trophy size={16} />{' '}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              alert('Coming soon!');
-            }}
-          >
-            Rank User
-          </a>
-        </div>
+        {showAwardButton && (
+          <div className="contact-item">
+            <Trophy size={16} />{' '}
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                onAwardBadge?.();
+              }}
+            >
+              Give Badge
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

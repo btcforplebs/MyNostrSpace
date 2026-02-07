@@ -94,15 +94,18 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = React.memo(({
 
               // Video
               if (lowerUrl.match(/\.(mp4|mov|webm)(\?.*)?$/)) {
+                const videoSrc = url.includes('#') ? url : `${url}#t=0.1`;
                 return (
                   <div
                     key={wordIndex}
                     style={{ marginTop: '5px', marginBottom: '5px', display: 'block' }}
                   >
                     <video
-                      src={url}
+                      src={videoSrc}
                       controls
                       preload="metadata"
+                      playsInline
+                      muted
                       style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px' }}
                     />
                   </div>

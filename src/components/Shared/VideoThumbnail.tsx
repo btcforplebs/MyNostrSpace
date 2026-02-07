@@ -2,17 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 
 interface VideoThumbnailProps {
   src: string;
+  poster?: string;
   style?: React.CSSProperties;
   className?: string;
 }
 
-export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ src, style, className }) => {
+export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ src, poster, style, className }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasError, setHasError] = useState(false);
 
+  // Add media fragment for Safari if not present and no poster
+  const videoSrc = src.includes('#') || poster ? src : `${src}#t=0.1`;
+
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || poster) return;
 
     // Seek to 1 second to get a representative frame (not just black)
     const handleLoadedMetadata = () => {
@@ -31,7 +35,7 @@ export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ src, style, clas
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('error', handleError);
     };
-  }, [src]);
+  }, [src, poster]);
 
   if (hasError) {
     return (
@@ -57,7 +61,8 @@ export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ src, style, clas
   return (
     <video
       ref={videoRef}
-      src={src}
+      src={videoSrc}
+      poster={poster}
       preload="metadata"
       muted
       playsInline

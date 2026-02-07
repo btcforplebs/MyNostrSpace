@@ -16,7 +16,6 @@ import { BlogEditor } from './BlogEditor';
 import { WavlakePlayer } from '../Music/WavlakePlayer';
 import { Avatar } from '../Shared/Avatar';
 import { VideoThumbnail } from '../Shared/VideoThumbnail';
-import { Virtuoso } from 'react-virtuoso';
 import { useNotifications } from '../../context/NotificationContext';
 import { useProfile } from '../../hooks/useProfile';
 import { subscribeToProfile } from '../../hooks/profileCache';
@@ -1324,21 +1323,28 @@ const HomePage = () => {
                         to show
                       </div>
                     )}
-                    <Virtuoso
-                      data={feed.slice(0, displayedFeedCount)}
-                      overscan={200}
-                      increaseViewportBy={{ top: 1000, bottom: 500 }}
-                      useWindowScroll
-                      itemContent={(_index, event) => (
-                        <FeedItem key={event.id} event={event} />
-                      )}
-                      endReached={() => {
-                        if (feed.length > displayedFeedCount) {
-                          setDisplayedFeedCount((c) => c + 15);
-                        } else if (hasMoreFeed && !isLoadingMoreFeed) {
-                          loadMoreFeed();
-                        }
+                    {feed.slice(0, displayedFeedCount).map((event) => (
+                      <FeedItem key={event.id} event={event} />
+                    ))}
+                    <div
+                      ref={(el) => {
+                        if (!el) return;
+                        const observer = new IntersectionObserver(
+                          (entries) => {
+                            if (entries[0].isIntersecting) {
+                              if (feed.length > displayedFeedCount) {
+                                setDisplayedFeedCount((c) => c + 15);
+                              } else if (hasMoreFeed && !isLoadingMoreFeed) {
+                                loadMoreFeed();
+                              }
+                            }
+                          },
+                          { rootMargin: '200px' }
+                        );
+                        observer.observe(el);
+                        return () => observer.disconnect();
                       }}
+                      style={{ height: '1px' }}
                     />
                     {isLoadingMoreFeed && (
                       <div style={{ padding: '15px', textAlign: 'center' }}>

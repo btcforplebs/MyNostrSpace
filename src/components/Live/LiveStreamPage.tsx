@@ -348,16 +348,9 @@ export const LiveStreamPage = () => {
     const attemptPlay = async () => {
       if (!isMounted) return;
       try {
-        video.muted = false;
         await video.play();
-      } catch (error) {
-        console.warn('Autoplay blocked, falling back to muted', error);
-        video.muted = true;
-        try {
-          await video.play();
-        } catch (e) {
-          console.error('Muted autoplay also failed', e);
-        }
+      } catch (e) {
+        console.warn('Autoplay failed, user will need to click play', e);
       }
     };
 
@@ -527,8 +520,6 @@ export const LiveStreamPage = () => {
                     <video
                       ref={videoRef}
                       controls
-                      autoPlay
-                      muted
                       playsInline
                       className="react-player"
                       style={{

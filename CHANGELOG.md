@@ -19,6 +19,19 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 ### 🎨 UI/UX Enhancements
 
+#### **Mobile Comment Header Layout**
+- Comment headers now stack name and date vertically on mobile to prevent cramped text.
+- Added `.comment-header`, `.comment-author-name`, and `.comment-date` CSS classes for threaded comments.
+- Date/time displays on its own line below the author name on screens under 768px.
+- Feed header line also stacks vertically on mobile for consistency.
+
+#### **Notifications Page Improvements**
+- Notifications now render images and media instead of raw URLs.
+- `nostr:npub` and `nostr:nevent` references now display as clickable names/links using `RichTextRenderer`.
+- Fixed text wrapping issues for long URLs and nostr identifiers.
+- Added proper word-break styling to `.notif-preview`, `.notif-target-post`, `.notification-group`, `.notif-summary`, and `.notification-info`.
+- Added image size constraints in notification previews (max-height 150px/200px).
+
 #### **Marketplace Mobile Optimization**
 - Improved marketplace popup placement on mobile devices to prevent scrolling.
 - Ensured all popup content (images, descriptions, links) fits within the mobile viewport.

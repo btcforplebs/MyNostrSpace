@@ -10,23 +10,45 @@ Welcome to **mynostrspace.com**, the ultimate fusion of 2005 social media nostal
 
 ## ⚡️ Features
 
-- **🎨 Total Profile Freedom**: Use the built-in **Layout Editor** to inject custom CSS directly into your profile. Go Emo, Go Cyberpunk, or Go Geocities—it's your space.
-- **🔝 The Legendary Top 8**: Hand-pick your closest allies and display them proudly on your profile.
-- **🎵 Music Player**: Integrated with **Wavlake** to bring your favorite tracks to your page. Retro player skin? Included.
-- **🖼️ Photo Lightbox**: High-performance image viewing with a simple click.
-- **💬 Comment Wall**: Leave notes for your friends, just like the old days, but signed with your Nostr keys.
-- **📺 Live Streams**: Watch and host live streams with HLS support. Integrated chat for real-time interaction.
-- **🎬 Videos & Films**: Dedicated pages for video content discovery. Parse video links from posts, YouTube, Vimeo, and more.
-- **📝 Long-form Blogs**: Read and write long-form articles (Kind 30023) with the built-in blog editor.
-- **🛒 Marketplace**: Browse products and listings from the Nostr marketplace (Kind 30017/30018).
-- **📅 Calendar View**: Visualize your posts and articles in a monthly calendar format.
-- **🌩️ Blossom Support**: Seamlessly upload background images and media using the Blossom media protocol.
-- **📱 Mobile Optimized**: A responsive experience that feels native on your phone while keeping that desktop-retro vibe.
-- **⚡ Performance Optimized**: 
-  - **Virtual Scrolling**: Smart lazy-loading on feeds and streams - only renders what you see, dramatically improving page speed.
-  - **Threaded Conversations**: Proper nested reply structure in thread view with visual hierarchy.
-  - **Progressive Loading**: Intersection Observer-based infinite scroll for smooth, fast browsing.
-  - **Batched Updates**: Optimized event handling prevents UI lag even with hundreds of posts.
+### Nostr Protocol Support
+NIP-01 notes/posts, NIP-02 follow lists, NIP-07 browser extension login, NIP-46 Bunker/remote signer, NIP-10 threaded replies, NIP-23 long-form articles, NIP-25 reactions/likes, NIP-57 zaps, NIP-58 badges (display + awarding), NIP-65 relay lists, NIP-89 client tags, NIP-94 file metadata, NIP-98 authenticated uploads, reposts, zap receipts, profile badges, recipes, custom profile CSS, livestreams, music tracks, relay management, wall posts, quote posts, media uploads via Blossom, nostr: URI rendering
+
+### MySpace-Style Features
+- **🎨 Custom Profile Themes**: Full CSS editor with presets (Classic MySpace, Matrix, Y2K Glitter, Emo/Scene, GeoCities, Cyberpunk)
+- **🖼️ Profile Background Uploads**: Upload custom backgrounds via Blossom
+- **😊 Mood Selector**: Set your mood with every status update
+- **💬 Comment Walls**: Leave notes for friends, signed with Nostr keys
+- **👥 Friend Lists**: View and manage your follows MySpace-style
+- **🎵 Music Player**: Integrated Wavlake player with retro skin
+- **📊 Profile Stats**: Followers, posts, and zaps received
+- **🏆 Profile Badges**: Display your NIP-58 badges on your profile
+- **📑 Tabbed Interface**: Feed, Media, Blog, Music, Live, Notifications
+
+### Pages & Content
+- **Home Feed**: Virtual-scrolled timeline with mood posting
+- **Profile**: Customizable profiles with Photos, Videos, Recipes, Livestreams, Blog tabs
+- **Browse/Discover**: Category grid with people discovery
+- **Search**: Find people and notes across relays
+- **Thread View**: Nested threaded conversations
+- **Photos & Videos**: Masonry gallery with lazy loading
+- **Music**: Wavlake integration for Nostr music
+- **Blogs**: Long-form article reading and writing
+- **Recipes**: Community recipes from Zap.cooking
+- **Marketplace**: Product listings (Kind 30017/30018)
+- **Calendar**: Visualize posts by date
+- **Livestreams**: HLS streaming with live chat
+- **Film**: Movie content discovery
+- **Badges**: View and award NIP-58 badges
+- **Audio/Video Rooms**: Corny Chat and Nostr Nests integration
+- **Settings**: Relay management and profile editing
+
+### Performance
+- **Virtual Scrolling**: Only renders visible items
+- **Infinite Scroll**: Intersection Observer-based loading
+- **Profile Caching**: Deduplicated requests with shared cache
+- **Batched Stats**: Single query for interaction counts
+- **Code Splitting**: Route-based lazy loading
+- **Skeleton Loaders**: Smooth loading states
 
 ---
 

@@ -127,63 +127,65 @@ export const ThreadPage = () => {
 
   return (
     <div className="thread-page-container">
-      <Navbar />
-      <div className="thread-content">
-        <div style={{ marginBottom: '10px' }}>
-          <Link
-            to="/"
+      <div className="thread-page-wrapper">
+        <Navbar />
+        <div className="thread-content">
+          <div style={{ marginBottom: '10px' }}>
+            <Link
+              to="/"
+              style={{
+                color: '#003399',
+                fontSize: '9pt',
+                fontWeight: 'bold',
+                textDecoration: 'none',
+              }}
+            >
+              &laquo; Back to Home
+            </Link>
+          </div>
+
+          <div
             style={{
-              color: '#003399',
-              fontSize: '9pt',
+              backgroundColor: '#ff9933',
+              color: 'black',
+              padding: '3px 5px',
+              fontSize: '10pt',
               fontWeight: 'bold',
-              textDecoration: 'none',
             }}
           >
-            &laquo; Back to Home
-          </Link>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: '#ff9933',
-            color: 'black',
-            padding: '3px 5px',
-            fontSize: '10pt',
-            fontWeight: 'bold',
-          }}
-        >
-          Thread View
-        </div>
-
-        {loading && <div style={{ padding: '20px' }}>Loading thread...</div>}
-
-        {!loading && !rootEvent && (
-          <div style={{ padding: '20px' }}>
-            {isBlockedUser(eventId || '') ? 'Content from this user is blocked.' : 'Event not found.'}
+            Thread View
           </div>
-        )}
 
-        {!loading && rootEvent && (
-          <div className="thread-root" style={{ marginTop: '10px' }}>
-            <FeedItem event={rootEvent} hideThreadButton={true} />
+          {loading && <div style={{ padding: '20px' }}>Loading thread...</div>}
 
-            {threadTree.length > 0 && (
-              <div style={{ marginTop: '15px' }}>{renderThread(threadTree)}</div>
-            )}
+          {!loading && !rootEvent && (
+            <div style={{ padding: '20px' }}>
+              {isBlockedUser(eventId || '') ? 'Content from this user is blocked.' : 'Event not found.'}
+            </div>
+          )}
 
-            {threadTree.length === 0 && !loadingReplies && (
-              <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
-                No replies yet.
-              </div>
-            )}
+          {!loading && rootEvent && (
+            <div className="thread-root" style={{ marginTop: '10px' }}>
+              <FeedItem event={rootEvent} hideThreadButton={true} />
 
-            {loadingReplies && (
-              <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
-                Loading replies...
-              </div>
-            )}
-          </div>
-        )}
+              {threadTree.length > 0 && (
+                <div style={{ marginTop: '15px' }}>{renderThread(threadTree)}</div>
+              )}
+
+              {threadTree.length === 0 && !loadingReplies && (
+                <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
+                  No replies yet.
+                </div>
+              )}
+
+              {loadingReplies && (
+                <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
+                  Loading replies...
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <style>{`
@@ -191,15 +193,19 @@ export const ThreadPage = () => {
           background-color: #e5e5e5;
           min-height: 100vh;
           font-family: verdana, arial, sans-serif, helvetica;
-          padding: 10px 0;
+          padding: 0;
+        }
+        .thread-page-wrapper {
+          max-width: 992px;
+          margin: 0 auto;
+          background-color: white;
+          min-height: 100vh;
+          box-shadow: 0 0 15px rgba(0,0,0,0.1);
         }
         .thread-content {
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 10px;
-          background-color: white;
+          padding: 15px;
           border: 1px solid #ccc;
-          margin-top: 10px;
+          border-top: none;
           color: black;
         }
         .thread-root {
@@ -217,3 +223,4 @@ export const ThreadPage = () => {
     </div>
   );
 };
+

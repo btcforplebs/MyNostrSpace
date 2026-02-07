@@ -256,6 +256,47 @@ h3,
     padding: 4px 8px !important;
     font-size: 8pt !important;
   }
+
+  .my-apps-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+}
+
+.profile-box {
+  border: 1px solid #6699cc;
+  margin-bottom: 10px;
+}
+
+.profile-box-body {
+  padding: 5px;
+  font-size: 9pt;
+}
+
+.my-apps-list {
+  list-style: none;
+  padding: 0;
+  margin: 5px 0;
+}
+
+.app-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+  color: #003399;
+  cursor: pointer;
+  font-size: 9pt;
+  font-weight: bold;
+}
+
+.app-item:hover {
+  text-decoration: underline;
+}
+
+.app-icon {
+  margin-right: 8px;
+  font-size: 1.1em;
 }
 
 .profile-details-grid {

@@ -24,38 +24,19 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
   const [isQuoting, setIsQuoting] = useState(false);
   const [zapInvoice, setZapInvoice] = useState<string | null>(null);
   const [isZapping, setIsZapping] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
+  const [showRepostConfirm, setShowRepostConfirm] = useState(false);
   const elementRef = useRef<HTMLDivElement>(null);
 
-  // Visibility detection with IntersectionObserver
+  // Subscribe to batched stats
   useEffect(() => {
-    const element = elementRef.current;
-    if (!element) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '200px' }
-    );
-
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  // Subscribe to batched stats when visible
-  useEffect(() => {
-    if (!isVisible || !ndk) return;
+    if (!ndk) return;
 
     const unsubscribe = subscribeToStats(event.id, ndk, user?.pubkey, (newStats) => {
       setStats(newStats);
     });
 
     return unsubscribe;
-  }, [isVisible, ndk, event.id, user?.pubkey]);
+  }, [ndk, event.id, user?.pubkey]);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -93,8 +74,11 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
     }
     if (stats.repostedByMe) return;
 
-    if (!confirm('Repost this note?')) return;
+    setShowRepostConfirm(true);
+  };
 
+  const confirmRepost = async () => {
+    setShowRepostConfirm(false);
     try {
       const repost = new NDKEvent(ndk);
       repost.kind = 6;
@@ -400,6 +384,56 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
               }}
             >
               Close
+            </button>
+          </div>
+        </div>
+      )}
+      {showRepostConfirm && (
+        <div
+          className="repost-confirm-modal"
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'white',
+            padding: '20px',
+            border: '1px solid #ccc',
+            boxShadow: '10px 10px 0px rgba(0,0,0,0.2)',
+            zIndex: 1001,
+            textAlign: 'center',
+            maxWidth: '90vw',
+            minWidth: '250px',
+          }}
+        >
+          <h3 style={{ margin: '0 0 15px 0', color: '#333' }}>Repost this note?</h3>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button
+              onClick={confirmRepost}
+              style={{
+                padding: '8px 16px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                border: '1px solid #003399',
+                background: '#003399',
+                color: 'white',
+                borderRadius: '3px',
+              }}
+            >
+              Yes, Repost
+            </button>
+            <button
+              onClick={() => setShowRepostConfirm(false)}
+              style={{
+                padding: '8px 16px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                border: '1px solid #ccc',
+                background: '#f0f0f0',
+                borderRadius: '3px',
+              }}
+            >
+              Cancel
             </button>
           </div>
         </div>

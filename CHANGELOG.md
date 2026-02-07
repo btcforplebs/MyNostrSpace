@@ -25,12 +25,12 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 - Date/time displays on its own line below the author name on screens under 768px.
 - Feed header line also stacks vertically on mobile for consistency.
 
-#### **Notifications Page Improvements**
-- Notifications now render images and media instead of raw URLs.
-- `nostr:npub` and `nostr:nevent` references now display as clickable names/links using `RichTextRenderer`.
-- Fixed text wrapping issues for long URLs and nostr identifiers.
-- Added proper word-break styling to `.notif-preview`, `.notif-target-post`, `.notification-group`, `.notif-summary`, and `.notification-info`.
-- Added image size constraints in notification previews (max-height 150px/200px).
+#### **Notifications Tab & Entity Loading Fixes**
+- Fixed an issue where manual text truncation in notification items broke the parsing of `nostr:nevent` and `nostr:npub` links.
+- Switched to CSS-based `line-clamp` for visual truncation in the notifications tab to ensure raw content remains intact for the renderer.
+- Resolved "Invalid filter(s) detected" error by adding validation for `"undefined"` IDs in event fetch calls across `HomePage.tsx`, `EmbeddedNote.tsx`, and `RichTextRenderer.tsx`.
+- Improved mobile text wrapping in the notifications tab with `overflow-wrap: break-word` and `word-break: break-word`.
+- Added extra validation in `RichTextRenderer` to ensure pubkeys and IDs are valid before rendering.
 
 #### **Marketplace Mobile Optimization**
 - Improved marketplace popup placement on mobile devices to prevent scrolling.

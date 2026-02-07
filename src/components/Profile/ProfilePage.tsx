@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useProfile } from '../../hooks/useProfile';
 import { useTop8 } from '../../hooks/useTop8';
@@ -6,6 +6,7 @@ import { CommentWall } from './CommentWall';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
 import { useExtendedProfile } from '../../hooks/useExtendedProfile';
 import { useResolvedPubkey } from '../../hooks/useResolvedPubkey';
+import { useRelationshipStatus } from '../../hooks/useRelationshipStatus';
 import { useNostr } from '../../context/NostrContext';
 import { WavlakePlayer } from '../Music/WavlakePlayer';
 import { ContactBox } from './ContactBox';
@@ -899,12 +900,14 @@ const ProfileBadges = ({ pubkey }: { pubkey: string }) => {
 
 const ProfilePage = () => {
   const { user, ndk } = useNostr();
+  const navigate = useNavigate();
   const { pubkey: identifier } = useParams<{ pubkey: string }>();
   const { hexPubkey, loading: resolving } = useResolvedPubkey(identifier);
   const { openLightbox } = useLightbox();
 
   const { profile, loading: profileLoading } = useProfile(hexPubkey || undefined);
   const { top8, loading: top8Loading } = useTop8(hexPubkey || undefined);
+  const { status: relationshipStatus } = useRelationshipStatus(hexPubkey || undefined);
 
   const userObj = hexPubkey ? ndk?.getUser({ pubkey: hexPubkey }) : null;
   const npub = userObj?.npub;
@@ -1248,11 +1251,44 @@ const ProfilePage = () => {
             onAwardBadge={() => setShowAwardModal(true)}
           />
 
+          <div className="profile-box">
+            <h3 className="section-header">My Apps</h3>
+            <div className="profile-box-body">
+              <ul className="my-apps-list">
+                <li className="app-item" onClick={() => navigate('/blogs')}>
+                  <span className="app-icon">✍️</span> Blogs
+                </li>
+                <li className="app-item" onClick={() => navigate('/videos')}>
+                  <span className="app-icon">🎥</span> Videos
+                </li>
+                <li className="app-item" onClick={() => navigate('/music')}>
+                  <span className="app-icon">🎵</span> Music
+                </li>
+                <li className="app-item" onClick={() => navigate('/recipes')}>
+                  <span className="app-icon">🍳</span> Recipes
+                </li>
+                <li className="app-item" onClick={() => navigate('/livestreams')}>
+                  <span className="app-icon">📺</span> Live
+                </li>
+                <li className="app-item" onClick={() => navigate('/badges')}>
+                  <span className="app-icon">🏆</span> Badges
+                </li>
+                <li className="app-item" onClick={() => navigate('/marketplace')}>
+                  <span className="app-icon">🛒</span> Shop
+                </li>
+                <li className="app-item" onClick={() => navigate('/photos')}>
+                  <span className="app-icon">🖼️</span> Photos
+                </li>
+              </ul>
+            </div>
+          </div>
+
           <div className="url-box">
             <b>MyNostrSpace URL:</b>
             <br />
             http://mynostrspace.com/p/{npub || hexPubkey}
           </div>
+
 
           <div className="interests-box">
             <h3 className="section-header">{displayName}'s Interests</h3>
@@ -1318,7 +1354,7 @@ const ProfilePage = () => {
             }}
           >
             <h2 style={{ fontSize: '14pt', margin: 0 }}>
-              {displayName} is in your extended network
+              {displayName} {relationshipStatus || 'is in your extended network'}
             </h2>
           </div>
 

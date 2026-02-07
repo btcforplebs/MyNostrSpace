@@ -171,11 +171,13 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = React.memo(({
                 if (type === 'npub' || type === 'nprofile') {
                   const pubkey =
                     type === 'npub' ? (data as string) : (data as { pubkey: string }).pubkey;
+                  if (!pubkey) return <span key={wordIndex}>{word} </span>;
                   return <InternalMention key={wordIndex} pubkey={pubkey} originalText={word} />;
                 }
 
                 if (type === 'note' || type === 'nevent') {
                   const id = type === 'note' ? (data as string) : (data as { id: string }).id;
+                  if (!id) return <span key={wordIndex}>{word} </span>;
                   return <EmbeddedNote key={wordIndex} id={id} />;
                 }
 

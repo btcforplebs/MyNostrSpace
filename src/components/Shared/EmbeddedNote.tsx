@@ -15,7 +15,7 @@ export const EmbeddedNote = ({ id }: EmbeddedNoteProps) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!ndk || !id) return;
+    if (!ndk || !id || id === 'undefined') return;
 
     // Use a flag to avoid setting state if already true,
     // though it's better to just start the fetch.

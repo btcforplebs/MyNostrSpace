@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import {
@@ -22,201 +22,86 @@ import { subscribeToProfile } from '../../hooks/profileCache';
 import { RichTextRenderer } from '../Shared/RichTextRenderer';
 import './HomePage.css';
 
-// Single notification author display
-const NotificationAuthor = ({ pubkey }: { pubkey: string }) => {
-  const { profile } = useProfile(pubkey);
-  const name = profile?.name || profile?.displayName || pubkey.slice(0, 8);
-  return (
-    <Link to={`/p/${pubkey}`} className="notif-author" onClick={(e) => e.stopPropagation()}>
-      {name}
-    </Link>
-  );
-};
-
-// Threaded reply component
-interface ThreadNode {
-  event: NDKEvent;
-  children: ThreadNode[];
-}
-
-const ThreadedReply = ({
-  node,
-  depth,
-  onClick,
-}: {
-  node: ThreadNode;
-  depth: number;
-  onClick: (link: string) => void;
-}) => {
-  const { profile } = useProfile(node.event.pubkey);
-  const authorName = profile?.name || profile?.displayName || node.event.pubkey.slice(0, 8);
-
-  return (
-    <div
-      className="threaded-reply"
-      style={{ marginLeft: depth > 0 ? 20 : 0, borderLeft: depth > 0 ? '2px solid #ddd' : 'none', paddingLeft: depth > 0 ? 10 : 0 }}
-    >
-      <div
-        className="notification-entry clickable"
-        onClick={() => onClick(`/thread/${node.event.id}`)}
-        style={{ padding: '8px 0' }}
-      >
-        <Avatar pubkey={node.event.pubkey} src={profile?.picture} size={32} className="notification-avatar" />
-        <div className="notification-info" style={{ flex: 1 }}>
-          <div className="notification-text">
-            <Link to={`/p/${node.event.pubkey}`} className="notif-author" onClick={(e) => e.stopPropagation()}>
-              {authorName}
-            </Link>
-          </div>
-          <div className="notif-preview">
-            <RichTextRenderer content={node.event.content.length > 150 ? node.event.content.slice(0, 150) + '...' : node.event.content} />
-          </div>
-          <div className="notif-date">{new Date((node.event.created_at || 0) * 1000).toLocaleString()}</div>
-        </div>
-      </div>
-      {node.children.map((child) => (
-        <ThreadedReply key={child.event.id} node={child} depth={depth + 1} onClick={onClick} />
-      ))}
-    </div>
-  );
-};
-
-// Grouped notification for a single target post
-const NotificationGroup = ({
-  targetId,
-  notifications,
+// Single notification item - shows who did what to your post
+const NotificationItem = ({
+  event,
   onClick,
   ndk,
 }: {
-  targetId: string;
-  notifications: NDKEvent[];
+  event: NDKEvent;
   onClick: (link: string) => void;
   ndk: import('@nostr-dev-kit/ndk').default | undefined;
 }) => {
+  const { profile } = useProfile(event.pubkey);
   const [targetEvent, setTargetEvent] = useState<NDKEvent | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  // Separate by type
-  const likes = notifications.filter((n) => n.kind === 7);
-  const reposts = notifications.filter((n) => n.kind === 6);
-  const zaps = notifications.filter((n) => n.kind === 9735);
-  const replies = notifications.filter((n) => n.kind === 1);
+  const authorName = profile?.name || profile?.displayName || event.pubkey.slice(0, 8);
+  const targetId = event.tags.find((t) => t[0] === 'e')?.[1];
 
-  // Build reply tree
-  const buildTree = useCallback((parentId: string, allReplies: NDKEvent[]): ThreadNode[] => {
-    const children = allReplies.filter((reply) => {
-      const eTags = reply.tags.filter((t) => t[0] === 'e');
-      const replyMarkerTag = eTags.find((t) => t[3] === 'reply');
-      const directParentId = replyMarkerTag ? replyMarkerTag[1] : eTags.length > 0 ? eTags[eTags.length - 1][1] : null;
-      return directParentId === parentId;
-    });
-    return children
-      .sort((a, b) => (a.created_at || 0) - (b.created_at || 0))
-      .map((child) => ({ event: child, children: buildTree(child.id, allReplies) }));
-  }, []);
-
-  const replyTree = useMemo(() => buildTree(targetId, replies), [targetId, replies, buildTree]);
-
-  // Fetch target event
+  // Fetch the target post
   useEffect(() => {
-    if (!ndk || !targetId) {
-      setLoading(false);
-      return;
-    }
+    if (!ndk || !targetId || targetId === 'undefined') return;
     ndk.fetchEvent(targetId).then((ev) => {
-      setTargetEvent(ev);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+      setTargetEvent(ev || null);
+    }).catch(() => { });
   }, [ndk, targetId]);
 
-  const latestTime = Math.max(...notifications.map((n) => n.created_at || 0));
+  // Determine action text
+  let actionText = '';
+  let actionIcon = '';
+  if (event.kind === 7) {
+    actionIcon = '♥';
+    actionText = 'liked your post';
+  } else if (event.kind === 6) {
+    actionIcon = '↻';
+    actionText = 'reposted your post';
+  } else if (event.kind === 1) {
+    actionIcon = '💬';
+    actionText = 'replied to your post';
+  } else if (event.kind === 9735) {
+    actionIcon = '⚡';
+    actionText = 'zapped your post';
+  }
 
   return (
-    <div className="notification-group" style={{ borderBottom: '1px solid #eee', padding: '12px 10px' }}>
-      {/* Interaction summary */}
-      <div className="notif-summary" style={{ fontSize: '9pt', color: '#666', marginBottom: '8px' }}>
-        {likes.length > 0 && (
-          <span style={{ marginRight: '10px' }}>
-            ❤️ {likes.length} {likes.length === 1 ? 'like' : 'likes'}
-            {likes.length <= 3 && (
-              <span style={{ color: '#999' }}>
-                {' '}from {likes.map((l, i) => (
-                  <span key={l.id}>
-                    {i > 0 && ', '}
-                    <NotificationAuthor pubkey={l.pubkey} />
-                  </span>
-                ))}
-              </span>
-            )}
-          </span>
-        )}
-        {reposts.length > 0 && (
-          <span style={{ marginRight: '10px' }}>
-            🔄 {reposts.length} {reposts.length === 1 ? 'repost' : 'reposts'}
-          </span>
-        )}
-        {zaps.length > 0 && (
-          <span style={{ marginRight: '10px' }}>
-            ⚡ {zaps.length} {zaps.length === 1 ? 'zap' : 'zaps'}
-          </span>
-        )}
-        {replies.length > 0 && (
-          <span>
-            💬 {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
-          </span>
-        )}
-      </div>
+    <div
+      className="notification-item clickable"
+      onClick={() => onClick(`/thread/${targetId}`)}
+    >
+      <Avatar pubkey={event.pubkey} src={profile?.picture} size={36} />
+      <div className="notification-content">
+        <div className="notification-action-line">
+          <span className="notification-icon">{actionIcon}</span>
+          <Link
+            to={`/p/${event.pubkey}`}
+            className="notification-user-name"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {authorName}
+          </Link>
+          <span className="notification-action"> {actionText}</span>
+        </div>
 
-      {/* Original post preview */}
-      {loading ? (
-        <div style={{ padding: '10px', color: '#999', fontSize: '9pt' }}>Loading post...</div>
-      ) : targetEvent ? (
-        <div
-          className="notif-target-post clickable"
-          onClick={() => onClick(`/thread/${targetId}`)}
-          style={{ background: '#f9f9f9', padding: '10px', borderRadius: '4px', marginBottom: '8px', cursor: 'pointer' }}
-        >
-          <div style={{ fontSize: '9pt', color: '#333' }}>
-            <RichTextRenderer content={targetEvent.content.length > 200 ? targetEvent.content.slice(0, 200) + '...' : targetEvent.content} />
+        {/* Show reply content if it's a reply */}
+        {event.kind === 1 && (
+          <div className="notification-reply-content">
+            <RichTextRenderer content={event.content} />
           </div>
-          <div style={{ fontSize: '8pt', color: '#999', marginTop: '4px' }}>
-            {new Date((targetEvent.created_at || 0) * 1000).toLocaleString()}
+        )}
+
+        {/* Show original post snippet */}
+        {targetEvent && (
+          <div className="notification-parent-snippet">
+            {targetEvent.content}
           </div>
-        </div>
-      ) : (
-        <div style={{ padding: '10px', color: '#999', fontSize: '9pt', fontStyle: 'italic' }}>
-          Original post not found
-        </div>
-      )}
+        )}
 
-      {/* Threaded replies */}
-      {replyTree.length > 0 && (
-        <div className="notif-replies" style={{ marginTop: '8px' }}>
-          {replyTree.map((node) => (
-            <ThreadedReply key={node.event.id} node={node} depth={0} onClick={onClick} />
-          ))}
+        <div className="notification-time">
+          {new Date((event.created_at || 0) * 1000).toLocaleString()}
         </div>
-      )}
-
-      <div style={{ fontSize: '8pt', color: '#aaa', marginTop: '6px' }}>
-        Latest activity: {new Date(latestTime * 1000).toLocaleString()}
       </div>
     </div>
   );
-};
-
-// Group notifications by target post
-const groupNotificationsByTarget = (notifications: NDKEvent[]): Map<string, NDKEvent[]> => {
-  const groups = new Map<string, NDKEvent[]>();
-  notifications.forEach((n) => {
-    const targetId = n.tags.find((t) => t[0] === 'e')?.[1];
-    if (targetId) {
-      const existing = groups.get(targetId) || [];
-      existing.push(n);
-      groups.set(targetId, existing);
-    }
-  });
-  return groups;
 };
 
 interface MusicTrack {
@@ -747,7 +632,7 @@ const HomePage = () => {
 
         if (isNewPost) {
           // Pre-fetch the author's profile into our cache so it's ready when shown
-          const unsub = subscribeToProfile(apiEvent.pubkey, ndk, () => {});
+          const unsub = subscribeToProfile(apiEvent.pubkey, ndk, () => { });
           // Unsubscribe after a delay - profile will remain in cache
           setTimeout(() => unsub(), 100);
 
@@ -929,12 +814,11 @@ const HomePage = () => {
         const buffer = [...notifBuffer];
         notifBuffer = [];
 
-        // Batch fetch profiles for notification authors
+        // Batch fetch profiles for notification authors using profile cache
         const uniqueAuthors = [...new Set(buffer.map((e) => e.pubkey))];
         uniqueAuthors.forEach((pk) => {
-          ndk.getUser({ pubkey: pk }).fetchProfile({
-            cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
-          }).catch(() => { });
+          const unsub = subscribeToProfile(pk, ndk, () => { });
+          setTimeout(() => unsub(), 100);
         });
 
         setNotifications((prev) => {
@@ -956,6 +840,9 @@ const HomePage = () => {
       };
 
       sub.on('event', (ev: NDKEvent) => {
+        // Skip notifications from yourself (self-replies, self-likes, etc.)
+        if (ev.pubkey === user.pubkey) return;
+
         notifBuffer.push(ev);
         if (!notifFlushTimeout) {
           notifFlushTimeout = setTimeout(() => {
@@ -1168,13 +1055,26 @@ const HomePage = () => {
                     <li className="app-item" onClick={() => navigate('/videos')}>
                       <span className="app-icon">🎥</span> Videos
                     </li>
-                    <li className="app-item" onClick={() => navigate('/marketplace')}>
-                      <span className="app-icon">🛒</span> Shop
-                    </li>
                     <li className="app-item" onClick={() => navigate('/music')}>
                       <span className="app-icon">🎵</span> Music
                     </li>
+                    <li className="app-item" onClick={() => navigate('/recipes')}>
+                      <span className="app-icon">🍳</span> Recipes
+                    </li>
+                    <li className="app-item" onClick={() => navigate('/livestreams')}>
+                      <span className="app-icon">📺</span> Live
+                    </li>
+                    <li className="app-item" onClick={() => navigate('/badges')}>
+                      <span className="app-icon">🏆</span> Badges
+                    </li>
+                    <li className="app-item" onClick={() => navigate('/marketplace')}>
+                      <span className="app-icon">🛒</span> Shop
+                    </li>
+                    <li className="app-item" onClick={() => navigate('/photos')}>
+                      <span className="app-icon">🖼️</span> Photos
+                    </li>
                   </ul>
+
                 </div>
               </div>
             </div>
@@ -1309,7 +1209,7 @@ const HomePage = () => {
                           const uniqueAuthors = [...new Set(pendingPosts.map((e) => e.pubkey))];
                           uniqueAuthors.forEach((pk) => {
                             if (ndk) {
-                              const unsub = subscribeToProfile(pk, ndk, () => {});
+                              const unsub = subscribeToProfile(pk, ndk, () => { });
                               setTimeout(() => unsub(), 100);
                             }
                           });
@@ -1326,26 +1226,7 @@ const HomePage = () => {
                     {feed.slice(0, displayedFeedCount).map((event) => (
                       <FeedItem key={event.id} event={event} />
                     ))}
-                    <div
-                      ref={(el) => {
-                        if (!el) return;
-                        const observer = new IntersectionObserver(
-                          (entries) => {
-                            if (entries[0].isIntersecting) {
-                              if (feed.length > displayedFeedCount) {
-                                setDisplayedFeedCount((c) => c + 15);
-                              } else if (hasMoreFeed && !isLoadingMoreFeed) {
-                                loadMoreFeed();
-                              }
-                            }
-                          },
-                          { rootMargin: '200px' }
-                        );
-                        observer.observe(el);
-                        return () => observer.disconnect();
-                      }}
-                      style={{ height: '1px' }}
-                    />
+                    <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
                     {isLoadingMoreFeed && (
                       <div style={{ padding: '15px', textAlign: 'center' }}>
                         Loading more posts...
@@ -1527,25 +1408,17 @@ const HomePage = () => {
                         No notifications yet.
                       </div>
                     )}
-                    <div className="notifications-tab-list">
-                      {(() => {
-                        const groups = groupNotificationsByTarget(notifications);
-                        // Sort groups by latest activity
-                        const sortedGroups = Array.from(groups.entries()).sort((a, b) => {
-                          const latestA = Math.max(...a[1].map((n) => n.created_at || 0));
-                          const latestB = Math.max(...b[1].map((n) => n.created_at || 0));
-                          return latestB - latestA;
-                        });
-                        return sortedGroups.map(([targetId, notifs]) => (
-                          <NotificationGroup
-                            key={targetId}
-                            targetId={targetId}
-                            notifications={notifs}
+                    <div className="notifications-list">
+                      {notifications
+                        .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+                        .map((event) => (
+                          <NotificationItem
+                            key={event.id}
+                            event={event}
                             onClick={(link: string) => navigate(link)}
                             ndk={ndk}
                           />
-                        ));
-                      })()}
+                        ))}
                     </div>
                   </div>
                 )}

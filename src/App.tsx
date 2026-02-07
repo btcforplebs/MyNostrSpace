@@ -62,6 +62,7 @@ const RecipesPage = lazy(() =>
 const BadgesPage = lazy(() =>
   import('./components/Badges/BadgesPage').then((m) => ({ default: m.BadgesPage }))
 );
+import { NotificationProvider } from './context/NotificationContext';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 
 function App() {
@@ -83,48 +84,50 @@ function App() {
 
   return (
     <HelmetProvider>
-      <LightboxProvider>
-        <div className="app-container">
-          <ErrorBoundary>
-            <Suspense
-              fallback={
-                <div className="loading-screen">
-                  <div className="loading-box">
-                    <div className="loading-body">
-                      <p>Loading...</p>
+      <NotificationProvider>
+        <LightboxProvider>
+          <div className="app-container">
+            <ErrorBoundary>
+              <Suspense
+                fallback={
+                  <div className="loading-screen">
+                    <div className="loading-box">
+                      <div className="loading-body">
+                        <p>Loading...</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              }
-            >
-              <Routes>
-                <Route path="/" element={user ? <HomePage /> : <LandingPage />} />
-                <Route path="/p/:pubkey" element={<ProfilePage />} />
-                <Route path="/p/:pubkey/friends" element={<FriendsPage />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/browse" element={<BrowsePage />} />
-                <Route path="/edit-layout" element={<LayoutEditor />} />
-                <Route path="/edit-profile" element={<EditProfilePage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/thread/:eventId" element={<ThreadPage />} />
-                <Route path="/blog/:pubkey/:identifier" element={<BlogPage />} />
-                <Route path="/live/:pubkey/:identifier" element={<LiveStreamPage />} />
-                <Route path="/livestreams" element={<LivestreamsPage />} />
-                <Route path="/blogs" element={<BlogsPage />} />
-                <Route path="/videos" element={<VideosPage />} />
-                <Route path="/photos" element={<PhotosPage />} />
-                <Route path="/marketplace" element={<MarketplacePage />} />
-                <Route path="/music" element={<MusicPage />} />
-                <Route path="/film" element={<FilmPage />} />
-                <Route path="/calendar" element={<CalendarPage />} />
-                <Route path="/recipes" element={<RecipesPage />} />
-                <Route path="/badges" element={<BadgesPage />} />
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
-        </div>
-        <Lightbox />
-      </LightboxProvider>
+                }
+              >
+                <Routes>
+                  <Route path="/" element={user ? <HomePage /> : <LandingPage />} />
+                  <Route path="/p/:pubkey" element={<ProfilePage />} />
+                  <Route path="/p/:pubkey/friends" element={<FriendsPage />} />
+                  <Route path="/search" element={<SearchPage />} />
+                  <Route path="/browse" element={<BrowsePage />} />
+                  <Route path="/edit-layout" element={<LayoutEditor />} />
+                  <Route path="/edit-profile" element={<EditProfilePage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/thread/:eventId" element={<ThreadPage />} />
+                  <Route path="/blog/:pubkey/:identifier" element={<BlogPage />} />
+                  <Route path="/live/:pubkey/:identifier" element={<LiveStreamPage />} />
+                  <Route path="/livestreams" element={<LivestreamsPage />} />
+                  <Route path="/blogs" element={<BlogsPage />} />
+                  <Route path="/videos" element={<VideosPage />} />
+                  <Route path="/photos" element={<PhotosPage />} />
+                  <Route path="/marketplace" element={<MarketplacePage />} />
+                  <Route path="/music" element={<MusicPage />} />
+                  <Route path="/film" element={<FilmPage />} />
+                  <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="/recipes" element={<RecipesPage />} />
+                  <Route path="/badges" element={<BadgesPage />} />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+          <Lightbox />
+        </LightboxProvider>
+      </NotificationProvider>
     </HelmetProvider>
   );
 }

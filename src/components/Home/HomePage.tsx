@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import {
@@ -17,7 +17,208 @@ import { WavlakePlayer } from '../Music/WavlakePlayer';
 import { Avatar } from '../Shared/Avatar';
 import { VideoThumbnail } from '../Shared/VideoThumbnail';
 import { Virtuoso } from 'react-virtuoso';
+import { useNotifications } from '../../context/NotificationContext';
+import { useProfile } from '../../hooks/useProfile';
+import { subscribeToProfile } from '../../hooks/profileCache';
+import { RichTextRenderer } from '../Shared/RichTextRenderer';
 import './HomePage.css';
+
+// Single notification author display
+const NotificationAuthor = ({ pubkey }: { pubkey: string }) => {
+  const { profile } = useProfile(pubkey);
+  const name = profile?.name || profile?.displayName || pubkey.slice(0, 8);
+  return (
+    <Link to={`/p/${pubkey}`} className="notif-author" onClick={(e) => e.stopPropagation()}>
+      {name}
+    </Link>
+  );
+};
+
+// Threaded reply component
+interface ThreadNode {
+  event: NDKEvent;
+  children: ThreadNode[];
+}
+
+const ThreadedReply = ({
+  node,
+  depth,
+  onClick,
+}: {
+  node: ThreadNode;
+  depth: number;
+  onClick: (link: string) => void;
+}) => {
+  const { profile } = useProfile(node.event.pubkey);
+  const authorName = profile?.name || profile?.displayName || node.event.pubkey.slice(0, 8);
+
+  return (
+    <div
+      className="threaded-reply"
+      style={{ marginLeft: depth > 0 ? 20 : 0, borderLeft: depth > 0 ? '2px solid #ddd' : 'none', paddingLeft: depth > 0 ? 10 : 0 }}
+    >
+      <div
+        className="notification-entry clickable"
+        onClick={() => onClick(`/thread/${node.event.id}`)}
+        style={{ padding: '8px 0' }}
+      >
+        <Avatar pubkey={node.event.pubkey} src={profile?.picture} size={32} className="notification-avatar" />
+        <div className="notification-info" style={{ flex: 1 }}>
+          <div className="notification-text">
+            <Link to={`/p/${node.event.pubkey}`} className="notif-author" onClick={(e) => e.stopPropagation()}>
+              {authorName}
+            </Link>
+          </div>
+          <div className="notif-preview">
+            <RichTextRenderer content={node.event.content.length > 150 ? node.event.content.slice(0, 150) + '...' : node.event.content} />
+          </div>
+          <div className="notif-date">{new Date((node.event.created_at || 0) * 1000).toLocaleString()}</div>
+        </div>
+      </div>
+      {node.children.map((child) => (
+        <ThreadedReply key={child.event.id} node={child} depth={depth + 1} onClick={onClick} />
+      ))}
+    </div>
+  );
+};
+
+// Grouped notification for a single target post
+const NotificationGroup = ({
+  targetId,
+  notifications,
+  onClick,
+  ndk,
+}: {
+  targetId: string;
+  notifications: NDKEvent[];
+  onClick: (link: string) => void;
+  ndk: import('@nostr-dev-kit/ndk').default | undefined;
+}) => {
+  const [targetEvent, setTargetEvent] = useState<NDKEvent | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Separate by type
+  const likes = notifications.filter((n) => n.kind === 7);
+  const reposts = notifications.filter((n) => n.kind === 6);
+  const zaps = notifications.filter((n) => n.kind === 9735);
+  const replies = notifications.filter((n) => n.kind === 1);
+
+  // Build reply tree
+  const buildTree = useCallback((parentId: string, allReplies: NDKEvent[]): ThreadNode[] => {
+    const children = allReplies.filter((reply) => {
+      const eTags = reply.tags.filter((t) => t[0] === 'e');
+      const replyMarkerTag = eTags.find((t) => t[3] === 'reply');
+      const directParentId = replyMarkerTag ? replyMarkerTag[1] : eTags.length > 0 ? eTags[eTags.length - 1][1] : null;
+      return directParentId === parentId;
+    });
+    return children
+      .sort((a, b) => (a.created_at || 0) - (b.created_at || 0))
+      .map((child) => ({ event: child, children: buildTree(child.id, allReplies) }));
+  }, []);
+
+  const replyTree = useMemo(() => buildTree(targetId, replies), [targetId, replies, buildTree]);
+
+  // Fetch target event
+  useEffect(() => {
+    if (!ndk || !targetId) {
+      setLoading(false);
+      return;
+    }
+    ndk.fetchEvent(targetId).then((ev) => {
+      setTargetEvent(ev);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [ndk, targetId]);
+
+  const latestTime = Math.max(...notifications.map((n) => n.created_at || 0));
+
+  return (
+    <div className="notification-group" style={{ borderBottom: '1px solid #eee', padding: '12px 10px' }}>
+      {/* Interaction summary */}
+      <div className="notif-summary" style={{ fontSize: '9pt', color: '#666', marginBottom: '8px' }}>
+        {likes.length > 0 && (
+          <span style={{ marginRight: '10px' }}>
+            ❤️ {likes.length} {likes.length === 1 ? 'like' : 'likes'}
+            {likes.length <= 3 && (
+              <span style={{ color: '#999' }}>
+                {' '}from {likes.map((l, i) => (
+                  <span key={l.id}>
+                    {i > 0 && ', '}
+                    <NotificationAuthor pubkey={l.pubkey} />
+                  </span>
+                ))}
+              </span>
+            )}
+          </span>
+        )}
+        {reposts.length > 0 && (
+          <span style={{ marginRight: '10px' }}>
+            🔄 {reposts.length} {reposts.length === 1 ? 'repost' : 'reposts'}
+          </span>
+        )}
+        {zaps.length > 0 && (
+          <span style={{ marginRight: '10px' }}>
+            ⚡ {zaps.length} {zaps.length === 1 ? 'zap' : 'zaps'}
+          </span>
+        )}
+        {replies.length > 0 && (
+          <span>
+            💬 {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+          </span>
+        )}
+      </div>
+
+      {/* Original post preview */}
+      {loading ? (
+        <div style={{ padding: '10px', color: '#999', fontSize: '9pt' }}>Loading post...</div>
+      ) : targetEvent ? (
+        <div
+          className="notif-target-post clickable"
+          onClick={() => onClick(`/thread/${targetId}`)}
+          style={{ background: '#f9f9f9', padding: '10px', borderRadius: '4px', marginBottom: '8px', cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: '9pt', color: '#333' }}>
+            <RichTextRenderer content={targetEvent.content.length > 200 ? targetEvent.content.slice(0, 200) + '...' : targetEvent.content} />
+          </div>
+          <div style={{ fontSize: '8pt', color: '#999', marginTop: '4px' }}>
+            {new Date((targetEvent.created_at || 0) * 1000).toLocaleString()}
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding: '10px', color: '#999', fontSize: '9pt', fontStyle: 'italic' }}>
+          Original post not found
+        </div>
+      )}
+
+      {/* Threaded replies */}
+      {replyTree.length > 0 && (
+        <div className="notif-replies" style={{ marginTop: '8px' }}>
+          {replyTree.map((node) => (
+            <ThreadedReply key={node.event.id} node={node} depth={0} onClick={onClick} />
+          ))}
+        </div>
+      )}
+
+      <div style={{ fontSize: '8pt', color: '#aaa', marginTop: '6px' }}>
+        Latest activity: {new Date(latestTime * 1000).toLocaleString()}
+      </div>
+    </div>
+  );
+};
+
+// Group notifications by target post
+const groupNotificationsByTarget = (notifications: NDKEvent[]): Map<string, NDKEvent[]> => {
+  const groups = new Map<string, NDKEvent[]>();
+  notifications.forEach((n) => {
+    const targetId = n.tags.find((t) => t[0] === 'e')?.[1];
+    if (targetId) {
+      const existing = groups.get(targetId) || [];
+      existing.push(n);
+      groups.set(targetId, existing);
+    }
+  });
+  return groups;
+};
 
 interface MusicTrack {
   title: string;
@@ -49,7 +250,6 @@ const HomePage = () => {
   const [isLoadingMoreFeed, setIsLoadingMoreFeed] = useState(false);
   const [isLoadingMoreMedia, setIsLoadingMoreMedia] = useState(false);
   const [notifications, setNotifications] = useState<NDKEvent[]>([]);
-  const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [stats, setStats] = useState<{
     followers: number | null;
     posts: number | null;
@@ -155,7 +355,7 @@ const HomePage = () => {
   const [currentMusicIndex, setCurrentMusicIndex] = useState(0);
   const [shouldAutoplayMusic, setShouldAutoplayMusic] = useState(false);
   const [streamEvents, setStreamEvents] = useState<NDKEvent[]>([]);
-  const [viewMode, setViewMode] = useState<'feed' | 'media' | 'blog' | 'music' | 'streams'>('feed');
+  const [viewMode, setViewMode] = useState<'feed' | 'media' | 'blog' | 'music' | 'streams' | 'notifications'>('feed');
   const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
   // Pagination State
   const [feedUntil, setFeedUntil] = useState<number | null>(null);
@@ -174,6 +374,8 @@ const HomePage = () => {
   const [displayedStreamsCount, setDisplayedStreamsCount] = useState(15);
   const loadMoreStreamsTriggerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(3);
+  const { markAsRead, lastSeen } = useNotifications();
+  const [hasNewNotifs, setHasNewNotifs] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -545,6 +747,11 @@ const HomePage = () => {
           feedEoseRef.current && (apiEvent.created_at || 0) > eoseTimestampRef.current;
 
         if (isNewPost) {
+          // Pre-fetch the author's profile into our cache so it's ready when shown
+          const unsub = subscribeToProfile(apiEvent.pubkey, ndk, () => {});
+          // Unsubscribe after a delay - profile will remain in cache
+          setTimeout(() => unsub(), 100);
+
           setPendingPosts((prev) => {
             if (prev.find((e) => e.id === apiEvent.id)) return prev;
             return [apiEvent, ...prev].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
@@ -728,7 +935,7 @@ const HomePage = () => {
         uniqueAuthors.forEach((pk) => {
           ndk.getUser({ pubkey: pk }).fetchProfile({
             cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
-          }).catch(() => {});
+          }).catch(() => { });
         });
 
         setNotifications((prev) => {
@@ -736,9 +943,16 @@ const HomePage = () => {
           const unique = Array.from(
             new Map(combined.map((item) => [item.id, item])).values()
           );
-          return unique
+          const sorted = unique
             .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
             .slice(0, 50);
+
+          // Check if any are newer than lastSeen
+          if (sorted.length > 0 && (sorted[0].created_at || 0) > lastSeen) {
+            setHasNewNotifs(true);
+          }
+
+          return sorted;
         });
       };
 
@@ -964,96 +1178,6 @@ const HomePage = () => {
                   </ul>
                 </div>
               </div>
-
-              <div className="home-box">
-                <div className="home-box-header">Notifications</div>
-                <div className="home-box-body" style={{ padding: 0 }}>
-                  <div className="notifications-list">
-                    {notifications.length === 0 && (
-                      <div style={{ padding: '10px', fontSize: '8pt', textAlign: 'center' }}>
-                        No notifications yet.
-                      </div>
-                    )}
-                    {notifications.slice(0, showAllNotifications ? undefined : 5).map((n) => {
-                      const authorName =
-                        n.author.profile?.name ||
-                        n.author.profile?.displayName ||
-                        n.pubkey.slice(0, 8);
-                      const type =
-                        n.kind === 1
-                          ? 'replied'
-                          : n.kind === 7
-                            ? 'liked'
-                            : n.kind === 9735
-                              ? 'zapped'
-                              : n.kind === 6
-                                ? 'reposted'
-                                : 'interacted';
-
-                      // Determine link for the notification
-                      let link = `/p/${n.pubkey}`;
-                      if (n.kind === 1 || n.kind === 7 || n.kind === 6) {
-                        const targetId = n.tags.find((t) => t[0] === 'e')?.[1] || n.id;
-                        link = `/thread/${targetId}`;
-                      } else if (n.kind === 9735) {
-                        const targetId = n.tags.find((t) => t[0] === 'e')?.[1];
-                        if (targetId) link = `/thread/${targetId}`;
-                      }
-
-                      return (
-                        <div
-                          key={n.id}
-                          className="notification-item clickable"
-                          onClick={() => navigate(link)}
-                        >
-                          <Avatar
-                            pubkey={n.pubkey}
-                            src={n.author.profile?.image}
-                            size={24}
-                            className="notification-user-pic"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/p/${n.pubkey}`);
-                            }}
-                          />
-                          <div className="notification-content">
-                            <Link
-                              to={`/p/${n.pubkey}`}
-                              className="notification-user-name"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {authorName}
-                            </Link>
-                            <span className="notification-action"> {type} your post</span>
-                            <div className="notification-time">
-                              {new Date((n.created_at || 0) * 1000).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {notifications.length > 5 && (
-                    <div
-                      style={{ padding: '5px', textAlign: 'center', borderTop: '1px solid #ccc' }}
-                    >
-                      <button
-                        onClick={() => setShowAllNotifications(!showAllNotifications)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#003399',
-                          cursor: 'pointer',
-                          fontSize: '8pt',
-                          fontWeight: 'bold',
-                        }}
-                      >
-                        {showAllNotifications ? 'Show Less' : `View All (${notifications.length})`}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* Main Content */}
@@ -1150,6 +1274,18 @@ const HomePage = () => {
                 >
                   Live
                 </button>
+                <button
+                  className={viewMode === 'notifications' ? 'active' : ''}
+                  onClick={() => {
+                    setViewMode('notifications');
+                    setHasNewNotifs(false);
+                    markAsRead();
+                  }}
+                  style={{ position: 'relative' }}
+                >
+                  Notifications
+                  {hasNewNotifs && <span className="unread-dot"></span>}
+                </button>
               </div>
 
               <div
@@ -1170,6 +1306,15 @@ const HomePage = () => {
                       <div
                         className="new-posts-banner"
                         onClick={() => {
+                          // Ensure profiles are in our cache before showing posts
+                          const uniqueAuthors = [...new Set(pendingPosts.map((e) => e.pubkey))];
+                          uniqueAuthors.forEach((pk) => {
+                            if (ndk) {
+                              const unsub = subscribeToProfile(pk, ndk, () => {});
+                              setTimeout(() => unsub(), 100);
+                            }
+                          });
+
                           const sorted = dedupAndSortFeed(pendingPosts, feed);
                           setFeed(sorted);
                           setPendingPosts([]);
@@ -1366,6 +1511,36 @@ const HomePage = () => {
                         Showing {displayedStreamsCount} of {streamEvents.length} streams
                       </div>
                     )}
+                  </div>
+                )}
+
+                {viewMode === 'notifications' && (
+                  <div className="notifications-tab-content">
+                    {notifications.length === 0 && (
+                      <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+                        No notifications yet.
+                      </div>
+                    )}
+                    <div className="notifications-tab-list">
+                      {(() => {
+                        const groups = groupNotificationsByTarget(notifications);
+                        // Sort groups by latest activity
+                        const sortedGroups = Array.from(groups.entries()).sort((a, b) => {
+                          const latestA = Math.max(...a[1].map((n) => n.created_at || 0));
+                          const latestB = Math.max(...b[1].map((n) => n.created_at || 0));
+                          return latestB - latestA;
+                        });
+                        return sortedGroups.map(([targetId, notifs]) => (
+                          <NotificationGroup
+                            key={targetId}
+                            targetId={targetId}
+                            notifications={notifs}
+                            onClick={(link: string) => navigate(link)}
+                            ndk={ndk}
+                          />
+                        ));
+                      })()}
+                    </div>
                   </div>
                 )}
               </div>

@@ -40,7 +40,7 @@ export const Navbar = () => {
               <img src="/mynostrspace_logo.png" alt="MyNostrSpace" className="landing-logo" />
               <h1>MyNostrSpace</h1>
             </div>
-            <span className="slogan">a place for friends</span>
+            <span className="slogan">use nostr like its 2009</span>
           </Link>
         </div>
 

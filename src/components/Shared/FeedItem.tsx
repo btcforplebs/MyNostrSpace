@@ -98,16 +98,19 @@ const ThreadedComments: React.FC<ThreadedCommentsProps> = ({
               style={{ flexShrink: 0 }}
             />
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 'bold' }}>
+              <div className="comment-header">
                 <Link
                   to={`/p/${node.event.pubkey}`}
-                  style={{ color: '#003399', textDecoration: 'none' }}
+                  className="comment-author-name"
                 >
                   {node.event.author.profile?.name ||
                     node.event.author.profile?.displayName ||
                     node.event.author.profile?.display_name ||
                     node.event.pubkey.slice(0, 8)}
                 </Link>
+                <span className="comment-date">
+                  {new Date((node.event.created_at || 0) * 1000).toLocaleString()}
+                </span>
               </div>
               <div style={{ color: '#333', fontSize: '9pt', lineHeight: 1.4 }}>
                 <RichTextRenderer content={node.event.content} />

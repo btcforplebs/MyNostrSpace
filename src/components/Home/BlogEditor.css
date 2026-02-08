@@ -1,3 +1,5 @@
+/* BlogEditor.css - Uses design tokens from design-tokens.css */
+
 .blog-editor-overlay {
   position: fixed;
   top: 0;
@@ -12,17 +14,17 @@
 }
 
 .blog-editor-modal {
-  background: white;
+  background: var(--myspace-bg-content);
   width: 600px;
   max-width: 90vw;
-  border: 1px solid #6699cc;
+  border: 1px solid var(--myspace-blue);
   box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.2);
 }
 
 .blog-editor-header {
   background: var(--myspace-blue);
   color: white;
-  padding: 5px 10px;
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
   font-weight: bold;
   display: flex;
   justify-content: space-between;
@@ -30,28 +32,28 @@
 }
 
 .blog-editor-body {
-  padding: 15px;
+  padding: var(--myspace-spacing-lg);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--myspace-spacing-md);
 }
 
 .blog-title-input,
 .blog-summary-input,
 .blog-image-input {
   width: 100%;
-  padding: 8px;
-  border: 1px solid #ccc;
-  font-size: 10pt;
+  padding: var(--myspace-spacing-md);
+  border: 1px solid var(--myspace-border);
+  font-size: var(--myspace-font-size-base);
   box-sizing: border-box;
 }
 
 .blog-content-textarea {
   width: 100%;
   height: 300px;
-  padding: 10px;
-  border: 1px solid #ccc;
-  font-size: 10pt;
+  padding: var(--myspace-spacing-md);
+  border: 1px solid var(--myspace-border);
+  font-size: var(--myspace-font-size-base);
   font-family: inherit;
   box-sizing: border-box;
   resize: vertical;
@@ -60,13 +62,13 @@
 .blog-editor-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--myspace-spacing-md);
 }
 
 .cancel-btn {
-  background: #ccc;
-  border: 1px solid #999;
-  padding: 5px 15px;
+  background: var(--myspace-border);
+  border: 1px solid var(--myspace-gray-500);
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-lg);
   cursor: pointer;
   font-weight: bold;
 }
@@ -74,8 +76,8 @@
 .publish-btn {
   background: var(--myspace-blue);
   color: white;
-  border: 1px solid #003366;
-  padding: 5px 20px;
+  border: 1px solid var(--myspace-blue-dark);
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-xl);
   cursor: pointer;
   font-weight: bold;
 }
@@ -86,7 +88,7 @@
 }
 
 .publish-btn:not(:disabled):hover {
-  background: #5588bb;
+  background: var(--myspace-blue-hover);
 }
 
 /* Markdown Toolbar */
@@ -94,17 +96,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
-  padding: 4px;
-  background: #f0f0f0;
-  border: 1px solid #ccc;
+  padding: var(--myspace-spacing-xs);
+  background: var(--myspace-gray-100);
+  border: 1px solid var(--myspace-border);
   border-bottom: none;
   align-items: center;
 }
 
 .blog-toolbar button {
-  background: white;
-  border: 1px solid #ccc;
-  padding: 3px 8px;
+  background: var(--myspace-bg-content);
+  border: 1px solid var(--myspace-border);
+  padding: 3px var(--myspace-spacing-md);
   cursor: pointer;
   font-size: 8.5pt;
   font-family: inherit;
@@ -113,86 +115,86 @@
 }
 
 .blog-toolbar button:hover {
-  background: #dde8f0;
-  border-color: #6699cc;
+  background: var(--myspace-light-blue);
+  border-color: var(--myspace-blue);
 }
 
 .toolbar-divider {
   width: 1px;
   height: 18px;
-  background: #ccc;
+  background: var(--myspace-border);
   margin: 0 3px;
 }
 
 .toolbar-preview-btn {
   margin-left: auto !important;
-  background: #ff9933 !important;
+  background: var(--myspace-orange) !important;
   color: white !important;
-  border-color: #cc7a29 !important;
+  border-color: var(--myspace-orange-hover) !important;
   font-weight: bold;
 }
 
 .toolbar-preview-btn:hover {
-  background: #e68a2e !important;
+  background: var(--myspace-orange-hover) !important;
 }
 
 .toolbar-preview-btn.active {
   background: var(--myspace-blue) !important;
-  border-color: #003366 !important;
+  border-color: var(--myspace-blue-dark) !important;
 }
 
 /* Markdown Preview */
 .blog-preview {
   width: 100%;
   height: 300px;
-  padding: 10px;
-  border: 1px solid #ccc;
-  font-size: 10pt;
+  padding: var(--myspace-spacing-md);
+  border: 1px solid var(--myspace-border);
+  font-size: var(--myspace-font-size-base);
   box-sizing: border-box;
   overflow-y: auto;
-  background: #fefefe;
+  background: var(--myspace-gray-100);
   line-height: 1.6;
 }
 
 .blog-preview h1 {
   font-size: 18pt;
-  margin: 10px 0 5px;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 5px;
+  margin: var(--myspace-spacing-md) 0 var(--myspace-spacing-sm);
+  border-bottom: 1px solid var(--myspace-gray-300);
+  padding-bottom: var(--myspace-spacing-sm);
 }
 
 .blog-preview h2 {
   font-size: 14pt;
-  margin: 10px 0 5px;
+  margin: var(--myspace-spacing-md) 0 var(--myspace-spacing-sm);
 }
 
 .blog-preview h3 {
   font-size: 12pt;
-  margin: 8px 0 4px;
+  margin: var(--myspace-spacing-md) 0 var(--myspace-spacing-xs);
 }
 
 .blog-preview blockquote {
-  margin: 8px 0;
-  padding: 5px 10px;
-  border-left: 3px solid #6699cc;
-  background: #f5f5f5;
-  color: #555;
+  margin: var(--myspace-spacing-md) 0;
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  border-left: 3px solid var(--myspace-blue);
+  background: var(--myspace-gray-100);
+  color: var(--myspace-text-light);
 }
 
 .blog-preview pre {
   background: #2d2d2d;
   color: #f8f8f2;
-  padding: 10px;
+  padding: var(--myspace-spacing-md);
   overflow-x: auto;
-  font-size: 9pt;
+  font-size: var(--myspace-font-size-md);
   border-radius: 3px;
 }
 
 .blog-preview code {
-  background: #eee;
-  padding: 1px 4px;
-  font-size: 9pt;
-  border-radius: 2px;
+  background: var(--myspace-gray-200);
+  padding: 1px var(--myspace-spacing-xs);
+  font-size: var(--myspace-font-size-md);
+  border-radius: var(--myspace-border-radius-sm);
 }
 
 .blog-preview pre code {
@@ -201,26 +203,26 @@
 }
 
 .blog-preview ul {
-  margin: 5px 0;
-  padding-left: 20px;
+  margin: var(--myspace-spacing-sm) 0;
+  padding-left: var(--myspace-spacing-xl);
 }
 
 .blog-preview img {
   max-width: 100%;
-  border-radius: 4px;
-  margin: 5px 0;
+  border-radius: var(--myspace-border-radius-sm);
+  margin: var(--myspace-spacing-sm) 0;
 }
 
 .blog-preview hr {
   border: none;
-  border-top: 1px solid #ddd;
-  margin: 10px 0;
+  border-top: 1px solid var(--myspace-gray-300);
+  margin: var(--myspace-spacing-md) 0;
 }
 
 .blog-preview a {
-  color: #003399;
+  color: var(--myspace-link);
 }
 
 .blog-preview p {
-  margin: 5px 0;
+  margin: var(--myspace-spacing-sm) 0;
 }

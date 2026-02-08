@@ -1,47 +1,59 @@
-/* MySpace Film Page Scoped Styles */
+/* FilmPage.css - Uses design tokens from design-tokens.css */
 
-.film-page-container {
-  background-color: #e5e5e5;
+.fp-page-container {
+  background-color: var(--myspace-bg);
   min-height: 100vh;
-  font-family: verdana, arial, sans-serif, helvetica;
+  font-family: var(--myspace-font-family);
 }
 
-.film-header-area {
-  padding-bottom: 20px;
+.fp-wrapper {
+  max-width: var(--myspace-container-width) !important;
+  margin: 0 auto !important;
+  background-color: var(--myspace-bg-content);
+  box-shadow: var(--myspace-shadow-md);
+  min-height: 100vh;
+  display: block !important;
+  width: 100%;
 }
 
-.film-content {
-  max-width: 992px;
-  margin: 0 auto;
-  padding: 15px;
-  background-color: #ffffff;
-  border: 1px solid #6699cc;
-  min-height: 80vh;
+.fp-content {
+  padding: var(--myspace-spacing-lg);
+  background-color: var(--myspace-bg-content);
+  border: 1px solid var(--myspace-border);
+  border-top: none;
 }
 
-.section-header {
-  margin: 0 0 10px 0;
-  padding: 8px 12px;
-  background-color: #ffcc99;
-  color: #ff6600;
-  font-size: 11pt;
+.fp-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--myspace-spacing-md);
+}
+
+.fp-content .section-header {
+  margin: 0;
+  padding: var(--myspace-spacing-md) var(--myspace-spacing-md);
+  background-color: var(--myspace-orange);
+  color: white;
+  font-size: var(--myspace-font-size-lg);
   font-weight: bold;
-  border: 1px solid #6699cc;
+  border: 1px solid var(--myspace-orange-hover);
   text-align: left;
+  border-radius: var(--myspace-border-radius-sm);
 }
 
 .film-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 15px;
-  margin-bottom: 20px;
+  gap: var(--myspace-spacing-lg);
+  margin-bottom: var(--myspace-spacing-xl);
 }
 
 .film-card {
   text-align: center;
-  border: 1px solid #ccc;
-  padding: 8px;
-  background: #fcfcfc;
+  border: 1px solid var(--myspace-border);
+  padding: var(--myspace-spacing-md);
+  background: var(--myspace-gray-100);
   cursor: pointer;
   transition: all 0.2s ease;
   min-width: 0;
@@ -50,19 +62,19 @@
 }
 
 .film-card:hover {
-  border-color: #003399;
-  background: #fff;
-  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  border-color: var(--myspace-link);
+  background: var(--myspace-bg-content);
+  box-shadow: var(--myspace-shadow-sm);
 }
 
 .film-poster-wrapper {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: var(--myspace-spacing-md);
   position: relative;
   width: 100%;
   aspect-ratio: 2/3;
-  background-color: #eee;
-  border: 1px solid #000;
+  background-color: var(--myspace-gray-200);
+  border: 1px solid var(--myspace-text);
 }
 
 .film-poster {
@@ -77,10 +89,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #333;
-  color: #fff;
+  background-color: var(--myspace-gray-700);
+  color: var(--myspace-bg-content);
   font-size: 0.8rem;
-  padding: 5px;
+  padding: var(--myspace-spacing-sm);
 }
 
 .film-info {
@@ -93,9 +105,9 @@
 .film-title {
   display: block;
   font-weight: bold;
-  color: #003399;
+  color: var(--myspace-link);
   text-decoration: none;
-  font-size: 9pt;
+  font-size: var(--myspace-font-size-md);
   margin: 0 0 3px 0;
   line-height: 1.2;
   display: -webkit-box;
@@ -107,8 +119,8 @@
 
 .film-year {
   display: block;
-  color: #666;
-  font-size: 8pt;
+  color: var(--myspace-text-muted);
+  font-size: var(--myspace-font-size-sm);
 }
 
 /* Modal Styles */
@@ -126,20 +138,20 @@
 }
 
 .film-modal-content {
-  background: #ffffff;
+  background: var(--myspace-bg-content);
   width: 90%;
   max-width: 800px;
-  border: 2px solid #000;
+  border: 2px solid var(--myspace-blue);
   position: relative;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--myspace-shadow-lg);
   display: flex;
   flex-direction: column;
 }
 
 .film-modal-header {
-  background-color: #ffcc99;
-  padding: 5px 10px;
-  border-bottom: 1px solid #000;
+  background-color: var(--myspace-blue);
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  border-bottom: 1px solid var(--myspace-blue-dark);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -147,9 +159,9 @@
 
 .film-modal-header h3 {
   margin: 0;
-  font-size: 10pt;
+  font-size: var(--myspace-font-size-base);
   font-weight: bold;
-  color: #000;
+  color: white;
 }
 
 .close-modal-btn {
@@ -158,12 +170,12 @@
   font-size: 14pt;
   font-weight: bold;
   cursor: pointer;
-  color: #000;
+  color: white;
   line-height: 1;
 }
 
 .close-modal-btn:hover {
-  color: #cc0000;
+  color: var(--myspace-orange);
 }
 
 .film-player-wrapper {
@@ -181,23 +193,23 @@
 }
 
 .film-details {
-  padding: 10px;
-  background: #f9f9f9;
-  border-top: 1px solid #ccc;
-  font-size: 8pt;
+  padding: var(--myspace-spacing-md);
+  background: var(--myspace-gray-100);
+  border-top: 1px solid var(--myspace-border);
+  font-size: var(--myspace-font-size-sm);
 }
 
 .film-meta {
   margin: 0;
-  color: #666;
+  color: var(--myspace-text-muted);
 }
 
 .loading-spiral {
   text-align: center;
   padding: 50px;
-  font-size: 10pt;
+  font-size: var(--myspace-font-size-base);
   font-weight: bold;
-  color: #003399;
+  color: var(--myspace-link);
 }
 
 /* Responsive Styles */
@@ -210,17 +222,17 @@
 @media (max-width: 768px) {
   .film-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: var(--myspace-spacing-md);
   }
 }
 
 @media (max-width: 600px) {
   .film-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: var(--myspace-spacing-md);
   }
 
   .film-card {
-    padding: 5px;
+    padding: var(--myspace-spacing-sm);
   }
 }

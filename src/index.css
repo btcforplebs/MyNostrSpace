@@ -1,16 +1,20 @@
+/* Import MySpace Design Tokens - Single source of truth */
+@import './styles/design-tokens.css';
+
 * {
   box-sizing: border-box;
 }
 
+html {
+  background-color: var(--myspace-bg);
+}
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: var(--myspace-font-family);
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  color-scheme: light;
+  color: var(--myspace-text);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -18,13 +22,12 @@
 }
 
 a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+  color: var(--myspace-link);
+  text-decoration: none;
 }
 
 a:hover {
-  color: #535bf2;
+  text-decoration: underline;
 }
 
 body {
@@ -48,18 +51,17 @@ button {
 .nostr-input {
   width: 100%;
   padding: 8px;
-  font-size: 9pt;
-  background-color: #fff !important;
-  color: #000 !important;
-  border: 1px solid #ccc !important;
-  border-radius: 0;
-  /* Retro MySpace feel */
-  font-family: verdana, arial, sans-serif;
+  font-size: var(--myspace-font-size-base);
+  background-color: var(--myspace-bg-content) !important;
+  color: var(--myspace-text) !important;
+  border: 1px solid var(--myspace-border) !important;
+  border-radius: var(--myspace-border-radius);
+  font-family: var(--myspace-font-family);
 }
 
 .nostr-input:focus {
-  outline: 1px solid #6699cc;
-  border-color: #6699cc !important;
+  outline: 1px solid var(--myspace-blue);
+  border-color: var(--myspace-blue) !important;
 }
 
 @media (max-width: 768px) {
@@ -115,7 +117,7 @@ button:focus-visible {
 
 /* Retro Loading Screen, styled like old MySpace login */
 .loading-screen {
-  background-color: white;
+  background-color: var(--myspace-bg-content);
   height: 100vh;
   height: 100dvh;
   width: 100vw;
@@ -123,31 +125,31 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: verdana, arial, sans-serif, helvetica;
+  font-family: var(--myspace-font-family);
 }
 
 .loading-box {
-  background-color: white;
+  background-color: var(--myspace-bg-content);
   width: 300px;
-  border: 1px solid black;
+  border: 1px solid var(--myspace-text);
   text-align: center;
 }
 
 .loading-header {
-  background-color: #6699cc;
+  background-color: var(--myspace-blue);
   color: white;
   font-weight: bold;
-  padding: 5px;
-  font-size: 10pt;
+  padding: var(--myspace-spacing-sm);
+  font-size: var(--myspace-font-size-md);
   text-align: left;
 }
 
 .loading-body {
-  padding: 20px;
-  color: black !important;
-  font-size: 10pt;
+  padding: var(--myspace-spacing-xl);
+  color: var(--myspace-text) !important;
+  font-size: var(--myspace-font-size-md);
 }
 
 .loading-body p {
-  color: black !important;
+  color: var(--myspace-text) !important;
 }

@@ -55,16 +55,12 @@ export const MusicPage = () => {
   }, []);
 
   return (
-    <div className="music-page-container">
-      <div
-        className="music-header-area"
-        style={{ maxWidth: '992px', margin: '0 auto', width: '100%' }}
-      >
+    <div className="home-page-container mp-page-container">
+      <div className="home-wrapper mp-wrapper">
         <Navbar />
-      </div>
 
-      <div className="music-content">
-        <h2 className="section-header">Top Music on Wavlake (Last 7 Days)</h2>
+        <div className="home-content mp-content">
+          <h2 className="mp-section-header">Top Music on Wavlake (Last 7 Days)</h2>
 
         {!loading && tracks.length > 0 && (
           <div className="sticky-player-container">
@@ -127,6 +123,7 @@ export const MusicPage = () => {
             No tracks found right now. Check back later!
           </div>
         )}
+        </div>
       </div>
     </div>
   );

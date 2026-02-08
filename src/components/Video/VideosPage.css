@@ -1,39 +1,39 @@
-/* Videos Page Scoped Styles */
+/* Videos Page Scoped Styles - Uses design tokens from design-tokens.css */
 
 .vp-page-container {
-  background-color: #e5e5e5;
+  background-color: var(--myspace-bg);
   min-height: 100vh;
-  font-family: verdana, arial, sans-serif, helvetica;
+  font-family: var(--myspace-font-family);
 }
 
 /* Use the home-wrapper styles but ensure centering */
 .vp-wrapper {
-  max-width: 992px !important;
+  max-width: var(--myspace-container-width) !important;
   margin: 0 auto !important;
-  background-color: #ffffff;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+  background-color: var(--myspace-bg-content);
+  box-shadow: var(--myspace-shadow-md);
   min-height: 100vh;
   display: block !important;
   width: 100%;
 }
 
 .vp-content {
-  padding: 15px;
-  background-color: #ffffff;
-  border: 1px solid #ccc;
+  padding: var(--myspace-spacing-lg);
+  background-color: var(--myspace-bg-content);
+  border: 1px solid var(--myspace-border);
   border-top: none;
 }
 
 .vp-section-header {
-  margin: 10px 0 20px 0;
+  margin: var(--myspace-spacing-md) 0 var(--myspace-spacing-xl) 0;
   padding: 8px 12px;
-  background-color: #ff9933;
+  background-color: var(--myspace-orange);
   color: white;
-  font-size: 11pt;
+  font-size: var(--myspace-font-size-lg);
   font-weight: bold;
-  border: 1px solid #e68a00;
+  border: 1px solid var(--myspace-orange-hover);
   text-align: left;
-  border-radius: 4px;
+  border-radius: var(--myspace-border-radius-sm);
 }
 
 .vp-loading-state {
@@ -42,17 +42,17 @@
   align-items: center;
   justify-content: center;
   padding: 60px 20px;
-  color: #666;
+  color: var(--myspace-text-muted);
 }
 
 .vp-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #ff9933;
+  border: 4px solid var(--myspace-gray-100);
+  border-top: 4px solid var(--myspace-orange);
   border-radius: 50%;
   animation: vp-spin 1s linear infinite;
-  margin-bottom: 15px;
+  margin-bottom: var(--myspace-spacing-lg);
 }
 
 @keyframes vp-spin {
@@ -73,8 +73,8 @@
 }
 
 .vp-video-card {
-  background-color: white;
-  border: 1px solid #ddd;
+  background-color: var(--myspace-bg-content);
+  border: 1px solid var(--myspace-gray-300);
   padding: 8px;
   cursor: pointer;
   transition:
@@ -82,25 +82,24 @@
     box-shadow 0.2s;
   display: flex;
   flex-direction: column;
-  border-radius: 4px;
+  border-radius: var(--myspace-border-radius-sm);
   min-width: 0;
-  /* Critical for grid stability */
 }
 
 .vp-video-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-color: #ff9933;
+  box-shadow: var(--myspace-shadow-md);
+  border-color: var(--myspace-orange);
 }
 
 .vp-thumbnail-container {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background-color: #000;
+  background-color: var(--myspace-text);
   overflow: hidden;
-  border-radius: 2px;
-  margin-bottom: 10px;
+  border-radius: var(--myspace-border-radius-sm);
+  margin-bottom: var(--myspace-spacing-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -118,12 +117,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(45deg, #333, #000);
+  background: linear-gradient(45deg, var(--myspace-gray-700), var(--myspace-text));
 }
 
 .vp-play-icon {
   font-size: 40px;
-  color: #ff9933;
+  color: var(--myspace-orange);
   opacity: 0.8;
 }
 
@@ -145,9 +144,9 @@
 
 .vp-video-title {
   font-weight: bold;
-  font-size: 10pt;
-  color: #003399;
-  margin-bottom: 5px;
+  font-size: var(--myspace-font-size-md);
+  color: var(--myspace-link);
+  margin-bottom: var(--myspace-spacing-sm);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -158,13 +157,13 @@
 }
 
 .vp-video-author {
-  font-size: 8.5pt;
-  color: #666;
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-text-muted);
   text-decoration: none;
 }
 
 .vp-video-author:hover {
-  color: #ff9933;
+  color: var(--myspace-orange);
   text-decoration: underline;
 }
 
@@ -176,27 +175,27 @@
 }
 
 .vp-load-more-btn {
-  background-color: #ff9933;
+  background-color: var(--myspace-orange);
   color: white;
   border: none;
   padding: 12px 30px;
-  font-size: 11pt;
+  font-size: var(--myspace-font-size-lg);
   font-weight: bold;
-  border-radius: 4px;
+  border-radius: var(--myspace-border-radius-sm);
   cursor: pointer;
   transition:
     background-color 0.2s,
     transform 0.1s;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--myspace-shadow-sm);
 }
 
 .vp-load-more-btn:hover:not(:disabled) {
-  background-color: #e68a00;
+  background-color: var(--myspace-orange-hover);
   transform: translateY(-2px);
 }
 
 .vp-load-more-btn:disabled {
-  background-color: #ccc;
+  background-color: var(--myspace-border);
   cursor: not-allowed;
 }
 
@@ -225,40 +224,40 @@
 }
 
 .vp-modal-header {
-  padding: 15px 20px;
+  padding: var(--myspace-spacing-lg) var(--myspace-spacing-xl);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #333;
-  background: #222;
+  border-bottom: 1px solid var(--myspace-gray-700);
+  background: var(--myspace-gray-700);
 }
 
 .vp-modal-header h3 {
   margin: 0;
-  color: #fff;
+  color: white;
   font-size: 12pt;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 20px;
+  padding-right: var(--myspace-spacing-xl);
 }
 
 .vp-close-btn {
   background: none;
   border: none;
-  color: #999;
+  color: var(--myspace-text-light);
   font-size: 24pt;
   cursor: pointer;
   line-height: 1;
 }
 
 .vp-close-btn:hover {
-  color: #fff;
+  color: white;
 }
 
 .vp-modal-body {
   width: 100%;
-  background: #000;
+  background: var(--myspace-text);
   aspect-ratio: 16 / 9;
 }
 
@@ -269,22 +268,22 @@
 }
 
 .vp-modal-footer {
-  padding: 15px 20px;
+  padding: var(--myspace-spacing-lg) var(--myspace-spacing-xl);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #222;
+  background: var(--myspace-gray-700);
 }
 
 .vp-modal-author {
-  color: #ff9933;
+  color: var(--myspace-orange);
   text-decoration: none;
   font-weight: bold;
 }
 
 .vp-download {
-  color: #888;
-  font-size: 9pt;
+  color: var(--myspace-text-light);
+  font-size: var(--myspace-font-size-base);
   text-decoration: none;
 }
 

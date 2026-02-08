@@ -1,89 +1,99 @@
-/* MarketplacePage.css */
-.marketplace-container {
+/* MarketplacePage.css - Uses design tokens from design-tokens.css */
+
+.mkt-page-container {
+  background-color: var(--myspace-bg);
+  min-height: 100vh;
+  font-family: var(--myspace-font-family);
+  color: var(--myspace-text);
+}
+
+.mkt-wrapper {
+  max-width: var(--myspace-container-width) !important;
+  margin: 0 auto !important;
+  background-color: var(--myspace-bg-content);
+  box-shadow: var(--myspace-shadow-md);
+  min-height: 100vh;
+  display: block !important;
   width: 100%;
-  min-height: 100vh;
-  background-color: #e5e5e5;
-  /* MySpace gray background */
-  font-family: 'Verdana', 'Arial', sans-serif;
-  color: #000;
 }
 
-/* Wrapper to constrain width like the Landing Page */
-.marketplace-wrapper {
-  max-width: 992px;
-  margin: 0 auto;
-  background-color: #fff;
-  min-height: 100vh;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+.mkt-content {
+  padding: var(--myspace-spacing-lg);
+  background-color: var(--myspace-bg-content);
+  border: 1px solid var(--myspace-border);
+  border-top: none;
 }
 
-.marketplace-content {
-  max-width: 1000px;
-  /* Standard old-school width */
-  margin: 0 auto;
-  padding: 20px;
-  background-color: #fff;
-  border-left: 2px solid #666;
-  border-right: 2px solid #666;
+.mkt-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--myspace-spacing-lg);
+  flex-wrap: wrap;
+  gap: var(--myspace-spacing-md);
 }
 
-.section-header {
-  background-color: #ffcc99;
-  /* MySpace orange-y header */
-  color: #000;
-  font-size: 16px;
+.mkt-section-header {
+  margin: 0;
+  padding: var(--myspace-spacing-md) var(--myspace-spacing-md);
+  background-color: var(--myspace-orange);
+  color: white;
+  font-size: var(--myspace-font-size-lg);
   font-weight: bold;
-  padding: 5px 10px;
-  margin-bottom: 15px;
-  border: 1px solid #000;
+  border: 1px solid var(--myspace-orange-hover);
   text-align: left;
+  border-radius: var(--myspace-border-radius-sm);
+}
+
+.mkt-filters {
+  display: flex;
+  gap: var(--myspace-spacing-md);
 }
 
 .loading-spiral {
   text-align: center;
   padding: 50px;
   font-style: italic;
-  color: #666;
+  color: var(--myspace-text-muted);
 }
 
 .marketplace-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 15px;
+  gap: var(--myspace-spacing-lg);
 }
 
 @media (max-width: 768px) {
   .marketplace-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    gap: var(--myspace-spacing-md);
   }
 }
 
 .product-card {
-  border: 1px solid #ccc;
-  background-color: #fff;
-  padding: 10px;
+  border: 1px solid var(--myspace-border);
+  background-color: var(--myspace-bg-content);
+  padding: var(--myspace-spacing-md);
   text-align: center;
   transition: all 0.2s ease;
 }
 
 .product-card:hover {
-  border-color: #003399;
-  background-color: #f0f8ff;
+  border-color: var(--myspace-link);
+  background-color: var(--myspace-bg-alt);
   cursor: pointer;
 }
 
 .product-image-wrapper {
   width: 100%;
   height: 200px;
-  /* Fixed height for uniformity */
   overflow: hidden;
-  margin-bottom: 10px;
-  border: 1px solid #eee;
+  margin-bottom: var(--myspace-spacing-md);
+  border: 1px solid var(--myspace-gray-200);
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #000;
+  background-color: var(--myspace-text);
 }
 
 .product-image {
@@ -93,33 +103,30 @@
 }
 
 .product-info {
-  font-size: 11px;
-  /* Small MySpace font */
+  font-size: var(--myspace-font-size-lg);
 }
 
 .product-title {
-  font-size: 12px;
+  font-size: 12pt;
   font-weight: bold;
-  color: #003399;
-  /* Link blue */
-  margin: 5px 0;
+  color: var(--myspace-link);
+  margin: var(--myspace-spacing-sm) 0;
   height: 3em;
-  /* Limit to roughly 2 lines */
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .product-price {
   font-weight: bold;
-  color: #000;
-  margin-bottom: 5px;
+  color: var(--myspace-text);
+  margin-bottom: var(--myspace-spacing-sm);
 }
 
 .product-description {
-  color: #666;
+  color: var(--myspace-text-muted);
   height: 2.4em;
   overflow: hidden;
-  margin-top: 5px;
+  margin-top: var(--myspace-spacing-sm);
 }
 
 /* Modal Styles */
@@ -137,21 +144,21 @@
 }
 
 .marketplace-modal-content {
-  background: #fff;
+  background: var(--myspace-bg-content);
   width: 80%;
   max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
-  border: 3px solid #003399;
+  border: 3px solid var(--myspace-blue);
   padding: 0;
   position: relative;
-  font-family: 'Verdana', sans-serif;
+  font-family: var(--myspace-font-family);
 }
 
 .marketplace-modal-header {
-  background-color: #003399;
-  color: #fff;
-  padding: 10px;
+  background-color: var(--myspace-blue);
+  color: white;
+  padding: var(--myspace-spacing-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -161,17 +168,17 @@
 .close-modal-btn {
   background: none;
   border: none;
-  color: #fff;
+  color: white;
   font-size: 20px;
   cursor: pointer;
   font-weight: bold;
 }
 
 .marketplace-modal-body {
-  padding: 20px;
+  padding: var(--myspace-spacing-xl);
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: var(--myspace-spacing-xl);
 }
 
 .modal-image-container {
@@ -182,7 +189,7 @@
 
 .modal-image {
   max-width: 100%;
-  border: 1px solid #ccc;
+  border: 1px solid var(--myspace-border);
 }
 
 .modal-details {
@@ -192,68 +199,65 @@
 }
 
 .modal-title {
-  font-size: 18px;
-  color: #003399;
+  font-size: 18pt;
+  color: var(--myspace-link);
   margin-top: 0;
 }
 
 .modal-price {
-  font-size: 16px;
+  font-size: var(--myspace-font-size-2xl);
   font-weight: bold;
-  margin: 10px 0;
+  margin: var(--myspace-spacing-md) 0;
 }
 
 .modal-description {
-  font-size: 12px;
+  font-size: 12pt;
   line-height: 1.5;
-  margin-bottom: 20px;
+  margin-bottom: var(--myspace-spacing-xl);
 }
 
 .buy-button {
-  background-color: #ffcc99;
-  border: 2px solid #000;
-  padding: 10px 20px;
+  background-color: var(--myspace-orange);
+  border: 2px solid var(--myspace-orange-hover);
+  padding: var(--myspace-spacing-md) var(--myspace-spacing-xl);
   font-weight: bold;
   cursor: pointer;
-  font-family: 'Verdana', sans-serif;
+  font-family: var(--myspace-font-family);
   text-transform: uppercase;
-  font-size: 12px;
-  color: #000;
+  font-size: 12pt;
+  color: white;
   text-decoration: none;
   display: inline-block;
 }
 
-
 .buy-button:hover {
-  background-color: #fff;
+  background-color: var(--myspace-orange-hover);
 }
 
 .shopstr-button {
-  background-color: #003399;
-  border: 2px solid #000;
-  padding: 10px 20px;
+  background-color: var(--myspace-blue);
+  border: 2px solid var(--myspace-blue-dark);
+  padding: var(--myspace-spacing-md) var(--myspace-spacing-xl);
   font-weight: bold;
   cursor: pointer;
-  font-family: 'Verdana', sans-serif;
+  font-family: var(--myspace-font-family);
   text-transform: uppercase;
-  font-size: 12px;
-  color: #fff;
+  font-size: 12pt;
+  color: white;
   text-decoration: none;
   display: inline-block;
 }
 
 .shopstr-button:hover {
-  background-color: #fff;
-  color: #003399;
-  border-color: #003399;
+  background-color: var(--myspace-blue-hover);
 }
 
 .marketplace-filter-select {
-  padding: 5px;
-  border: 1px solid #000;
-  background: #fff;
-  color: #000;
-  font-family: 'Verdana', sans-serif;
+  padding: var(--myspace-spacing-sm);
+  border: 1px solid var(--myspace-border);
+  background: var(--myspace-bg-content);
+  color: var(--myspace-text);
+  font-family: var(--myspace-font-family);
 }
 
 @media (max-width: 768px) {
@@ -264,8 +268,8 @@
 
   .marketplace-modal-body {
     flex-direction: column;
-    padding: 15px;
-    gap: 15px;
+    padding: var(--myspace-spacing-lg);
+    gap: var(--myspace-spacing-lg);
   }
 
   .modal-image-container {
@@ -284,13 +288,13 @@
   }
 
   .modal-price {
-    font-size: 18px;
-    margin: 5px 0;
+    font-size: 18pt;
+    margin: var(--myspace-spacing-sm) 0;
   }
 
   .modal-description {
-    font-size: 13px;
-    margin-bottom: 15px;
+    font-size: 13pt;
+    margin-bottom: var(--myspace-spacing-lg);
   }
 
   .buy-button,
@@ -298,11 +302,15 @@
     width: 100%;
     box-sizing: border-box;
     text-align: center;
-    margin-bottom: 10px;
+    margin-bottom: var(--myspace-spacing-md);
   }
 
-  .modal-details>div[style*="display: flex"] {
+  .mkt-header-row {
     flex-direction: column;
-    gap: 5px !important;
+    align-items: stretch;
+  }
+
+  .mkt-section-header {
+    width: 100%;
   }
 }

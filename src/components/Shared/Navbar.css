@@ -1,31 +1,21 @@
-/* Navbar.css */
-:root {
-  --myspace-blue: #6699cc;
-  --myspace-dark-blue: #003399;
-  --myspace-orange: #ff9933;
-  --bg-gray: #e5e5e5;
-  --link-blue: #003399;
-  --myspace-light-blue: #d5e5f5;
-  --input-bg: #ffffff;
-}
+/* Navbar.css - Uses design tokens from design-tokens.css */
 
 /* Wrapper to contain the full header + nav */
 .navbar-wrapper {
   width: 100%;
-  background-color: white;
+  background-color: var(--myspace-bg-content);
 }
 
 /* --- Header Section (Logo, Title, Search) --- */
 .navbar-header {
-  padding: 15px 10px;
-  /* padding-top: calc(15px + env(safe-area-inset-top)); */
+  padding: var(--myspace-spacing-lg) var(--myspace-spacing-md);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  background-color: white;
-  gap: 15px;
-  max-width: 992px;
+  background-color: var(--myspace-bg-content);
+  gap: var(--myspace-spacing-lg);
+  max-width: var(--myspace-container-width);
   margin: 0 auto;
 }
 
@@ -46,7 +36,7 @@
 .logo-area h1 {
   font-size: 20pt;
   margin: 0;
-  color: var(--myspace-dark-blue);
+  color: var(--myspace-blue-dark);
   font-weight: bold;
   letter-spacing: -1px;
 }
@@ -66,12 +56,12 @@
 }
 
 .slogan {
-  font-size: 8.5pt;
-  color: var(--myspace-dark-blue);
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-blue-dark);
   font-weight: bold;
   font-style: italic;
   display: block;
-  margin-top: 5px;
+  margin-top: var(--myspace-spacing-sm);
 }
 
 .header-right {
@@ -88,12 +78,12 @@
 }
 
 .header-links {
-  font-size: 8.5pt;
-  color: #333;
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-gray-700);
 }
 
 .header-links a {
-  color: var(--myspace-dark-blue);
+  color: var(--myspace-blue-dark);
   text-decoration: none;
   font-weight: bold;
 }
@@ -111,24 +101,24 @@
 
 .header-search form {
   display: flex;
-  gap: 5px;
+  gap: var(--myspace-spacing-sm);
   align-items: center;
 }
 
 .header-search input {
-  padding: 3px;
-  font-size: 9pt;
-  border: 1px solid #ccc;
-  border-radius: 0;
-  color: black;
-  background-color: white;
+  padding: var(--myspace-spacing-xs);
+  font-size: var(--myspace-font-size-base);
+  border: 1px solid var(--myspace-border);
+  border-radius: var(--myspace-border-radius);
+  color: var(--myspace-text);
+  background-color: var(--myspace-bg-content);
   -webkit-appearance: none;
   appearance: none;
 }
 
 .powered-by {
-  font-size: 7pt;
-  color: #999;
+  font-size: var(--myspace-font-size-xs);
+  color: var(--myspace-text-light);
   margin-top: 2px;
   text-align: right;
 }
@@ -136,28 +126,27 @@
 .powered-by span {
   font-weight: bold;
   color: #660099;
-  /* Nostr purple-ish */
+  /* Nostr purple */
 }
 
 /* --- Blue Navigation Bar --- */
 .navbar-container {
-  background-color: #003399;
-  /* myspace-dark-blue */
-  padding: 3px 0;
+  background-color: var(--myspace-blue-dark);
+  padding: var(--myspace-spacing-xs) 0;
   text-align: center;
   color: white;
-  font-size: 8.5pt;
+  font-size: var(--myspace-font-size-sm);
   font-weight: bold;
   width: 100%;
   white-space: normal;
   line-height: 1.5;
-  font-family: verdana, arial, sans-serif, helvetica;
+  font-family: var(--myspace-font-family);
 }
 
 .navbar-container-inner {
-  max-width: 992px;
+  max-width: var(--myspace-container-width);
   margin: 0 auto;
-  padding: 0 10px;
+  padding: 0 var(--myspace-spacing-md);
 }
 
 .navbar-container a {

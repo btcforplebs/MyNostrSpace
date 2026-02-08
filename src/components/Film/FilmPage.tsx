@@ -194,12 +194,11 @@ export const FilmPage = () => {
   }, [fetchMovies, ndk]);
 
   return (
-    <div className="film-page-container">
-      <div className="film-header-area">
+    <div className="home-page-container fp-page-container">
+      <div className="home-wrapper fp-wrapper">
         <Navbar />
-      </div>
 
-      <div className="film-content">
+        <div className="home-content fp-content">
         <div
           className="fp-header-row"
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
@@ -241,6 +240,7 @@ export const FilmPage = () => {
             ))}
           </div>
         )}
+        </div>
       </div>
 
       {selectedMovie && (

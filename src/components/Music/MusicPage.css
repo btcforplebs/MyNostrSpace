@@ -1,72 +1,81 @@
-/* MySpace Music Page Styles */
+/* MusicPage.css - Uses design tokens from design-tokens.css */
 
-.music-page-container {
-  max-width: 992px;
+.mp-page-container {
+  background-color: var(--myspace-bg);
+  min-height: 100vh;
+  font-family: var(--myspace-font-family);
+}
+
+.mp-wrapper {
+  max-width: var(--myspace-container-width) !important;
+  margin: 0 auto !important;
+  background-color: var(--myspace-bg-content);
+  box-shadow: var(--myspace-shadow-md);
+  min-height: 100vh;
+  display: block !important;
   width: 100%;
-  margin: 0 auto;
-  background-color: #ffffff;
-  font-family: verdana, arial, sans-serif, helvetica;
-  font-size: 8pt;
 }
 
-.music-content {
-  padding: 10px;
+.mp-content {
+  padding: var(--myspace-spacing-lg);
+  background-color: var(--myspace-bg-content);
+  border: 1px solid var(--myspace-border);
+  border-top: none;
 }
 
-.section-header {
-  background-color: #ffcc99;
-  /* MySpace Orange */
-  color: #000000;
-  padding: 3px 5px;
-  margin-bottom: 10px;
-  font-size: 9pt;
+.mp-section-header {
+  margin: var(--myspace-spacing-md) 0 var(--myspace-spacing-xl) 0;
+  padding: var(--myspace-spacing-md) var(--myspace-spacing-md);
+  background-color: var(--myspace-orange);
+  color: white;
+  font-size: var(--myspace-font-size-lg);
   font-weight: bold;
-  border: 1px solid #000000;
+  border: 1px solid var(--myspace-orange-hover);
+  text-align: left;
+  border-radius: var(--myspace-border-radius-sm);
 }
 
 .sticky-player-container {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: white;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #ccc;
-  margin-bottom: 15px;
+  background: var(--myspace-bg-content);
+  padding-bottom: var(--myspace-spacing-md);
+  border-bottom: 1px solid var(--myspace-border);
+  margin-bottom: var(--myspace-spacing-lg);
 }
 
 .music-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px;
-  margin-bottom: 20px;
+  gap: var(--myspace-spacing-lg);
+  margin-bottom: var(--myspace-spacing-xl);
 }
 
 .music-card {
   text-align: center;
-  border: 1px solid #ccc;
-  padding: 10px;
-  background: #f9f9f9;
+  border: 1px solid var(--myspace-border);
+  padding: var(--myspace-spacing-md);
+  background: var(--myspace-gray-100);
   cursor: pointer;
-  transition:
-    transform 0.1s,
-    border-color 0.2s;
+  transition: transform 0.1s, border-color 0.2s;
   min-width: 0;
 }
 
 .music-card:hover {
   transform: translateY(-2px);
-  border-color: #003399;
+  border-color: var(--myspace-link);
 }
 
 .music-card.active-track {
-  border: 2px solid #ffcc99;
-  background-color: #fff8f0;
-  box-shadow: 0 0 5px rgba(255, 204, 153, 0.5);
+  border: 2px solid var(--myspace-orange);
+  background-color: var(--myspace-orange-light);
+  box-shadow: 0 0 5px rgba(255, 153, 51, 0.5);
 }
 
 .album-art-wrapper {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: var(--myspace-spacing-sm);
   position: relative;
 }
 
@@ -74,19 +83,19 @@
   width: 100%;
   aspect-ratio: 1/1;
   object-fit: cover;
-  border: 1px solid #000;
+  border: 1px solid var(--myspace-text);
 }
 
 .track-info {
-  margin-top: 5px;
+  margin-top: var(--myspace-spacing-sm);
 }
 
 .track-title {
   display: block;
   font-weight: bold;
-  color: #003399;
+  color: var(--myspace-link);
   text-decoration: none;
-  font-size: 8pt;
+  font-size: var(--myspace-font-size-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -94,8 +103,8 @@
 
 .track-artist {
   display: block;
-  color: #000;
-  font-size: 8pt;
+  color: var(--myspace-text);
+  font-size: var(--myspace-font-size-sm);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -104,13 +113,13 @@
 
 .track-title:hover {
   text-decoration: underline;
-  color: #cc0000;
+  color: var(--myspace-error);
 }
 
 @media (max-width: 768px) {
   .music-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: var(--myspace-spacing-md);
   }
 }
 
@@ -118,7 +127,7 @@
   .music-grid {
     display: flex !important;
     flex-direction: column !important;
-    gap: 8px;
+    gap: var(--myspace-spacing-md);
   }
 
   .music-card {
@@ -126,13 +135,13 @@
     flex-direction: row !important;
     align-items: center !important;
     text-align: left !important;
-    padding: 5px;
+    padding: var(--myspace-spacing-sm);
     height: 60px !important;
   }
 
   .album-art-wrapper {
     margin-bottom: 0 !important;
-    margin-right: 10px !important;
+    margin-right: var(--myspace-spacing-md) !important;
     flex-shrink: 0;
     width: 50px !important;
     height: 50px !important;
@@ -150,10 +159,10 @@
   }
 
   .track-title {
-    font-size: 9pt;
+    font-size: var(--myspace-font-size-md);
   }
 
   .track-artist {
-    font-size: 8pt;
+    font-size: var(--myspace-font-size-sm);
   }
 }

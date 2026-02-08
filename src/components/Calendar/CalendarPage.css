@@ -1,27 +1,26 @@
-/* Calendar Page Styles */
+/* CalendarPage.css - Uses design tokens from design-tokens.css */
 
 .calendar-page-wrapper {
-  max-width: 992px;
+  max-width: var(--myspace-container-width);
   width: 100%;
   margin: 0 auto;
-  background-color: #ffffff;
+  background-color: var(--myspace-bg-content);
   min-height: 100vh;
 }
 
 .calendar-container {
-  font-family: verdana, arial, sans-serif, helvetica;
-  padding: 20px;
-  color: #333333;
-  /* Explicitly set dark text */
+  font-family: var(--myspace-font-family);
+  padding: var(--myspace-spacing-xl);
+  color: var(--myspace-gray-700);
 }
 
 .calendar-header-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  background-color: #6699cc;
-  padding: 10px;
+  margin-bottom: var(--myspace-spacing-xl);
+  background-color: var(--myspace-blue);
+  padding: var(--myspace-spacing-md);
   color: white;
 }
 
@@ -31,38 +30,38 @@
 }
 
 .calendar-nav-btn {
-  background: #fff;
-  border: 1px solid #003399;
-  color: #003399;
+  background: var(--myspace-bg-content);
+  border: 1px solid var(--myspace-link);
+  color: var(--myspace-link);
   cursor: pointer;
-  padding: 5px 10px;
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
   font-weight: bold;
 }
 
 .calendar-nav-btn:hover {
-  background: #eef;
+  background: var(--myspace-bg-alt);
 }
 
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 1px;
-  background-color: #ccc;
-  border: 1px solid #ccc;
+  background-color: var(--myspace-border);
+  border: 1px solid var(--myspace-border);
 }
 
 .calendar-day-header {
-  background-color: #e5e5e5;
+  background-color: var(--myspace-bg);
   font-weight: bold;
   text-align: center;
-  padding: 10px 0;
-  font-size: 10pt;
+  padding: var(--myspace-spacing-md) 0;
+  font-size: var(--myspace-font-size-base);
 }
 
 .calendar-day-cell {
-  background-color: #fff;
+  background-color: var(--myspace-bg-content);
   min-height: 100px;
-  padding: 5px;
+  padding: var(--myspace-spacing-sm);
   position: relative;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -71,94 +70,94 @@
 }
 
 .calendar-day-cell:hover {
-  background-color: #f9f9f9;
+  background-color: var(--myspace-gray-100);
 }
 
 .calendar-day-cell.other-month {
-  background-color: #f0f0f0;
-  color: #999;
+  background-color: var(--myspace-gray-100);
+  color: var(--myspace-gray-500);
 }
 
 .calendar-day-cell.today {
   background-color: #ffffe0;
-  border: 1px solid #ffd700;
+  border: 1px solid var(--myspace-warning);
 }
 
 .calendar-day-cell.has-posts {
-  background-color: #e6f2ff;
+  background-color: var(--myspace-bg-alt);
 }
 
 .day-number {
   font-weight: bold;
-  margin-bottom: 5px;
-  font-size: 10pt;
+  margin-bottom: var(--myspace-spacing-sm);
+  font-size: var(--myspace-font-size-base);
 }
 
 .post-dot {
   width: 6px;
   height: 6px;
-  background-color: #003399;
+  background-color: var(--myspace-link);
   border-radius: 50%;
   display: inline-block;
   margin: 1px;
 }
 
 .post-preview-item {
-  font-size: 8pt;
-  color: #333;
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-gray-700);
   margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   background: rgba(102, 153, 204, 0.2);
   padding: 1px 3px;
-  border-radius: 2px;
+  border-radius: var(--myspace-border-radius-sm);
 }
 
 /* Selected Day View */
 .selected-day-view {
-  margin-top: 20px;
-  border: 1px solid #ccc;
-  padding: 15px;
-  background: #f9f9f9;
+  margin-top: var(--myspace-spacing-xl);
+  border: 1px solid var(--myspace-border);
+  padding: var(--myspace-spacing-lg);
+  background: var(--myspace-gray-100);
 }
 
 .selected-day-view h3 {
   margin-top: 0;
-  color: #003399;
-  border-bottom: 1px solid #ccc;
-  padding-bottom: 5px;
+  color: var(--myspace-link);
+  border-bottom: 1px solid var(--myspace-border);
+  padding-bottom: var(--myspace-spacing-sm);
 }
 
 .calendar-post-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--myspace-spacing-md);
 }
 
 .calendar-post-card {
-  border: 1px solid #ddd;
-  background: #fff;
-  padding: 10px;
+  border: 1px solid var(--myspace-gray-300);
+  background: var(--myspace-bg-content);
+  padding: var(--myspace-spacing-md);
 }
 
 .calendar-post-time {
-  font-size: 8pt;
-  color: #666;
-  margin-bottom: 5px;
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-text-muted);
+  margin-bottom: var(--myspace-spacing-sm);
   font-weight: bold;
 }
 
 .calendar-post-content {
-  font-size: 10pt;
+  font-size: var(--myspace-font-size-base);
   line-height: 1.4;
-  color: #333333;
+  color: var(--myspace-gray-700);
   word-break: break-word;
 }
 
 .calendar-post-content img,
 .calendar-post-content video {
-  margin-top: 10px;
+  margin-top: var(--myspace-spacing-md);
 }
 
 /* Responsive */
@@ -169,6 +168,5 @@
 
   .post-preview-item {
     display: none;
-    /* Hide text previews on mobile, keep dots? */
   }
 }

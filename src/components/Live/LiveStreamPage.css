@@ -1,10 +1,12 @@
+/* LiveStreamPage.css - Uses design tokens from design-tokens.css */
+
 .home-page-container {
-  background-color: #e5e5e5;
-  color: #000;
+  background-color: var(--myspace-bg);
+  color: var(--myspace-text);
 }
 
 .myspace-container * {
-  color: #000;
+  color: var(--myspace-text);
 }
 
 /* Override some specific elements that SHOULD be white */
@@ -15,7 +17,7 @@
 }
 
 .myspace-container a {
-  color: #003399;
+  color: var(--myspace-link);
 }
 
 /* Navbar links should be white on blue background */
@@ -26,42 +28,39 @@
 
 .myspace-container {
   min-height: 100vh;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--myspace-font-family);
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  /* Prevent horizontal scroll */
   max-width: 100vw;
   width: 100%;
 }
 
 .myspace-body {
   width: 100%;
-  max-width: 992px;
+  max-width: var(--myspace-container-width);
   margin: 0 auto;
-  background-color: white;
+  background-color: var(--myspace-bg-content);
   display: flex;
-  gap: 20px;
-  padding: 20px;
-  border-left: 1px solid #6699cc;
-  border-right: 1px solid #6699cc;
+  gap: var(--myspace-spacing-xl);
+  padding: var(--myspace-spacing-xl);
+  border-left: 1px solid var(--myspace-blue);
+  border-right: 1px solid var(--myspace-blue);
   box-sizing: border-box;
 }
 
 .col-left {
-  width: 300px;
+  width: var(--myspace-sidebar-width);
   flex-shrink: 0;
   min-width: 0;
-  /* Prevent flex blowout */
 }
 
 .col-right {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--myspace-spacing-xl);
   min-width: 0;
-  /* Prevent flex blowout */
 }
 
 /* Profile Box */
@@ -70,31 +69,31 @@
 }
 
 .profile-box h3 {
-  color: #ff6600;
+  color: var(--myspace-orange);
   margin-top: 0;
 }
 
 .profile-pic img {
   max-width: 100%;
-  border: 2px solid black;
+  border: 2px solid var(--myspace-text);
 }
 
 .status-badge {
   display: inline-block;
-  padding: 5px 10px;
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
   color: white;
   font-weight: bold;
-  margin: 10px 0;
-  border-radius: 4px;
+  margin: var(--myspace-spacing-md) 0;
+  border-radius: var(--myspace-border-radius-sm);
 }
 
 .status-badge.live {
-  background-color: red;
+  background-color: var(--myspace-error);
   animation: blink 2s infinite;
 }
 
 .status-badge.offline {
-  background-color: gray;
+  background-color: var(--myspace-offline);
 }
 
 @keyframes blink {
@@ -113,41 +112,38 @@
 
 /* Content Boxes */
 .content-box {
-  border: 1px solid #6699cc;
+  border: 1px solid var(--myspace-blue);
 }
 
 .box-header {
-  background-color: #ffcc99;
-  /* Classic MySpace Orange */
-  padding: 5px 10px;
-  border-bottom: 1px solid #6699cc;
+  background-color: var(--myspace-orange-light);
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  border-bottom: 1px solid var(--myspace-blue);
 }
 
 .box-header h2 {
   margin: 0;
-  color: #ff6600;
-  /* Darker Orange text */
+  color: var(--myspace-orange);
   font-size: 1.1rem;
 }
 
 .zap-button {
-  background-color: #ffcc99 !important;
-  color: #ff6600 !important;
-  margin-right: 5px;
+  background-color: var(--myspace-orange-light) !important;
+  color: var(--myspace-orange) !important;
+  margin-right: var(--myspace-spacing-sm);
   font-weight: bold;
 }
 
 .zap-button:hover {
-  background-color: #ffb366 !important;
+  background-color: var(--myspace-orange) !important;
 }
 
 /* Video Player */
 .video-player-wrapper {
   width: 100%;
   max-height: 80vh;
-  /* Strict max height on wrapper */
   aspect-ratio: 16/9;
-  background-color: black;
+  background-color: var(--myspace-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -155,31 +151,31 @@
 }
 
 .stream-summary {
-  padding: 10px;
-  font-size: 0.9rem;
+  padding: var(--myspace-spacing-md);
+  font-size: var(--myspace-font-size-base);
 }
 
 /* Chat Box */
 .chat-window {
   height: 400px;
   overflow-y: auto;
-  padding: 10px;
-  background-color: #ffffff;
-  border-bottom: 1px solid #ccc;
+  padding: var(--myspace-spacing-md);
+  background-color: var(--myspace-bg-content);
+  border-bottom: 1px solid var(--myspace-border);
 }
 
 .chat-message {
-  font-size: 0.9rem;
+  font-size: var(--myspace-font-size-base);
   margin-bottom: 6px;
   line-height: 1.4;
-  color: #333;
+  color: var(--myspace-gray-700);
 }
 
 .chat-author a {
   font-weight: bold;
-  color: #003399;
+  color: var(--myspace-link);
   text-decoration: none;
-  margin-right: 5px;
+  margin-right: var(--myspace-spacing-sm);
 }
 
 .chat-author a:hover {
@@ -187,76 +183,76 @@
 }
 
 .chat-time {
-  color: #999;
-  font-size: 0.8rem;
-  margin-left: 5px;
+  color: var(--myspace-text-light);
+  font-size: var(--myspace-font-size-sm);
+  margin-left: var(--myspace-spacing-sm);
 }
 
 .chat-input-area {
-  padding: 10px;
+  padding: var(--myspace-spacing-md);
   display: flex;
-  gap: 10px;
-  background-color: #ffffff;
+  gap: var(--myspace-spacing-md);
+  background-color: var(--myspace-bg-content);
   box-sizing: border-box;
   max-width: 100%;
 }
 
 .chat-input-area input {
   flex-grow: 1;
-  padding: 5px;
+  padding: var(--myspace-spacing-sm);
   min-width: 0;
   box-sizing: border-box;
 }
 
 .chat-input-area button,
 .post-button {
-  background-color: #6699cc;
+  background-color: var(--myspace-blue);
   color: white;
-  border: 1px solid black;
+  border: 1px solid var(--myspace-text);
   padding: 4px 12px;
   cursor: pointer;
-  font-family: verdana, arial, sans-serif;
-  font-size: 9pt;
+  font-family: var(--myspace-font-family);
+  font-size: var(--myspace-font-size-base);
   font-weight: bold;
 }
 
 .chat-input-area button:hover,
 .post-button:hover {
-  background-color: #537ca5;
+  background-color: var(--myspace-blue-hover);
 }
 
 .chat-input-area button:disabled,
 .post-button:disabled {
-  background-color: #ccc;
-  color: #666;
+  background-color: var(--myspace-border);
+  color: var(--myspace-text-muted);
   cursor: not-allowed;
 }
 
 .myspace-footer {
   text-align: center;
-  padding: 20px;
-  color: #666;
-  font-size: 0.8rem;
-  background-color: white;
+  padding: var(--myspace-spacing-xl);
+  color: var(--myspace-text-muted);
+  font-size: var(--myspace-font-size-sm);
+  background-color: var(--myspace-bg-content);
   width: 100%;
-  max-width: 992px;
+  max-width: var(--myspace-container-width);
   margin: 0 auto;
-  border: 1px solid #6699cc;
+  border: 1px solid var(--myspace-blue);
   border-top: none;
   box-sizing: border-box;
 }
 
 .myspace-footer a {
-  color: #003399;
+  color: var(--myspace-link);
   text-decoration: none;
-  margin: 0 5px;
+  margin: 0 var(--myspace-spacing-sm);
 }
 
 /* Skeleton Loader */
 .skeleton-loader {
   width: 100%;
   height: 100%;
-  background-color: #222;
+  background-color: var(--myspace-gray-700);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -271,7 +267,7 @@
   height: 40px;
   border: 4px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
-  border-top-color: #fff;
+  border-top-color: white;
   animation: spin 1s ease-in-out infinite;
 }
 
@@ -288,21 +284,19 @@
     width: 100%;
     margin: 0;
     border: none;
-    padding: 10px;
+    padding: var(--myspace-spacing-md);
     box-sizing: border-box;
   }
 
   .col-left {
     width: 100%;
     order: 1;
-    /* Profile on top */
-    margin-bottom: 20px;
+    margin-bottom: var(--myspace-spacing-xl);
   }
 
   .col-right {
     width: 100%;
     order: 2;
-    /* Video/Chat below */
   }
 
   .profile-box {
@@ -310,23 +304,22 @@
     flex-wrap: wrap;
     align-items: flex-start;
     text-align: left;
-    gap: 15px;
-    padding: 15px;
-    background: #f8f8f8;
-    border: 1px solid #6699cc;
+    gap: var(--myspace-spacing-lg);
+    padding: var(--myspace-spacing-lg);
+    background: var(--myspace-gray-100);
+    border: 1px solid var(--myspace-blue);
     box-sizing: border-box;
   }
 
   .profile-box h3 {
     width: 100%;
-    margin: 0 0 10px 0;
+    margin: 0 0 var(--myspace-spacing-md) 0;
     font-size: 1.2rem;
-    color: #ff6600;
+    color: var(--myspace-orange);
   }
 
   .profile-pic {
     width: 60px;
-    /* Smaller pic as requested */
     flex-shrink: 0;
   }
 
@@ -334,8 +327,8 @@
     width: 60px;
     height: 60px;
     object-fit: cover;
-    border: 1px solid black;
-    border-radius: 4px;
+    border: 1px solid var(--myspace-text);
+    border-radius: var(--myspace-border-radius-sm);
   }
 
   .profile-details {
@@ -345,9 +338,9 @@
 
   .profile-details p {
     margin: 0 0 8px 0;
-    font-size: 0.85rem;
+    font-size: var(--myspace-font-size-sm);
     line-height: 1.4;
-    color: #333;
+    color: var(--myspace-gray-700);
   }
 
   .online-status {
@@ -355,9 +348,9 @@
   }
 
   .status-badge {
-    margin: 5px 0;
-    font-size: 0.75rem;
-    padding: 3px 8px;
+    margin: var(--myspace-spacing-sm) 0;
+    font-size: var(--myspace-font-size-xs);
+    padding: var(--myspace-spacing-xs) 8px;
   }
 
   .video-player-wrapper {

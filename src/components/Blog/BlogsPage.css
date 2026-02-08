@@ -1,51 +1,51 @@
-/* Blogs Index Page Scoped Styles */
+/* BlogsPage.css - Uses design tokens from design-tokens.css */
 
 .bp-page-container {
-  background-color: #e5e5e5;
+  background-color: var(--myspace-bg);
   min-height: 100vh;
-  font-family: verdana, arial, sans-serif, helvetica;
+  font-family: var(--myspace-font-family);
 }
 
 .bp-wrapper {
-  max-width: 992px !important;
+  max-width: var(--myspace-container-width) !important;
   margin: 0 auto !important;
-  background-color: #ffffff;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+  background-color: var(--myspace-bg-content);
+  box-shadow: var(--myspace-shadow-md);
   min-height: 100vh;
   display: block !important;
 }
 
 .bp-content {
-  padding: 15px;
-  background-color: #ffffff;
-  border: 1px solid #ccc;
+  padding: var(--myspace-spacing-lg);
+  background-color: var(--myspace-bg-content);
+  border: 1px solid var(--myspace-border);
   border-top: none;
 }
 
 .bp-section-header {
-  margin: 10px 0 20px 0;
-  padding: 8px 12px;
-  background-color: #ff9933;
+  margin: var(--myspace-spacing-md) 0 var(--myspace-spacing-xl) 0;
+  padding: var(--myspace-spacing-md) var(--myspace-spacing-md);
+  background-color: var(--myspace-orange);
   color: white;
   font-size: 11pt;
   font-weight: bold;
-  border: 1px solid #e68a00;
+  border: 1px solid var(--myspace-orange-hover);
   text-align: left;
-  border-radius: 4px;
+  border-radius: var(--myspace-border-radius-sm);
 }
 
 .bp-grid {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: var(--myspace-spacing-lg);
 }
 
 .bp-card {
-  border: 1px solid #cccccc;
-  background-color: #f9f9f9;
-  padding: 10px;
+  border: 1px solid var(--myspace-border);
+  background-color: var(--myspace-gray-100);
+  padding: var(--myspace-spacing-md);
   display: flex;
-  gap: 10px;
+  gap: var(--myspace-spacing-md);
 }
 
 .bp-card-left {
@@ -58,14 +58,14 @@
   width: 70px;
   height: 70px;
   object-fit: cover;
-  border: 1px solid #999;
+  border: 1px solid var(--myspace-gray-500);
 }
 
 .bp-author-name {
   display: block;
-  margin-top: 5px;
-  font-size: 8pt;
-  color: #003399;
+  margin-top: var(--myspace-spacing-sm);
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-link);
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -79,37 +79,37 @@
 
 .bp-card-title {
   font-weight: bold;
-  font-size: 10pt;
-  margin-bottom: 5px;
+  font-size: var(--myspace-font-size-base);
+  margin-bottom: var(--myspace-spacing-sm);
 }
 
 .bp-card-title a {
-  color: #003399;
+  color: var(--myspace-link);
   text-decoration: none;
 }
 
 .bp-card-title a:hover {
   text-decoration: underline;
-  color: #cc0000;
+  color: var(--myspace-error);
 }
 
 .bp-card-meta {
-  font-size: 8pt;
-  color: #666;
-  margin-bottom: 5px;
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-text-muted);
+  margin-bottom: var(--myspace-spacing-sm);
 }
 
 .bp-card-snippet {
-  font-size: 9pt;
+  font-size: var(--myspace-font-size-md);
   line-height: 1.4;
-  color: #333;
+  color: var(--myspace-gray-700);
 }
 
 .bp-read-more {
-  font-size: 8pt;
-  color: #cc0000;
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-error);
   text-decoration: none;
-  margin-left: 5px;
+  margin-left: var(--myspace-spacing-sm);
 }
 
 @media (max-width: 992px) {

@@ -278,29 +278,15 @@ export const MarketplacePage = () => {
   });
 
   return (
-    <div className="marketplace-container">
-      <div className="marketplace-wrapper">
+    <div className="home-page-container mkt-page-container">
+      <div className="home-wrapper mkt-wrapper">
         <Navbar />
 
-        <div className="marketplace-content">
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '15px',
-              flexWrap: 'wrap',
-              gap: '10px',
-            }}
-          >
-            <h2
-              className="section-header"
-              style={{ marginBottom: 0, border: 'none', background: 'none', padding: 0 }}
-            >
-              Community Marketplace
-            </h2>
+        <div className="home-content mkt-content">
+          <div className="mkt-header-row">
+            <h2 className="mkt-section-header">Community Marketplace</h2>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div className="mkt-filters">
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
@@ -314,8 +300,6 @@ export const MarketplacePage = () => {
               </select>
             </div>
           </div>
-
-          <div style={{ borderBottom: '1px solid #000', marginBottom: '15px' }}></div>
 
           {loading && products.length === 0 ? (
             <div className="loading-spiral">Loading latest wares...</div>

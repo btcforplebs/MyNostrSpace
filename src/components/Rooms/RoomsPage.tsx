@@ -43,7 +43,13 @@ export const RoomsPage = () => {
     const [newRoomStatus, setNewRoomStatus] = useState<'live' | 'planned'>('live');
     const [newRoomStarts, setNewRoomStarts] = useState<string>('');
     const [newRoomTags, setNewRoomTags] = useState('');
-    const [newRoomService, setNewRoomService] = useState<'nests' | 'hivetalk'>('nests');
+    // Relay list for room event publishing (major relays + user's connected relays)
+    const ROOM_RELAYS = [
+        'wss://relay.damus.io',
+        'wss://relay.primal.net',
+        'wss://nos.lol',
+        'wss://relay.nostr.band',
+    ];
 
     const roomBufferRef = useRef<AudioRoom[]>([]);
     const isUpdatePendingRef = useRef(false);
@@ -259,8 +265,10 @@ export const RoomsPage = () => {
                 ['a', `${room.kind}:${room.pubkey}:${room.dTag}`]
             ];
 
-            console.log('Publishing deletion event...', event);
-            await event.publish();
+            const connectedRelays = ndk.pool.connectedRelays().map(r => r.url);
+            const allRelays = [...new Set([...ROOM_RELAYS, ...connectedRelays])];
+            console.log('Publishing deletion event to relays:', allRelays);
+            await event.publish(NDKRelaySet.fromRelayUrls(allRelays, ndk));
             console.log('Deletion published.');
 
             alert('Room kill signal sent.');
@@ -288,102 +296,62 @@ export const RoomsPage = () => {
         setIsCreating(true);
 
         try {
-            if (newRoomService === 'hivetalk') {
-                // HiveTalk: Generate random room ID and redirect to HiveTalk
-                const roomId = crypto.randomUUID().slice(0, 8);
-                const hiveTalkUrl = `https://vanilla.hivetalk.org/join/${roomId}`;
-                const unixNow = Math.floor(Date.now() / 1000);
-                let startTimestamp = unixNow;
+            // Collect all relays: hardcoded major relays + user's connected relays
+            const connectedRelays = ndk.pool.connectedRelays().map(r => r.url);
+            const allRelays = [...new Set([...ROOM_RELAYS, ...connectedRelays])];
 
-                if (newRoomStatus === 'planned' && newRoomStarts) {
-                    startTimestamp = Math.floor(new Date(newRoomStarts).getTime() / 1000);
-                }
+            // 1. Provision room via Nostr Nests API (pass relays so Nests monitors them)
+            const nest = await NestsApi.createNest(loggedInUser, {
+                relays: allRelays,
+                hls_stream: true
+            });
 
-                const tags = [
-                    ['d', roomId],
-                    ['title', newRoomTitle],
-                    ['summary', newRoomSummary],
-                    ['status', newRoomStatus === 'live' ? 'live' : 'planned'],
-                    ['starts', startTimestamp.toString()],
-                    ['service', 'https://vanilla.hivetalk.org'],
-                    ['streaming', hiveTalkUrl],
-                    ['t', 'video'],
-                    ['t', 'audio'],
-                    ['p', loggedInUser.pubkey, '', 'Host']
-                ];
+            console.log('Nest created:', nest);
 
-                if (newRoomImage) tags.push(['image', newRoomImage]);
+            // 2. Publish Kind 30312 Event
+            const roomId = nest.roomId;
+            const unixNow = Math.floor(Date.now() / 1000);
+            let startTimestamp = unixNow;
 
-                // Process hashtags
-                const userTags = newRoomTags.split(',').map(t => t.trim()).filter(t => t);
-                userTags.forEach(t => tags.push(['t', t]));
-
-                const event = new NDKEvent(ndk);
-                event.kind = 30311; // Use Kind 30311 for HiveTalk (standard live activity)
-                event.tags = tags;
-
-                const relays = ['wss://relay.damus.io', 'wss://relay.primal.net', ...ndk.pool.connectedRelays().map(r => r.url)];
-                await event.publish(NDKRelaySet.fromRelayUrls(relays, ndk));
-
-                console.log('HiveTalk room event published:', roomId);
-                alert('Room created! Opening HiveTalk...');
-                window.open(hiveTalkUrl, '_blank');
-                navigate(`/room/${loggedInUser.pubkey}/${roomId}`);
-            } else {
-                // 1. Provision room via Nostr Nests API
-                const nest = await NestsApi.createNest(loggedInUser, {
-                    relays: loggedInUser.ndk?.pool.connectedRelays().map(r => r.url) || [],
-                    hls_stream: true
-                });
-
-                console.log('Nest created:', nest);
-
-                // 2. Publish Kind 30312 Event
-                const roomId = nest.roomId;
-                const unixNow = Math.floor(Date.now() / 1000);
-                let startTimestamp = unixNow;
-
-                if (newRoomStatus === 'planned' && newRoomStarts) {
-                    startTimestamp = Math.floor(new Date(newRoomStarts).getTime() / 1000);
-                }
-
-                const tags = [
-                    ['d', roomId],
-                    ['title', newRoomTitle],
-                    ['summary', newRoomSummary],
-                    ['status', newRoomStatus === 'live' ? 'open' : 'closed'], // Nests requires 'open', 'private', or 'closed'
-                    ['starts', startTimestamp.toString()],
-                    ['service', 'https://nostrnests.com/api/v1/nests'], // Use Nests API identifier
-                    ['t', 'audio'],
-                    ['room', newRoomTitle], // Nests convention
-                    ['p', loggedInUser.pubkey, '', 'Host']
-                ];
-
-                if (newRoomImage) tags.push(['image', newRoomImage]);
-
-                // Add stream URLs (Prioritize m3u8)
-                const hlsEndpoint = nest.endpoints.find(u => u.includes('.m3u8'));
-                if (hlsEndpoint) tags.push(['streaming', hlsEndpoint]);
-
-                // Add other endpoints as backup
-                nest.endpoints.filter(u => !u.includes('.m3u8')).forEach(url => tags.push(['streaming', url]));
-
-                // Process hashtags
-                const userTags = newRoomTags.split(',').map(t => t.trim()).filter(t => t);
-                userTags.forEach(t => tags.push(['t', t]));
-                const event = new NDKEvent(ndk);
-                event.kind = 30312; // Use Kind 30312 (Nostr Nests Standard)
-                event.tags = tags;
-
-                // Critical: Publish to global relays. Note: relay.nostrnests.com is currently offline/invalid
-                const relays = ['wss://relay.damus.io', 'wss://relay.primal.net', ...ndk.pool.connectedRelays().map(r => r.url)];
-
-                await event.publish(NDKRelaySet.fromRelayUrls(relays, ndk));
-                console.log('Room event published to Nests & Global Relays:', roomId);
-
-                alert('Room created! Redirecting you to start broadcasting...');
-                navigate(`/room/${loggedInUser.pubkey}/${roomId}`);
+            if (newRoomStatus === 'planned' && newRoomStarts) {
+                startTimestamp = Math.floor(new Date(newRoomStarts).getTime() / 1000);
             }
+
+            const tags = [
+                ['d', roomId],
+                ['title', newRoomTitle],
+                ['summary', newRoomSummary],
+                ['status', newRoomStatus === 'live' ? 'open' : 'closed'],
+                ['starts', startTimestamp.toString()],
+                ['service', 'https://nostrnests.com/api/v1/nests'],
+                ['t', 'audio'],
+                ['room', newRoomTitle],
+                ['p', loggedInUser.pubkey, '', 'Host']
+            ];
+
+            if (newRoomImage) tags.push(['image', newRoomImage]);
+
+            // Add stream URLs (Prioritize m3u8)
+            const hlsEndpoint = nest.endpoints.find(u => u.includes('.m3u8'));
+            if (hlsEndpoint) tags.push(['streaming', hlsEndpoint]);
+
+            // Add other endpoints as backup
+            nest.endpoints.filter(u => !u.includes('.m3u8')).forEach(url => tags.push(['streaming', url]));
+
+            // Process hashtags
+            const userTags = newRoomTags.split(',').map(t => t.trim()).filter(t => t);
+            userTags.forEach(t => tags.push(['t', t]));
+
+            const event = new NDKEvent(ndk);
+            event.kind = 30312;
+            event.tags = tags;
+
+            await event.publish(NDKRelaySet.fromRelayUrls(allRelays, ndk));
+            console.log('Room event published to relays:', allRelays, roomId);
+
+            alert('Room created! Redirecting you to start broadcasting...');
+            navigate(`/room/${loggedInUser.pubkey}/${roomId}`);
+
             setShowCreateModal(false);
             setNewRoomTitle('');
             setNewRoomSummary('');
@@ -391,7 +359,6 @@ export const RoomsPage = () => {
             setNewRoomStatus('live');
             setNewRoomStarts('');
             setNewRoomTags('');
-            setNewRoomService('nests');
         } catch (e) {
             console.error('Error creating room:', e);
             alert('Failed to create room. Please try again.');
@@ -572,18 +539,6 @@ export const RoomsPage = () => {
                         </div>
 
                         <div className="create-room-modal-content">
-                            <div style={{ marginBottom: '10px' }}>
-                                <label style={{ display: 'block', fontSize: '0.9em', fontWeight: 'bold' }}>Service</label>
-                                <select
-                                    value={newRoomService}
-                                    onChange={(e) => setNewRoomService(e.target.value as 'nests' | 'hivetalk')}
-                                    style={{ width: '100%', padding: '5px' }}
-                                >
-                                    <option value="nests">Nostr Nests (Audio Only)</option>
-                                    <option value="hivetalk">HiveTalk (Video + Audio)</option>
-                                </select>
-                            </div>
-
                             <div style={{ marginBottom: '10px' }}>
                                 <label style={{ display: 'block', fontSize: '0.9em', fontWeight: 'bold' }}>Room Title *</label>
                                 <input

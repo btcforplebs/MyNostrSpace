@@ -222,24 +222,149 @@
     width: 100%;
 }
 
-/* HiveTalk Iframe */
-.hivetalk-iframe-container {
+/* LiveKit Room */
+.lk-room-container {
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 15px;
 }
 
-.hivetalk-iframe {
+.broadcast-indicator {
+    color: #cc0000;
+    font-weight: bold;
+    font-size: 12pt;
+    margin-bottom: 5px;
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.participants-section {
     width: 100%;
-    height: 500px;
-    border: none;
+}
+
+.participants-label {
+    font-weight: bold;
+    font-size: 10pt;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    padding-left: 5px;
+}
+
+.participants-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+}
+
+.participant-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 10px;
+    background: white;
+    border: 2px solid #ddd;
     border-radius: 8px;
-    background: #000;
+    min-width: 90px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.participant-card.speaking {
+    border-color: var(--myspace-orange, #ff9933);
+    box-shadow: 0 0 8px rgba(255, 153, 51, 0.4);
+}
+
+.participant-card.small {
+    min-width: 70px;
+    padding: 6px;
+}
+
+.participant-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #eee;
+}
+
+.participant-avatar.small {
+    width: 40px;
+    height: 40px;
+}
+
+.participant-name {
+    font-size: 9pt;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.participant-status {
+    font-size: 14pt;
+}
+
+.mic-toggle-btn {
+    background: var(--myspace-orange, #ff9933);
+    color: black;
+    border: 2px solid #cc6600;
+    padding: 8px 20px;
+    font-weight: bold;
+    font-size: 11pt;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.mic-toggle-btn.muted {
+    background: #ccc;
+    border-color: #999;
+}
+
+.mic-toggle-btn:hover {
+    opacity: 0.85;
+}
+
+.leave-btn {
+    background: #cc0000;
+    color: white;
+    border: 2px solid #990000;
+    padding: 6px 18px;
+    font-weight: bold;
+    font-size: 10pt;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+
+.leave-btn:hover {
+    background: #aa0000;
+}
+
+.room-summary {
+    padding: 10px 20px;
+    color: #555;
+    font-size: 10pt;
 }
 
 @media (max-width: 768px) {
-    .hivetalk-iframe {
-        height: 350px;
+    .participant-card {
+        min-width: 75px;
+        padding: 8px;
+    }
+
+    .participant-avatar {
+        width: 45px;
+        height: 45px;
     }
 }

@@ -260,19 +260,14 @@ export const VideoRoomPage = () => {
                                                 </a>
                                             </div>
                                         ) : (
-                                            <div className="hivetalk-join-container">
-                                                <p>This video room is hosted on HiveTalk.</p>
-                                                <a
-                                                    href={streamUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="myspace-button hivetalk-join-btn"
-                                                >
-                                                    🎥 Join Video Room in HiveTalk
-                                                </a>
-                                                <p className="hivetalk-note">
-                                                    Opens in a new tab with full video/audio capabilities.
-                                                </p>
+                                            <div style={{ width: '100%', height: '600px' }}>
+                                                <iframe
+                                                    src={streamUrl}
+                                                    style={{ width: '100%', height: '100%', border: 'none', borderRadius: '8px' }}
+                                                    allow="camera; microphone; display-capture; autoplay; clipboard-write"
+                                                    allowFullScreen
+                                                    title="Video Room"
+                                                />
                                             </div>
                                         )}
                                     </>

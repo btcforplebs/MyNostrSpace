@@ -189,12 +189,8 @@ export const VideoRoomsPage = () => {
     };
 
     const handleJoinRoom = (room: VideoRoom) => {
-        if (room.streaming) {
-            window.open(room.streaming, '_blank');
-        } else {
-            // Navigate to internal video room page
-            navigate(`/videoroom/${room.pubkey}/${room.dTag}`);
-        }
+        // Always navigate to internal video room page (iframe embed)
+        navigate(`/videoroom/${room.pubkey}/${room.dTag}`);
     };
 
     const handleCreateRoom = async () => {
@@ -245,12 +241,13 @@ export const VideoRoomsPage = () => {
             await event.publish(NDKRelaySet.fromRelayUrls(relays, ndk));
 
             console.log('Video room event published:', roomId);
-            alert('Video Room created! Opening VDO.ninja...\n\n✅ No server bandwidth needed - Peer-to-peer video!');
-            window.open(vdoNinjaUrl, '_blank');
 
             setShowCreateModal(false);
             setNewRoomTitle('');
             setNewRoomSummary('');
+
+            // Navigate to internal video room page (VDO.ninja embedded as iframe)
+            navigate(`/videoroom/${loggedInUser.pubkey}/${roomId}`);
         } catch (e) {
             console.error('Error creating video room:', e);
             alert('Failed to create video room. Please try again.');

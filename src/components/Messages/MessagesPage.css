@@ -1,0 +1,319 @@
+.messages-wrapper {
+  max-width: var(--myspace-container-width);
+  margin: 0 auto;
+  background-color: var(--myspace-bg-content);
+  box-shadow: var(--myspace-shadow-md);
+  min-height: 100vh;
+}
+
+.messages-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 60px);
+  background-color: var(--myspace-bg-content);
+  font-family: var(--myspace-font-family);
+}
+
+.messages-page-not-logged-in {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: var(--myspace-font-family);
+}
+
+.not-logged-in-message {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--myspace-text-light);
+  text-align: center;
+}
+
+.not-logged-in-message p {
+  margin: 0;
+  font-size: var(--myspace-font-size-md);
+}
+
+.messages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--myspace-spacing-xl);
+  border-bottom: 1px solid var(--myspace-border);
+  background-color: var(--myspace-bg-content);
+  flex-shrink: 0;
+}
+
+.messages-header h1 {
+  margin: 0;
+  font-size: var(--myspace-font-size-2xl);
+  color: var(--myspace-text);
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: var(--myspace-spacing-md);
+  font-family: var(--myspace-font-family);
+}
+
+.unread-badge {
+  background-color: var(--myspace-error);
+  color: white;
+  padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
+  border-radius: 12px;
+  font-size: var(--myspace-font-size-sm);
+  font-weight: bold;
+}
+
+.messages-header-buttons {
+  display: flex;
+  gap: var(--myspace-spacing-md);
+  align-items: center;
+}
+
+.read-all-btn {
+  padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
+  background-color: var(--myspace-gray-200);
+  color: var(--myspace-text);
+  border: 1px solid var(--myspace-border);
+  border-radius: var(--myspace-border-radius-sm);
+  cursor: pointer;
+  font-size: var(--myspace-font-size-sm);
+  font-weight: bold;
+  transition: background-color 0.2s;
+  font-family: var(--myspace-font-family);
+}
+
+.read-all-btn:hover {
+  background-color: var(--myspace-gray-300);
+}
+
+.new-message-btn {
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  background-color: var(--myspace-blue);
+  color: white;
+  border: 1px solid var(--myspace-blue-hover);
+  border-radius: var(--myspace-border-radius-sm);
+  cursor: pointer;
+  font-size: var(--myspace-font-size-md);
+  font-weight: bold;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+  font-family: var(--myspace-font-family);
+}
+
+.new-message-btn:hover {
+  background-color: var(--myspace-blue-hover);
+}
+
+.conversation-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  gap: var(--myspace-spacing-lg);
+  padding: var(--myspace-spacing-lg) var(--myspace-spacing-xl);
+  border-bottom: 1px solid var(--myspace-gray-100);
+  cursor: pointer;
+  transition: background-color 0.15s;
+  user-select: none;
+  background-color: var(--myspace-bg-content);
+}
+
+.conversation-item:hover {
+  background-color: var(--myspace-bg-alt);
+}
+
+.conversation-item:active {
+  background-color: var(--myspace-gray-200);
+}
+
+.conversation-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--myspace-border);
+}
+
+.conversation-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.conversation-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--myspace-spacing-lg);
+  margin-bottom: var(--myspace-spacing-xs);
+}
+
+.conversation-name {
+  margin: 0;
+  font-size: var(--myspace-font-size-lg);
+  font-weight: bold;
+  color: var(--myspace-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--myspace-font-family);
+}
+
+.conversation-time {
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-text-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.conversation-preview {
+  margin: 0;
+  font-size: var(--myspace-font-size-base);
+  color: var(--myspace-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.unread-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--myspace-spacing-md);
+  flex-shrink: 0;
+}
+
+.unread-count {
+  background-color: var(--myspace-error);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--myspace-font-size-xs);
+  font-weight: bold;
+}
+
+.loading-state,
+.error-state,
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--myspace-text-light);
+  text-align: center;
+  padding: var(--myspace-spacing-xl);
+}
+
+.loading-state p,
+.error-state p,
+.empty-state p {
+  margin: 0 0 var(--myspace-spacing-xl) 0;
+  font-size: var(--myspace-font-size-md);
+}
+
+.error-state {
+  color: var(--myspace-error);
+}
+
+.start-conversation-btn {
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  background-color: var(--myspace-blue);
+  color: white;
+  border: 1px solid var(--myspace-blue-hover);
+  border-radius: var(--myspace-border-radius-sm);
+  cursor: pointer;
+  font-size: var(--myspace-font-size-md);
+  font-weight: bold;
+  transition: background-color 0.2s;
+  font-family: var(--myspace-font-family);
+}
+
+.start-conversation-btn:hover {
+  background-color: var(--myspace-blue-hover);
+}
+
+@media (max-width: 768px) {
+  .messages-header {
+    padding: 12px;
+  }
+
+  .messages-header h1 {
+    font-size: 20px;
+  }
+
+  .new-message-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+
+  .conversation-item {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .conversation-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .conversation-name {
+    font-size: 14px;
+  }
+
+  .conversation-preview {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .messages-header {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .messages-header h1 {
+    font-size: 18px;
+    margin: 0;
+  }
+
+  .new-message-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .conversation-item {
+    padding: 8px 10px;
+    gap: 10px;
+  }
+
+  .conversation-avatar {
+    width: 40px;
+    height: 40px;
+  }
+
+  .conversation-name {
+    font-size: 13px;
+  }
+
+  .conversation-preview {
+    font-size: 12px;
+  }
+
+  .unread-count {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+}

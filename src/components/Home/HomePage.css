@@ -443,44 +443,15 @@
   color: var(--myspace-text-muted);
 }
 
-.notification-reply-content {
-  background: var(--myspace-light-blue-pale);
-  padding: 8px;
-  border-radius: var(--myspace-border-radius-sm);
-  font-size: var(--myspace-font-size-base);
-  color: var(--myspace-gray-700);
-  margin-top: 4px;
-  overflow-wrap: break-word;
-  word-wrap: break-word;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.notification-reply-content img {
-  max-width: 100%;
-  max-height: 100px;
-  border-radius: 4px;
-}
-
-.notification-parent-snippet {
+.notification-reply-preview {
   color: var(--myspace-text-light);
   font-size: var(--myspace-font-size-sm);
-  font-style: italic;
   padding-left: 8px;
   border-left: 2px solid var(--myspace-gray-300);
   margin-top: 4px;
   overflow-wrap: break-word;
   word-wrap: break-word;
   word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .notification-time {
@@ -953,4 +924,44 @@
 .comment-date {
   font-size: var(--myspace-font-size-sm);
   color: var(--myspace-text-muted);
+}
+
+/* You've Got Mail! - Alerts Box (matching My Apps style) */
+.mail-box {
+  border: 1px solid var(--myspace-border-blue);
+  margin-bottom: var(--myspace-spacing-xl);
+}
+
+.mail-box-header {
+  background-color: #d97979;
+  color: white;
+  padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
+  font-size: var(--myspace-font-size-md);
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mail-box-body {
+  padding: var(--myspace-spacing-sm);
+  font-size: var(--myspace-font-size-base);
+}
+
+.mail-text {
+  color: var(--myspace-blue);
+  cursor: pointer;
+  font-weight: bold;
+  text-decoration: none;
+  user-select: none;
+}
+
+.mail-text:hover {
+  text-decoration: underline;
+}
+
+.mail-count,
+.mail-message,
+.mail-action {
+  display: none;
 }

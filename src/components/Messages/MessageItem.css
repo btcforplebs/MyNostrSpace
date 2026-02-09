@@ -1,0 +1,121 @@
+.message-item {
+  display: flex;
+  gap: var(--myspace-spacing-md);
+  margin-bottom: var(--myspace-spacing-lg);
+  align-items: flex-end;
+  font-family: var(--myspace-font-family);
+}
+
+.message-item.incoming {
+  flex-direction: row;
+}
+
+.message-item.outgoing {
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+}
+
+.message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--myspace-border);
+}
+
+.message-bubble-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--myspace-spacing-xs);
+  max-width: 60%;
+}
+
+.message-item.outgoing .message-bubble-container {
+  align-items: flex-end;
+}
+
+.message-item.incoming .message-bubble-container {
+  align-items: flex-start;
+}
+
+.message-sender-name {
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-text-muted);
+  padding: 0 var(--myspace-spacing-sm);
+  font-weight: bold;
+}
+
+.message-bubble {
+  background-color: var(--myspace-blue);
+  color: white;
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  border-radius: var(--myspace-border-radius-sm);
+  word-wrap: break-word;
+  position: relative;
+  box-shadow: var(--myspace-shadow-sm);
+}
+
+.message-item.incoming .message-bubble {
+  background-color: var(--myspace-gray-200);
+  color: var(--myspace-text);
+  border: 1px solid var(--myspace-border);
+}
+
+.message-item.outgoing .message-bubble {
+  background-color: var(--myspace-blue);
+  color: white;
+}
+
+.message-content {
+  margin: 0;
+  font-size: var(--myspace-font-size-md);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-timestamp {
+  font-size: var(--myspace-font-size-xs);
+  color: var(--myspace-text-light);
+  padding: 0 var(--myspace-spacing-sm);
+  margin-top: var(--myspace-spacing-xs);
+}
+
+.message-item.incoming .message-timestamp {
+  color: var(--myspace-text-light);
+}
+
+.message-item.outgoing .message-timestamp {
+  color: var(--myspace-text-light);
+}
+
+@media (max-width: 768px) {
+  .message-bubble-container {
+    max-width: 80%;
+  }
+
+  .message-avatar {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .message-bubble-container {
+    max-width: 85%;
+  }
+
+  .message-bubble {
+    padding: 6px 10px;
+  }
+
+  .message-content {
+    font-size: 13px;
+  }
+
+  .message-avatar {
+    width: 24px;
+    height: 24px;
+  }
+}

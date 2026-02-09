@@ -96,6 +96,8 @@ export const Navbar = () => {
           {user && (
             <>
               {' '}
+              | <Link to="/messages">Messages</Link>
+              {' '}
               | <Link to={`/p/${user.pubkey}`}>My Profile</Link>
             </>
           )}

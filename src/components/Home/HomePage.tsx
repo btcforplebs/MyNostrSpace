@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, memo, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import {
@@ -19,32 +19,22 @@ import { VideoThumbnail } from '../Shared/VideoThumbnail';
 import { useNotifications } from '../../context/NotificationContext';
 import { useProfile } from '../../hooks/useProfile';
 import { subscribeToProfile } from '../../hooks/profileCache';
-import { RichTextRenderer } from '../Shared/RichTextRenderer';
+import { getTotalUnreadCount } from '../../services/messageCache';
+import { useMessages } from '../../hooks/useMessages';
 import './HomePage.css';
 
 // Single notification item - shows who did what to your post
-const NotificationItem = ({
+const NotificationItem = memo(({
   event,
   onClick,
-  ndk,
 }: {
   event: NDKEvent;
   onClick: (link: string) => void;
-  ndk: import('@nostr-dev-kit/ndk').default | undefined;
 }) => {
   const { profile } = useProfile(event.pubkey);
-  const [targetEvent, setTargetEvent] = useState<NDKEvent | null>(null);
 
   const authorName = profile?.name || profile?.displayName || event.pubkey.slice(0, 8);
   const targetId = event.tags.find((t) => t[0] === 'e')?.[1];
-
-  // Fetch the target post
-  useEffect(() => {
-    if (!ndk || !targetId || targetId === 'undefined') return;
-    ndk.fetchEvent(targetId).then((ev) => {
-      setTargetEvent(ev || null);
-    }).catch(() => { });
-  }, [ndk, targetId]);
 
   // Determine action text
   let actionText = '';
@@ -82,17 +72,11 @@ const NotificationItem = ({
           <span className="notification-action"> {actionText}</span>
         </div>
 
-        {/* Show reply content if it's a reply */}
-        {event.kind === 1 && (
-          <div className="notification-reply-content">
-            <RichTextRenderer content={event.content} />
-          </div>
-        )}
-
-        {/* Show original post snippet */}
-        {targetEvent && (
-          <div className="notification-parent-snippet">
-            {targetEvent.content}
+        {/* Show brief reply preview if it's a reply */}
+        {event.kind === 1 && event.content && (
+          <div className="notification-reply-preview">
+            {event.content.slice(0, 100)}
+            {event.content.length > 100 && '...'}
           </div>
         )}
 
@@ -102,7 +86,7 @@ const NotificationItem = ({
       </div>
     </div>
   );
-};
+});
 
 interface MusicTrack {
   title: string;
@@ -260,6 +244,7 @@ const HomePage = () => {
   const [columnCount, setColumnCount] = useState(3);
   const { markAsRead, lastSeen } = useNotifications();
   const [hasNewNotifs, setHasNewNotifs] = useState(false);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   useEffect(() => {
     const handleResize = () => {
@@ -454,7 +439,7 @@ const HomePage = () => {
     });
   }, []);
 
-  const MOODS = [
+  const MOODS = useMemo(() => [
     'None',
     'Happy',
     'Sad',
@@ -465,7 +450,7 @@ const HomePage = () => {
     'Bored',
     'Hyper',
     'Creative',
-  ];
+  ], []);
 
   const handleMusicSelect = (index: number) => {
     setCurrentMusicIndex(index);
@@ -475,32 +460,46 @@ const HomePage = () => {
   const getFollows = useCallback(async () => {
     if (!ndk || !user) return [];
 
-    // Return cached immediately if available for instant load
-    if (followsFetchedRef.current && followsCacheRef.current.length > 0) {
+    // Return cached immediately if available
+    if (followsCacheRef.current.length > 0) {
       return followsCacheRef.current;
     }
 
-    const activeUser = ndk.getUser({ pubkey: user.pubkey });
-    const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
-      ]);
-    };
+    // Start fetching if not already started
+    if (!followsFetchedRef.current) {
+      followsFetchedRef.current = true;
 
-    const followedUsersSet = await withTimeout(
-      activeUser.follows().catch(() => new Set<import('@nostr-dev-kit/ndk').NDKUser>()),
-      3000,
-      new Set<import('@nostr-dev-kit/ndk').NDKUser>()
-    );
-    const followPubkeys = Array.from(followedUsersSet || new Set()).map((u) => u.pubkey);
-    if (!followPubkeys.includes(user.pubkey)) followPubkeys.push(user.pubkey);
+      const activeUser = ndk.getUser({ pubkey: user.pubkey });
+      const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+        return Promise.race([
+          promise,
+          new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+        ]);
+      };
 
-    // Cache the result
-    followsCacheRef.current = followPubkeys;
-    followsFetchedRef.current = true;
+      try {
+        const followedUsersSet = await withTimeout(
+          activeUser.follows().catch(() => new Set<import('@nostr-dev-kit/ndk').NDKUser>()),
+          3000,
+          new Set<import('@nostr-dev-kit/ndk').NDKUser>()
+        );
+        const followPubkeys = Array.from(followedUsersSet || new Set()).map((u) => u.pubkey);
+        if (!followPubkeys.includes(user.pubkey)) followPubkeys.push(user.pubkey);
+        followsCacheRef.current = followPubkeys;
+      } catch (e) {
+        // Fallback to just self if follows fails
+        followsCacheRef.current = [user.pubkey];
+      }
+    } else {
+      // If fetch is in progress, wait for it to complete (but not indefinitely)
+      let attempts = 0;
+      while (followsCacheRef.current.length === 0 && attempts < 60) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        attempts++;
+      }
+    }
 
-    return followPubkeys;
+    return followsCacheRef.current;
   }, [ndk, user]);
 
   const loadMoreFeed = useCallback(async () => {
@@ -660,15 +659,32 @@ const HomePage = () => {
             const oldest = prev[prev.length - 1];
             if (oldest.created_at) setFeedUntil(oldest.created_at - 1);
 
-            // Batch pre-fetch profiles for visible authors (fire-and-forget)
-            const uniqueAuthors = [...new Set(prev.slice(0, 20).map((e) => e.pubkey))];
-            Promise.all(
-              uniqueAuthors.map((pk) =>
-                ndk?.getUser({ pubkey: pk }).fetchProfile({
-                  cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
-                }).catch(() => { })
-              )
-            );
+            // Defer profile pre-fetch to avoid blocking the main thread
+            if (typeof requestIdleCallback !== 'undefined') {
+              requestIdleCallback(() => {
+                const uniqueAuthors = [...new Set(prev.slice(0, 20).map((e) => e.pubkey))];
+                uniqueAuthors.forEach((pk) => {
+                  // Fetch one profile at a time with delays to avoid overwhelming the relays
+                  setTimeout(() => {
+                    ndk?.getUser({ pubkey: pk }).fetchProfile({
+                      cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+                    }).catch(() => { });
+                  }, 50);
+                });
+              });
+            } else {
+              // Fallback for browsers that don't support requestIdleCallback
+              setTimeout(() => {
+                const uniqueAuthors = [...new Set(prev.slice(0, 20).map((e) => e.pubkey))];
+                uniqueAuthors.forEach((pk, idx) => {
+                  setTimeout(() => {
+                    ndk?.getUser({ pubkey: pk }).fetchProfile({
+                      cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+                    }).catch(() => { });
+                  }, idx * 50);
+                });
+              }, 100);
+            }
           }
           return prev;
         });
@@ -800,7 +816,7 @@ const HomePage = () => {
       const filter: NDKFilter = {
         kinds: [1, 6, 7, 9735],
         '#p': [user.pubkey],
-        limit: 50,
+        limit: 30, // Reduced from 50 to avoid excessive initial fetches
       };
 
       sub = ndk.subscribe(filter, { closeOnEose: false });
@@ -848,11 +864,13 @@ const HomePage = () => {
           notifFlushTimeout = setTimeout(() => {
             flushNotifications();
             notifFlushTimeout = null;
-          }, 300);
+          }, 500); // Increased from 300ms to batch more notifications
         }
       });
 
-      sub.on('eose', flushNotifications);
+      sub.on('eose', () => {
+        flushNotifications();
+      });
     };
 
     startNotificationSub();
@@ -860,6 +878,29 @@ const HomePage = () => {
       if (sub) sub.stop();
     };
   }, [ndk, user]);
+
+  // Subscribe to messages in the background
+  useMessages(user?.pubkey || null, ndk);
+
+  // Fetch unread message count periodically
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUnread = async () => {
+      try {
+        const count = await getTotalUnreadCount();
+        setUnreadMessageCount(count);
+      } catch (err) {
+        console.error('Failed to fetch unread message count:', err);
+      }
+    };
+
+    fetchUnread();
+
+    // Refresh count every 5 seconds
+    const interval = setInterval(fetchUnread, 5000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -1044,6 +1085,17 @@ const HomePage = () => {
                   </ul>
                 </div>
               </div>
+
+              {unreadMessageCount > 0 && (
+                <div className="mail-box">
+                  <div className="mail-box-header">Alerts</div>
+                  <div className="mail-box-body">
+                    <div className="mail-text clickable" onClick={() => navigate('/messages')}>
+                      📬 You've Got Mail!
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="home-box">
                 <div className="home-box-header">My Apps</div>
@@ -1269,36 +1321,36 @@ const HomePage = () => {
                                   style={{ aspectRatio: isExpanded ? '16/9' : 'auto' }}
                                 >
                                   {item.type === 'image' ? (
-                                    <img src={item.url} alt="" loading="lazy" />
+                                    <img src={item.url} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: 'auto' }} />
                                   ) : isExpanded ? (
                                     ytMatch ? (
                                       <iframe
                                         src={`https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`}
                                         title="YouTube video"
-                                        frameBorder="0"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                         allowFullScreen
                                         style={{ width: '100%', height: '100%', border: 'none' }}
+                                        loading="lazy"
                                       />
                                     ) : vimeoMatch ? (
                                       <iframe
                                         src={`https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`}
                                         title="Vimeo video"
-                                        frameBorder="0"
                                         allow="autoplay; fullscreen; picture-in-picture"
                                         allowFullScreen
                                         style={{ width: '100%', height: '100%', border: 'none' }}
+                                        loading="lazy"
                                       />
                                     ) : streamableMatch ? (
                                       <iframe
                                         src={`https://streamable.com/e/${streamableMatch[1]}?autoplay=1`}
                                         title="Streamable video"
-                                        frameBorder="0"
                                         allowFullScreen
                                         style={{ width: '100%', height: '100%', border: 'none' }}
+                                        loading="lazy"
                                       />
                                     ) : (
-                                      <video src={item.url} controls autoPlay preload="metadata" />
+                                      <video src={item.url} controls autoPlay preload="metadata" style={{ width: '100%', height: '100%' }} />
                                     )
                                   ) : (
                                     <div
@@ -1416,7 +1468,6 @@ const HomePage = () => {
                             key={event.id}
                             event={event}
                             onClick={(link: string) => navigate(link)}
-                            ndk={ndk}
                           />
                         ))}
                     </div>

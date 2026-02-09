@@ -16,14 +16,13 @@ import { SEO } from '../Shared/SEO';
 import { useLightbox } from '../../context/LightboxContext';
 import {
   type NDKEvent,
-  NDKRelaySet,
   type NDKFilter,
   NDKSubscriptionCacheUsage,
   NDKKind,
+  NDKRelaySet,
 } from '@nostr-dev-kit/ndk';
 import { FeedItem } from '../Shared/FeedItem';
 import './ProfilePage.css';
-import { filterRelays } from '../../utils/relay';
 import { isBlockedUser } from '../../utils/blockedUsers';
 import { AwardBadgeModal } from '../Badges/AwardBadgeModal';
 
@@ -74,7 +73,12 @@ const ProfileRecipes = ({ pubkey }: { pubkey: string }) => {
             }}
           >
             {image && (
-              <img src={image} style={{ width: '80px', height: '80px', objectFit: 'cover' }} />
+              <img
+                src={image}
+                style={{ width: '80px', height: '80px', objectFit: 'cover' }}
+                loading="lazy"
+                decoding="async"
+              />
             )}
             <div>
               <div style={{ fontWeight: 'bold', color: '#003399' }}>{title}</div>
@@ -899,7 +903,7 @@ const ProfileBadges = ({ pubkey }: { pubkey: string }) => {
 // --- Main ProfilePage ---
 
 const ProfilePage = () => {
-  const { user, ndk } = useNostr();
+  const { user, ndk, relays } = useNostr();
   const navigate = useNavigate();
   const { pubkey: identifier } = useParams<{ pubkey: string }>();
   const { hexPubkey, loading: resolving } = useResolvedPubkey(identifier);
@@ -1027,17 +1031,11 @@ const ProfilePage = () => {
     setStats({ followers: 0, posts: 0, zaps: 0 });
 
     try {
-      // 1. Get User's Preferred Relays (Kind 10002)
-      const relayEvent = await ndk.fetchEvent({ kinds: [10002 as number], authors: [hexPubkey] });
-      const relayUrls = relayEvent
-        ? relayEvent.tags.filter((t) => t[0] === 'r').map((t) => t[1])
-        : [];
+      // 1. Use app-wide relay configuration (user's settings or defaults)
+      const relaySet = relays.length > 0 ? NDKRelaySet.fromRelayUrls(relays, ndk) : undefined;
 
-      const targetRelays =
-        relayUrls.length > 0 ? NDKRelaySet.fromRelayUrls(filterRelays(relayUrls), ndk) : undefined;
-
-      // 2. Start Subscriptions (Streaming)
-      const subOptions = { closeOnEose: true, relaySet: targetRelays };
+      // 2. Start Subscriptions with configured relays
+      const subOptions = { closeOnEose: true, relaySet };
 
       const followersSub = ndk.subscribe({ kinds: [3], '#p': [hexPubkey] }, subOptions);
       const postsSub = ndk.subscribe({ kinds: [1], authors: [hexPubkey] }, subOptions);
@@ -1164,17 +1162,39 @@ const ProfilePage = () => {
         <div className="left-column">
           <div className="profile-pic-box">
             <div
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}
             >
               <h1>{displayName}</h1>
-              {user?.pubkey === hexPubkey && (
-                <Link
-                  to="/edit-profile"
-                  style={{ fontSize: '8pt', textDecoration: 'none', color: '#003399' }}
-                >
-                  [ Edit Profile ]
-                </Link>
-              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {user?.pubkey === hexPubkey && (
+                  <Link
+                    to="/edit-profile"
+                    style={{ fontSize: '8pt', textDecoration: 'none', color: '#003399' }}
+                  >
+                    [ Edit Profile ]
+                  </Link>
+                )}
+                {user?.pubkey !== hexPubkey && user?.pubkey && hexPubkey && (
+                  <button
+                    onClick={() => navigate(`/messages/${hexPubkey}`)}
+                    style={{
+                      fontSize: '8pt',
+                      padding: '4px 10px',
+                      backgroundColor: '#0066cc',
+                      color: 'white',
+                      border: '1px solid #0052a3',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      textDecoration: 'none',
+                    }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#0052a3')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#0066cc')}
+                  >
+                    ✉️ Send Message
+                  </button>
+                )}
+              </div>
             </div>
             <div className="profile-details-grid">
               {profile?.image ? (

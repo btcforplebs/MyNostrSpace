@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { type NDKFilter, NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
@@ -16,6 +16,36 @@ interface PhotoFile {
   authorName?: string;
   created_at: number;
 }
+
+// Memoized photo card component to prevent unnecessary re-renders
+const PhotoCard = memo(({ photo, onSelect }: { photo: PhotoFile; onSelect: (photo: PhotoFile) => void }) => (
+  <div
+    className="pp-photo-card"
+    onClick={() => onSelect(photo)}
+  >
+    <div className="pp-image-container">
+      <img
+        src={photo.url}
+        alt={photo.title}
+        className="pp-photo-image"
+        loading="lazy"
+        decoding="async"
+      />
+    </div>
+    <div className="pp-photo-info">
+      <div className="pp-photo-title" title={photo.title}>
+        {photo.title}
+      </div>
+      <Link
+        to={`/p/${photo.pubkey}`}
+        className="pp-photo-author"
+        onClick={(e) => e.stopPropagation()}
+      >
+        By: {photo.authorName || photo.pubkey.slice(0, 8)}
+      </Link>
+    </div>
+  </div>
+));
 
 export const PhotosPage = () => {
   const { ndk, user: loggedInUser } = useNostr();
@@ -152,27 +182,55 @@ export const PhotosPage = () => {
             setTimeout(processBuffer, 300);
           }
 
-          // Fetch profile asynchronously
-          ndk
-            ?.getUser({ pubkey: event.pubkey })
-            .fetchProfile()
-            .then((profile) => {
-              setPhotos((prev) =>
-                prev.map((p) =>
-                  p.pubkey === event.pubkey && !p.authorName
-                    ? {
-                      ...p,
-                      authorName:
-                        profile?.name ||
-                        profile?.displayName ||
-                        profile?.nip05 ||
-                        event.pubkey.slice(0, 8),
-                    }
-                    : p
-                )
-              );
-            })
-            .catch(() => { });
+          // Defer profile fetching to avoid blocking
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => {
+              ndk
+                ?.getUser({ pubkey: event.pubkey })
+                .fetchProfile()
+                .then((profile) => {
+                  setPhotos((prev) =>
+                    prev.map((p) =>
+                      p.pubkey === event.pubkey && !p.authorName
+                        ? {
+                          ...p,
+                          authorName:
+                            profile?.name ||
+                            profile?.displayName ||
+                            profile?.nip05 ||
+                            event.pubkey.slice(0, 8),
+                        }
+                        : p
+                    )
+                  );
+                })
+                .catch(() => { });
+            });
+          } else {
+            // Fallback for browsers without requestIdleCallback
+            setTimeout(() => {
+              ndk
+                ?.getUser({ pubkey: event.pubkey })
+                .fetchProfile()
+                .then((profile) => {
+                  setPhotos((prev) =>
+                    prev.map((p) =>
+                      p.pubkey === event.pubkey && !p.authorName
+                        ? {
+                          ...p,
+                          authorName:
+                            profile?.name ||
+                            profile?.displayName ||
+                            profile?.nip05 ||
+                            event.pubkey.slice(0, 8),
+                        }
+                        : p
+                    )
+                  );
+                })
+                .catch(() => { });
+            }, 100);
+          }
         }
       }
     },
@@ -308,32 +366,11 @@ export const PhotosPage = () => {
                 {columns.map((colPhotos, colIndex) => (
                   <div key={colIndex} className="pp-masonry-column">
                     {colPhotos.map((photo) => (
-                      <div
+                      <PhotoCard
                         key={photo.id}
-                        className="pp-photo-card"
-                        onClick={() => setSelectedPhoto(photo)}
-                      >
-                        <div className="pp-image-container">
-                          <img
-                            src={photo.url}
-                            alt={photo.title}
-                            className="pp-photo-image"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="pp-photo-info">
-                          <div className="pp-photo-title" title={photo.title}>
-                            {photo.title}
-                          </div>
-                          <Link
-                            to={`/p/${photo.pubkey}`}
-                            className="pp-photo-author"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            By: {photo.authorName || photo.pubkey.slice(0, 8)}
-                          </Link>
-                        </div>
-                      </div>
+                        photo={photo}
+                        onSelect={setSelectedPhoto}
+                      />
                     ))}
                   </div>
                 ))}
@@ -382,7 +419,7 @@ export const PhotosPage = () => {
             <button className="pp-close-btn" onClick={() => setSelectedPhoto(null)}>
               ×
             </button>
-            <img src={selectedPhoto.url} alt={selectedPhoto.title} className="pp-modal-image" />
+            <img src={selectedPhoto.url} alt={selectedPhoto.title} className="pp-modal-image" decoding="async" />
             <div className="pp-modal-footer">
               <Link to={`/p/${selectedPhoto.pubkey}`} className="pp-modal-author">
                 By: {selectedPhoto.authorName || selectedPhoto.pubkey.slice(0, 8)}

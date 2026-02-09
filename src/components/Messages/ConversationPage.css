@@ -1,0 +1,186 @@
+.conversation-wrapper {
+  max-width: var(--myspace-container-width);
+  margin: 0 auto;
+  background-color: var(--myspace-bg-content);
+  box-shadow: var(--myspace-shadow-md);
+  min-height: 100vh;
+}
+
+.conversation-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 60px);
+  background-color: var(--myspace-bg-content);
+  font-family: var(--myspace-font-family);
+}
+
+.conversation-header {
+  display: flex;
+  align-items: center;
+  gap: var(--myspace-spacing-xl);
+  padding: var(--myspace-spacing-lg) var(--myspace-spacing-xl);
+  border-bottom: 1px solid var(--myspace-border);
+  background-color: var(--myspace-bg-content);
+  flex-shrink: 0;
+}
+
+.back-button {
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  border: 1px solid var(--myspace-border);
+  background-color: var(--myspace-gray-200);
+  border-radius: var(--myspace-border-radius-sm);
+  cursor: pointer;
+  font-size: var(--myspace-font-size-md);
+  color: var(--myspace-text);
+  transition: background-color 0.2s;
+  font-family: var(--myspace-font-family);
+  font-weight: bold;
+}
+
+.back-button:hover {
+  background-color: var(--myspace-gray-300);
+}
+
+.header-info {
+  flex: 1;
+}
+
+.header-info h2 {
+  margin: 0;
+  font-size: var(--myspace-font-size-xl);
+  color: var(--myspace-text);
+  font-weight: bold;
+  font-family: var(--myspace-font-family);
+}
+
+.loading-indicator {
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-text-light);
+  font-style: italic;
+}
+
+.conversation-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--myspace-spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--myspace-spacing-md);
+  background-color: var(--myspace-bg-content);
+}
+
+.nip04-privacy-banner {
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196f3;
+  padding: var(--myspace-spacing-md) var(--myspace-spacing-lg);
+  border-radius: var(--myspace-border-radius-sm);
+  color: #1976d2;
+  font-size: var(--myspace-font-size-sm);
+  margin-bottom: var(--myspace-spacing-lg);
+  flex-shrink: 0;
+}
+
+.nip04-privacy-banner p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.no-messages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--myspace-text-light);
+  text-align: center;
+}
+
+.no-messages p {
+  margin: 0;
+  font-size: var(--myspace-font-size-md);
+}
+
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--myspace-spacing-xl);
+  color: var(--myspace-text-light);
+  font-size: var(--myspace-font-size-md);
+}
+
+.conversation-error,
+.conversation-error-banner {
+  color: var(--myspace-error);
+  font-size: var(--myspace-font-size-base);
+  padding: var(--myspace-spacing-md) var(--myspace-spacing-xl);
+  background-color: #ffebee;
+  border-top: 1px solid #ffcdd2;
+  text-align: left;
+}
+
+.conversation-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: var(--myspace-spacing-xl);
+}
+
+.conversation-error button {
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  background-color: var(--myspace-blue);
+  color: white;
+  border: 1px solid var(--myspace-blue-hover);
+  border-radius: var(--myspace-border-radius-sm);
+  cursor: pointer;
+  font-size: var(--myspace-font-size-md);
+  font-family: var(--myspace-font-family);
+  font-weight: bold;
+}
+
+.conversation-error button:hover {
+  background-color: var(--myspace-blue-hover);
+}
+
+@media (max-width: 768px) {
+  .conversation-page {
+    height: calc(100vh - 60px);
+  }
+
+  .conversation-header {
+    padding: 10px 12px;
+  }
+
+  .header-info h2 {
+    font-size: 16px;
+  }
+
+  .conversation-messages {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .conversation-page {
+    height: 100vh;
+  }
+
+  .conversation-header {
+    padding: 8px 10px;
+    gap: 10px;
+  }
+
+  .header-info h2 {
+    font-size: 14px;
+  }
+
+  .back-button {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .conversation-messages {
+    padding: 8px;
+  }
+}

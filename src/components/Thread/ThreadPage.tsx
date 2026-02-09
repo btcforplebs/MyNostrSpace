@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, type NDKFilter, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
@@ -10,6 +10,26 @@ interface ThreadNode {
   event: NDKEvent;
   children: ThreadNode[];
 }
+
+// Memoized thread item row to prevent unnecessary re-renders
+const ThreadItemRow = memo(({
+  node,
+  depth,
+  onRenderThread
+}: {
+  node: ThreadNode;
+  depth: number;
+  onRenderThread: (nodes: ThreadNode[], depth: number) => React.ReactNode;
+}) => (
+  <div className={depth > 0 ? 'nested-reply' : ''}>
+    <FeedItem event={node.event} hideThreadButton={true} />
+    {node.children.length > 0 && (
+      <div className="reply-children">
+        {onRenderThread(node.children, depth + 1)}
+      </div>
+    )}
+  </div>
+));
 
 export const ThreadPage = () => {
   const { eventId } = useParams();
@@ -112,18 +132,16 @@ export const ThreadPage = () => {
     };
   }, [ndk, eventId]);
 
-  const renderThread = (nodes: ThreadNode[], depth: number = 0) => {
+  const renderThread = useCallback((nodes: ThreadNode[], depth: number = 0) => {
     return nodes.map((node) => (
-      <div key={node.event.id} className={depth > 0 ? 'nested-reply' : ''}>
-        <FeedItem event={node.event} hideThreadButton={true} />
-        {node.children.length > 0 && (
-          <div className="reply-children">
-            {renderThread(node.children, depth + 1)}
-          </div>
-        )}
-      </div>
+      <ThreadItemRow
+        key={node.event.id}
+        node={node}
+        depth={depth}
+        onRenderThread={renderThread}
+      />
     ));
-  };
+  }, []);
 
   return (
     <div className="thread-page-container">

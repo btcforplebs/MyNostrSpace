@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { nip19 } from 'nostr-tools';
 import { Link } from 'react-router-dom';
 import { EmbeddedNote } from './EmbeddedNote';
 import { useLightbox } from '../../context/LightboxContext';
 import { useProfile } from '../../hooks/useProfile';
 
-const InternalMention: React.FC<{ pubkey: string; originalText: string }> = ({
+const InternalMention: React.FC<{ pubkey: string; originalText: string }> = React.memo(({
   pubkey,
   originalText,
 }) => {
@@ -23,7 +23,98 @@ const InternalMention: React.FC<{ pubkey: string; originalText: string }> = ({
       @{name}
     </Link>
   );
-};
+});
+
+// Lazy-loaded image component with intersection observer
+const LazyImage: React.FC<{ src: string; alt: string; onClick: () => void }> = React.memo(({
+  src,
+  alt,
+  onClick,
+}) => {
+  const [isLoaded, setIsLoaded] = React.useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  React.useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsLoaded(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '50px' }
+    );
+
+    observer.observe(img);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <img
+      ref={imgRef}
+      src={isLoaded ? src : undefined}
+      alt={alt}
+      style={{
+        maxWidth: '100%',
+        maxHeight: '400px',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        backgroundColor: isLoaded ? undefined : '#f0f0f0',
+        minHeight: isLoaded ? undefined : '200px',
+      }}
+      onClick={onClick}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+});
+
+// Lazy-loaded video component with intersection observer
+const LazyVideo: React.FC<{ src: string }> = React.memo(({ src }) => {
+  const [isLoaded, setIsLoaded] = React.useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsLoaded(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, []);
+
+  const videoSrc = isLoaded ? (src.includes('#') ? src : `${src}#t=0.1`) : undefined;
+
+  return (
+    <video
+      ref={videoRef}
+      src={videoSrc}
+      controls
+      preload={isLoaded ? 'metadata' : 'none'}
+      playsInline
+      muted
+      style={{
+        maxWidth: '100%',
+        maxHeight: '400px',
+        borderRadius: '4px',
+        backgroundColor: '#f0f0f0',
+        minHeight: isLoaded ? undefined : '200px',
+      }}
+    />
+  );
+});
 
 interface RichTextRendererProps {
   content: string;
@@ -76,17 +167,10 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = React.memo(({
                     key={wordIndex}
                     style={{ marginTop: '5px', marginBottom: '5px', display: 'block' }}
                   >
-                    <img
+                    <LazyImage
                       src={url}
                       alt="Embedded content"
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '400px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                      }}
                       onClick={() => openLightbox(url)}
-                      loading="lazy"
                     />
                   </div>
                 );
@@ -94,20 +178,12 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = React.memo(({
 
               // Video
               if (lowerUrl.match(/\.(mp4|mov|webm)(\?.*)?$/)) {
-                const videoSrc = url.includes('#') ? url : `${url}#t=0.1`;
                 return (
                   <div
                     key={wordIndex}
                     style={{ marginTop: '5px', marginBottom: '5px', display: 'block' }}
                   >
-                    <video
-                      src={videoSrc}
-                      controls
-                      preload="metadata"
-                      playsInline
-                      muted
-                      style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px' }}
-                    />
+                    <LazyVideo src={url} />
                   </div>
                 );
               }
@@ -131,8 +207,7 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = React.memo(({
                         width="100%"
                         height="315"
                         src={`https://www.youtube.com/embed/${videoId}`}
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                         title="Embedded Video"
                         style={{ maxWidth: '560px' }}

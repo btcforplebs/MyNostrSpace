@@ -62,6 +62,12 @@ const RecipesPage = lazy(() =>
 const BadgesPage = lazy(() =>
   import('./components/Badges/BadgesPage').then((m) => ({ default: m.BadgesPage }))
 );
+const MessagesPage = lazy(() =>
+  import('./components/Messages/MessagesPage').then((m) => ({ default: m.MessagesPage }))
+);
+const ConversationPage = lazy(() =>
+  import('./components/Messages/ConversationPage').then((m) => ({ default: m.ConversationPage }))
+);
 import { NotificationProvider } from './context/NotificationContext';
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 
@@ -121,6 +127,8 @@ function App() {
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="/recipes" element={<RecipesPage />} />
                   <Route path="/badges" element={<BadgesPage />} />
+                  <Route path="/messages" element={<MessagesPage />} />
+                  <Route path="/messages/:pubkey" element={<ConversationPage />} />
                 </Routes>
               </Suspense>
             </ErrorBoundary>

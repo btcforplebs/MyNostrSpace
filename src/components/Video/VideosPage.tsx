@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { type NDKFilter, NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
@@ -21,6 +21,46 @@ interface VideoFile {
 }
 
 const BLOCKED_TAGS = ['nsfw', 'explicit', 'porn', 'xxx', 'content-warning'];
+
+// Memoized video card component to prevent unnecessary re-renders
+const VideoCard = memo(({ video, onSelect }: { video: VideoFile; onSelect: (video: VideoFile) => void }) => (
+  <div
+    className="vp-video-card"
+    onClick={() => onSelect(video)}
+  >
+    <div className="vp-thumbnail-container">
+      {video.thumbnail ? (
+        <img
+          src={video.thumbnail}
+          alt={video.title}
+          className="vp-video-thumbnail"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        <VideoThumbnail
+          src={video.url}
+          className="vp-video-thumbnail"
+        />
+      )}
+      <div className="vp-badge">
+        {video.mime?.split('/')[1]?.toUpperCase() || 'MP4'}
+      </div>
+    </div>
+    <div className="vp-video-info">
+      <div className="vp-video-title" title={video.title}>
+        {video.title}
+      </div>
+      <Link
+        to={`/p/${video.pubkey}`}
+        className="vp-video-author"
+        onClick={(e) => e.stopPropagation()}
+      >
+        By: {video.authorName || video.pubkey.slice(0, 8)}
+      </Link>
+    </div>
+  </div>
+));
 
 export const VideosPage = () => {
   const { ndk, user: loggedInUser } = useNostr();
@@ -227,27 +267,55 @@ export const VideosPage = () => {
           setTimeout(processBuffer, 300);
         }
 
-        // Fetch profile
-        ndk
-          ?.getUser({ pubkey: event.pubkey })
-          .fetchProfile()
-          .then((profile) => {
-            setVideos((prev) =>
-              prev.map((v) =>
-                v.pubkey === event.pubkey && !v.authorName
-                  ? {
-                    ...v,
-                    authorName:
-                      profile?.name ||
-                      profile?.displayName ||
-                      profile?.nip05 ||
-                      event.pubkey.slice(0, 8),
-                  }
-                  : v
-              )
-            );
-          })
-          .catch(() => { });
+        // Defer profile fetching to avoid blocking
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(() => {
+            ndk
+              ?.getUser({ pubkey: event.pubkey })
+              .fetchProfile()
+              .then((profile) => {
+                setVideos((prev) =>
+                  prev.map((v) =>
+                    v.pubkey === event.pubkey && !v.authorName
+                      ? {
+                        ...v,
+                        authorName:
+                          profile?.name ||
+                          profile?.displayName ||
+                          profile?.nip05 ||
+                          event.pubkey.slice(0, 8),
+                      }
+                      : v
+                  )
+                );
+              })
+              .catch(() => { });
+          });
+        } else {
+          // Fallback for browsers without requestIdleCallback
+          setTimeout(() => {
+            ndk
+              ?.getUser({ pubkey: event.pubkey })
+              .fetchProfile()
+              .then((profile) => {
+                setVideos((prev) =>
+                  prev.map((v) =>
+                    v.pubkey === event.pubkey && !v.authorName
+                      ? {
+                        ...v,
+                        authorName:
+                          profile?.name ||
+                          profile?.displayName ||
+                          profile?.nip05 ||
+                          event.pubkey.slice(0, 8),
+                      }
+                      : v
+                  )
+                );
+              })
+              .catch(() => { });
+          }, 100);
+        }
       }
     },
     [ndk, loadingMore, processBuffer]
@@ -359,42 +427,11 @@ export const VideosPage = () => {
             <>
               <div className="vp-videos-grid">
                 {videos.map((video) => (
-                  <div
+                  <VideoCard
                     key={video.id}
-                    className="vp-video-card"
-                    onClick={() => setSelectedVideo(video)}
-                  >
-                    <div className="vp-thumbnail-container">
-                      {video.thumbnail ? (
-                        <img
-                          src={video.thumbnail}
-                          alt={video.title}
-                          className="vp-video-thumbnail"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <VideoThumbnail
-                          src={video.url}
-                          className="vp-video-thumbnail"
-                        />
-                      )}
-                      <div className="vp-badge">
-                        {video.mime?.split('/')[1]?.toUpperCase() || 'MP4'}
-                      </div>
-                    </div>
-                    <div className="vp-video-info">
-                      <div className="vp-video-title" title={video.title}>
-                        {video.title}
-                      </div>
-                      <Link
-                        to={`/p/${video.pubkey}`}
-                        className="vp-video-author"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        By: {video.authorName || video.pubkey.slice(0, 8)}
-                      </Link>
-                    </div>
-                  </div>
+                    video={video}
+                    onSelect={setSelectedVideo}
+                  />
                 ))}
               </div>
 

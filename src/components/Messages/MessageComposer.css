@@ -1,0 +1,129 @@
+.message-composer {
+  border-top: 1px solid var(--myspace-border);
+  padding: var(--myspace-spacing-lg);
+  background-color: var(--myspace-bg);
+  font-family: var(--myspace-font-family);
+}
+
+.composer-error {
+  color: var(--myspace-error);
+  font-size: var(--myspace-font-size-sm);
+  margin-bottom: var(--myspace-spacing-md);
+  padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
+  background-color: #ffebee;
+  border-radius: var(--myspace-border-radius-sm);
+  border-left: 2px solid var(--myspace-error);
+}
+
+.composer-input-container {
+  display: flex;
+  gap: var(--myspace-spacing-md);
+  align-items: flex-end;
+}
+
+.composer-textarea {
+  flex: 1;
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  border: 1px solid var(--myspace-border);
+  border-radius: var(--myspace-border-radius-sm);
+  font-family: var(--myspace-font-family);
+  font-size: var(--myspace-font-size-md);
+  resize: none;
+  max-height: 150px;
+  min-height: 40px;
+  line-height: 1.4;
+  background-color: var(--myspace-bg-content);
+  color: var(--myspace-text);
+  transition: border-color 0.2s;
+}
+
+.composer-textarea:focus {
+  outline: none;
+  border-color: var(--myspace-blue);
+  box-shadow: 0 0 0 2px rgba(102, 153, 204, 0.1);
+}
+
+.composer-textarea:disabled {
+  background-color: var(--myspace-gray-100);
+  color: var(--myspace-text-light);
+  cursor: not-allowed;
+}
+
+.composer-textarea::placeholder {
+  color: var(--myspace-text-light);
+}
+
+.composer-send-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--myspace-border-radius-sm);
+  background-color: var(--myspace-blue);
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.composer-send-btn:hover:not(:disabled) {
+  background-color: var(--myspace-blue-hover);
+}
+
+.composer-send-btn:active:not(:disabled) {
+  background-color: var(--myspace-blue-dark);
+}
+
+.composer-send-btn:disabled {
+  background-color: var(--myspace-gray-400);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.composer-hint {
+  font-size: var(--myspace-font-size-xs);
+  color: var(--myspace-text-light);
+  margin-top: var(--myspace-spacing-sm);
+  padding: 0 var(--myspace-spacing-sm);
+}
+
+@media (max-width: 768px) {
+  .message-composer {
+    padding: 10px;
+  }
+
+  .composer-textarea {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .composer-send-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .composer-hint {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .message-composer {
+    padding: 8px;
+  }
+
+  .composer-textarea {
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+  .composer-send-btn {
+    width: 36px;
+    height: 36px;
+  }
+}

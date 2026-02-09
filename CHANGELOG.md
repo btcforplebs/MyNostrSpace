@@ -2,6 +2,130 @@
 
 All notable changes to the MyNostrSpace project will be documented in this file.
 
+## [Unreleased] - 2026-02-08
+
+### 🐛 Bug Fixes
+
+#### **Message Caching & Read Status**
+- Fixed issue where unread messages weren't being properly tracked after reading them
+- **Root Cause:** Incoming DM events from network subscriptions were resetting read status to false, overwriting database state
+- **Solution:** Modified `useMessages.ts` to preserve read status from database when processing duplicate events
+- Now when you mark messages as read in a conversation, the "You've Got Mail!" notification properly decreases
+- **Files modified:** `useMessages.ts`
+
+#### **Message Subscription on Homepage**
+- Fixed "You've Got Mail!" notification not updating until user clicks Messages in navbar
+- **Root Cause:** `useMessages` hook was only called in MessagesPage/ConversationPage, not HomePage
+- **Solution:** Added `useMessages` call to HomePage to load messages in background automatically
+- Messages now start syncing as soon as homepage loads, no navigation required
+- **Files modified:** `HomePage.tsx`
+
+#### **Message Sending Error**
+- Fixed "undefined is not a constructor" error when sending messages
+- **Root Cause:** Code was trying to access NDKEvent through `ndk.constructor.NDKEvent` which is unreliable
+- **Solution:** Properly import NDKEvent from @nostr-dev-kit/ndk and use direct constructor
+- **Files modified:** `ConversationPage.tsx`
+
+#### **"You've Got Mail!" Styling**
+- Simplified notification box styling to match My Apps/Alerts design
+- Removed unnecessary gradients, shadows, and animations
+- Now uses clean rose/mauve header (#d97979) matching Alerts box
+- Only the text "You've Got Mail!" is clickable, not entire box
+- **Files modified:** `HomePage.tsx`, `HomePage.css`
+
+### 🚀 New Features
+
+#### **NIP-04 Direct Messaging System**
+Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encryption with Dexie local caching:
+
+**Core Features:**
+- ✅ Full two-way messaging: send and receive encrypted DMs
+- ✅ Real-time message subscriptions (kind 4 events)
+- ✅ Message encryption/decryption with NDK signer (supports all extensions: Alby, nos2x, Nos, NIP-46 signers)
+- ✅ Local Dexie database for persistent message storage and offline access
+- ✅ Conversation grouping with unread counts and last message previews
+- ✅ Auto-scroll to bottom on new messages
+- ✅ Responsive UI with design tokens (mobile & desktop)
+- ✅ NIP-04 privacy notice explaining encryption limitations
+
+**Pages & Components:**
+- `MessagesPage.tsx` - Main inbox showing all conversations with unread counts
+- `ConversationPage.tsx` - Individual message thread with single user
+- `MessageItem.tsx` - Single message bubble (sent/received styling)
+- `MessageComposer.tsx` - Text input with send functionality
+- `NewConversationModal.tsx` - Modal to start new DM with pubkey validation
+- Complete CSS styling for all components using design tokens
+
+**Services & Hooks:**
+- `messageCache.ts` - Dexie database service for message persistence (add, query, mark read, bulk operations)
+- `useMessages.ts` - Hook to subscribe to kind 4 events and cache locally
+- `useConversations.ts` - Hook to group messages by conversation partner
+- `useDMRelays.ts` - Hook to fetch user's DM relay preferences (kind 10050)
+
+**Architecture Decisions:**
+- Chose NIP-04 over NIP-17 for immediate compatibility with current Nostr ecosystem
+- NIP-17 infrastructure preserved for future upgrade when signers support NIP-44 encryption
+- Message batching (300ms) to prevent excessive re-renders during sync
+- Subscription-based loading with NDK cache-first strategy
+
+**Routes:**
+- `/messages` - Inbox with conversation list
+- `/messages/:pubkey` - Individual conversation thread
+
+#### **"You've Got Mail!" Homepage Section**
+- Added oldschool MySpace-themed mailbox notification above "My Apps"
+- Displays unread message count with eye-catching retro styling (orange gradient, yellow/cream background)
+- Shows mailbox emoji (📬) with bold count display
+- Conditional rendering (only shows when unread > 0)
+- Clickable section navigates to `/messages` inbox
+- Real-time updates every 5 seconds via Dexie database
+- Smooth hover animations with lift effect and text shadow
+- **Files modified:** `HomePage.tsx`, `HomePage.css`
+
+**"Mark All as Read" Button:**
+- Added to Messages page header to clear all unread counts at once
+- Only displays when totalUnread > 0
+- Updates both message read status and conversation metadata
+- Page reload ensures UI reflects changes across all conversations
+
+### ⚡ Performance Optimizations
+
+#### **Media Lazy Loading with IntersectionObserver**
+- Created `LazyImage` component in `RichTextRenderer.tsx` with IntersectionObserver (50px rootMargin)
+  - Only loads images when they enter viewport
+  - Prevents off-screen image loading, reducing initial network requests
+- Created `LazyVideo` component in `RichTextRenderer.tsx` with IntersectionObserver (100px rootMargin)
+  - Defers video loading until visible
+  - Sets `preload="none"` for off-screen videos
+- Enhanced `VideoThumbnail.tsx` with IntersectionObserver
+  - Only generates thumbnails for visible videos
+  - Reduces memory and CPU usage during gallery scrolling
+- Added `decoding="async"` to all images for non-blocking decode
+- Added `loading="lazy"` to all iframes (YouTube, Vimeo, Streamable)
+
+#### **Cross-Page Component Memoization**
+- `VideosPage.tsx`: Wrapped VideoCard component with `React.memo` to prevent re-renders
+- `PhotosPage.tsx`: Wrapped PhotoCard component with `React.memo` for smoother gallery scrolling
+- `ThreadPage.tsx`: Wrapped ThreadItemRow component with `React.memo` for thread interactions
+- Memoized `InternalMention` component in `RichTextRenderer.tsx` to prevent unnecessary profile fetches
+
+#### **Deferred Profile Fetching**
+- Implemented `requestIdleCallback` with `setTimeout` fallback for non-blocking profile loads
+- VideosPage, PhotosPage, and ThreadPage now fetch author profiles during browser idle time
+- Prevents blocking of main thread and user interactions
+
+#### **Build Error Fix**
+- Removed unused `memo` import from `ProfilePage.tsx` that was causing TypeScript compilation failure
+
+### 📊 Expected Performance Impact
+- ✅ Reduced initial network requests by ~50% (off-screen images/videos not loaded)
+- ✅ Smoother scrolling in media-heavy pages (gallery pages, feed with videos)
+- ✅ Faster page interactivity (deferred non-critical profile fetching)
+- ✅ Better memory usage (lazy loading + memoization prevents unnecessary DOM nodes)
+- ✅ Improved Core Web Vitals (LCP, CLS, FID)
+
+---
+
 ## [Unreleased] - 2026-02-07
 
 ### 🚀 New Features

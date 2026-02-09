@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { NDKEvent, type NDKFilter } from '@nostr-dev-kit/ndk';
+import { NDKEvent, type NDKFilter, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { RichTextRenderer } from './RichTextRenderer';
 import { InteractionBar } from './InteractionBar';
 import { useNostr } from '../../context/NostrContext';
@@ -284,12 +284,39 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
         kinds: [1],
         '#e': [event.id],
       };
-      const results = await ndk.fetchEvents(filter);
-      const sortedResults = Array.from(results).sort(
+
+      // Use subscribe with a timeout instead of fetchEvents for better relay connectivity
+      const commentsRef = new Map<string, NDKEvent>();
+      const sub = ndk.subscribe(
+        filter,
+        { closeOnEose: true, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
+      );
+
+      sub.on('event', (reply: NDKEvent) => {
+        if (!commentsRef.has(reply.id)) {
+          commentsRef.set(reply.id, reply);
+          // Fetch profile in background
+          reply.author.fetchProfile().catch(() => {});
+        }
+      });
+
+      // Wait for EOSE or timeout
+      await new Promise<void>((resolve) => {
+        const timeoutId = setTimeout(() => {
+          sub.stop();
+          resolve();
+        }, 5000); // 5 second timeout
+
+        sub.on('eose', () => {
+          clearTimeout(timeoutId);
+          sub.stop();
+          resolve();
+        });
+      });
+
+      const sortedResults = Array.from(commentsRef.values()).sort(
         (a, b) => (a.created_at || 0) - (b.created_at || 0)
       );
-      // Fetch profiles for authors
-      await Promise.all(sortedResults.map((e) => e.author.fetchProfile()));
       setComments(sortedResults);
     } catch (error) {
       console.error('Failed to fetch thread:', error);

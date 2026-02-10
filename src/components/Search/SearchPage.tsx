@@ -15,6 +15,7 @@ interface SearchResult {
   title?: string;
   image?: string;
   createdAt?: number;
+  nip05?: string;
 }
 
 export const SearchPage = () => {
@@ -65,6 +66,7 @@ export const SearchPage = () => {
                 image: profile.picture,
                 content: profile.about || '',
                 createdAt: event.created_at,
+                nip05: profile.nip05,
               });
             }
           } catch {
@@ -162,8 +164,14 @@ export const SearchPage = () => {
                       <Link
                         to={`/p/${profile.pubkey}`}
                         className="profile-search-name"
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                       >
-                        {profile.title || profile.pubkey.slice(0, 8)}
+                        <span>{profile.title || profile.pubkey.slice(0, 8)}</span>
+                        {profile.nip05 && (
+                          <span title={profile.nip05} style={{ color: '#0099ff', fontSize: '1.1em' }}>
+                            ✓
+                          </span>
+                        )}
                       </Link>
                       {profile.content && (
                         <div className="profile-search-bio">{profile.content}</div>

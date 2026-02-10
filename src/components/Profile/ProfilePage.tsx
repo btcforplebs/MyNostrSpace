@@ -1164,7 +1164,14 @@ const ProfilePage = () => {
             <div
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}
             >
-              <h1>{displayName}</h1>
+              <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {displayName}
+                {profile?.nip05 && (
+                  <span title={profile.nip05} style={{ color: '#0099ff', fontSize: '0.6em', verticalAlign: 'middle' }}>
+                    ✓
+                  </span>
+                )}
+              </h1>
               <div style={{ display: 'flex', gap: '8px' }}>
                 {user?.pubkey === hexPubkey && (
                   <Link

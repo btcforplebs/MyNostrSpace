@@ -1,0 +1,179 @@
+:root {
+    /* ========================================
+     MYSPACE COLOR PALETTE (Based on Classic 2005-2008)
+     ======================================== */
+
+    /* Primary Blues */
+    --myspace-blue: #6699cc;
+    /* The iconic header blue */
+    --myspace-blue-dark: #003399;
+    /* Darker blue for links/accents */
+    --myspace-light-blue: #b1d0f0;
+    /* Light blue backgrounds */
+
+    /* Orange Accents */
+    --myspace-orange: #ffcc99;
+    /* The classic orange headers */
+    --myspace-orange-dark: #cc6600;
+    /* Darker orange borders */
+
+    /* Backgrounds */
+    --myspace-bg-main: #e5e5e5;
+    /* The main page background gray */
+    --myspace-bg-content: #ffffff;
+    /* White content boxes */
+
+    /* Text */
+    --myspace-text-main: #000000;
+    --myspace-text-secondary: #333333;
+    --myspace-text-muted: #666666;
+    --myspace-link: #003399;
+    /* Standard link blue */
+    --myspace-link-hover: #cc0000;
+    /* Classic red hover */
+
+    /* Borders */
+    --myspace-border-blue: #6699cc;
+    --myspace-border-orange: #ffcc99;
+
+    /* Status Indicators */
+    --myspace-online: #00cc00;
+    --myspace-away: #ffcc00;
+    --myspace-offline: #cc0000;
+
+    /* ========================================
+     TYPOGRAPHY
+     ======================================== */
+
+    --myspace-font-family: verdana, arial, sans-serif, helvetica;
+    --myspace-font-size-xs: 9px;
+    --myspace-font-size-sm: 10px;
+    /* Typical small text */
+    --myspace-font-size-base: 12px;
+    /* Standard body text */
+    --myspace-font-size-md: 14px;
+    /* Headers */
+    --myspace-font-size-lg: 16px;
+    /* Large headers */
+
+    /* ========================================
+     SPACING
+     ======================================== */
+
+    --myspace-spacing-xs: 2px;
+    --myspace-spacing-sm: 4px;
+    --myspace-spacing-md: 10px;
+    --myspace-spacing-lg: 20px;
+
+    /* ========================================
+     LAYOUT
+     ======================================== */
+
+    --myspace-container-width: 800px;
+    /* Classic fixed width */
+}
+
+/* ========================================
+   GLOBAL UTIL CLASSES
+   ======================================== */
+
+.myspace-font {
+    font-family: var(--myspace-font-family);
+}
+
+.myspace-link {
+    color: var(--myspace-link);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.myspace-link:hover {
+    color: var(--myspace-link-hover);
+}
+
+.section-header,
+.myspace-section-header {
+    background-color: var(--myspace-orange);
+    color: black;
+    padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
+    margin-bottom: var(--myspace-spacing-sm);
+    margin-top: 0;
+    font-size: var(--myspace-font-size-md);
+    font-weight: bold;
+    text-align: left;
+    font-family: var(--myspace-font-family);
+}
+
+/* Blue header variant (for special cases like loading screens) */
+.section-header-blue {
+    background-color: var(--myspace-blue);
+    color: white;
+    padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
+    font-size: var(--myspace-font-size-md);
+    font-weight: bold;
+    font-family: var(--myspace-font-family);
+}
+
+/* ========================================
+   CONTAINER PATTERNS
+   ======================================== */
+
+.myspace-box {
+    border: 1px solid var(--myspace-border-blue);
+    background: var(--myspace-bg-content);
+    margin-bottom: var(--myspace-spacing-md);
+}
+
+.myspace-box-header {
+    background-color: var(--myspace-orange);
+    color: white;
+    padding: 4px 8px;
+    font-size: var(--myspace-font-size-md);
+    font-weight: bold;
+}
+
+.myspace-box-body {
+    padding: var(--myspace-spacing-sm);
+    font-size: var(--myspace-font-size-base);
+}
+
+/* ========================================
+   STATUS INDICATORS
+   ======================================== */
+
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.status-dot.online {
+    background-color: var(--myspace-online);
+}
+
+.status-dot.away {
+    background-color: var(--myspace-away);
+}
+
+.status-dot.offline {
+    background-color: var(--myspace-offline);
+}
+
+.last-seen {
+    font-size: var(--myspace-font-size-sm);
+    color: var(--myspace-text-muted);
+    font-style: italic;
+}
+
+.mood-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    background: var(--myspace-light-blue);
+    border: 1px solid var(--myspace-blue);
+    font-size: var(--myspace-font-size-sm);
+    border-radius: 3px;
+}

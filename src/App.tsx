@@ -65,6 +65,15 @@ const RoomsPage = lazy(() =>
 const RoomPage = lazy(() =>
   import('./components/Rooms/RoomPage').then((m) => ({ default: m.RoomPage }))
 );
+const RoomAppPlayer = lazy(() =>
+  import('./components/Rooms/RoomAppPlayer').then((m) => ({ default: m.RoomAppPlayer }))
+);
+const GamesPage = lazy(() =>
+  import('./components/Games/GamesPage').then((m) => ({ default: m.GamesPage }))
+);
+const GamePlayerPage = lazy(() =>
+  import('./components/Games/GamePlayerPage').then((m) => ({ default: m.GamePlayerPage }))
+);
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 
 function App() {
@@ -126,7 +135,10 @@ function App() {
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/recipes" element={<RecipesPage />} />
                 <Route path="/rooms" element={<RoomsPage />} />
+                <Route path="/rooms/app/:appId" element={<RoomAppPlayer />} />
                 <Route path="/room/:pubkey/:identifier" element={<RoomPage />} />
+                <Route path="/games" element={<GamesPage />} />
+                <Route path="/game/:gameId" element={<GamePlayerPage />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>

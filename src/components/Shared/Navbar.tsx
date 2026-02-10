@@ -92,7 +92,7 @@ export const Navbar = () => {
           <Link to="/videos">Videos</Link> | <Link to="/photos">Photos</Link> |{' '}
           <Link to="/music">Music</Link> | <Link to="/recipes">Recipes</Link> |{' '}
           <Link to="/marketplace">Marketplace</Link> | <Link to="/livestreams">Livestreams</Link> |{' '}
-          <Link to="/rooms">Rooms</Link>
+          <Link to="/rooms">Rooms</Link> | <Link to="/games">Games</Link>
           {user && (
             <>
               {' '}

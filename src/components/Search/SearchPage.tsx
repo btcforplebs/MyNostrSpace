@@ -38,8 +38,9 @@ export const SearchPage = () => {
         const searchRelaySet = NDKRelaySet.fromRelayUrls(APP_RELAYS.SEARCH, ndk);
 
         // Fetch profiles (kind 0) from search relays with higher limit
+        // Fetch profiles (kind 0) from search relays using NIP-50
         const profileEvents = await ndk.fetchEvents(
-          { kinds: [0], limit: 500 },
+          { kinds: [0], search: query, limit: 50 },
           { relaySet: searchRelaySet }
         );
         const foundProfiles = new Map<string, SearchResult>();
@@ -48,6 +49,7 @@ export const SearchPage = () => {
           if (isBlockedUser(event.pubkey)) return;
           try {
             const profile = JSON.parse(event.content);
+            // We still filter client-side just in case some relays ignore NIP-50 and return random stuff
             const name = (profile.name || '').toLowerCase();
             const displayName = (profile.display_name || '').toLowerCase();
             const about = (profile.about || '').toLowerCase();
@@ -77,9 +79,9 @@ export const SearchPage = () => {
           }
         });
 
-        // Fetch posts (kind 1) from search relays with higher limit
+        // Fetch posts (kind 1) from search relays using NIP-50
         const noteEvents = await ndk.fetchEvents(
-          { kinds: [1], limit: 1000 },
+          { kinds: [1], search: query, limit: 100 },
           { relaySet: searchRelaySet }
         );
         const foundPosts = new Map<string, SearchResult>();

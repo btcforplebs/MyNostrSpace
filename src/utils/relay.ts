@@ -35,14 +35,9 @@ export const APP_RELAYS = {
     'wss://relay.snort.social',
     'wss://relay.nostr.net',
     'wss://nostr.wine',
-    'wss://relay.nostr.band', // Note: This is blacklisted in filterRelays, but ALL_INITIAL_RELAYS uses filterRelays.
   ],
   SEARCH: [
     'wss://antiprimal.net',
-    'wss://purplepag.es',
-    'wss://relay.damus.io',
-    'wss://nos.lol',
-    'wss://relay.snort.social',
   ],
   STREAMING: [
     'wss://relay.zap.stream',

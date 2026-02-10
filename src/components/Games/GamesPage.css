@@ -1,0 +1,214 @@
+.games-page-container {
+    min-height: 100vh;
+    background-color: var(--myspace-bg-main);
+    display: flex;
+    flex-direction: column;
+    font-family: var(--myspace-font-family);
+}
+
+/* Wrapper to match HomePage layout (boxed 992px) */
+.games-wrapper {
+    max-width: 992px;
+    margin: 0 auto;
+    background-color: var(--myspace-bg-content);
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.games-content {
+    /* Removed max-width since wrapper handles it */
+    width: 100%;
+    padding: var(--myspace-spacing-md);
+    flex: 1;
+}
+
+/* Reusing .section-header from design-tokens.css, but if we need specific overrides: */
+/* .section-header is already globally defined to be orange and bold */
+
+.games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    /* Adjusted for MySpace density */
+    gap: var(--myspace-spacing-md);
+    padding: var(--myspace-spacing-md) 0;
+}
+
+.game-card {
+    background: var(--myspace-bg-content);
+    border: 1px solid var(--myspace-border-blue);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+}
+
+.game-card:hover {
+    border-color: var(--myspace-blue-dark);
+    outline: 2px solid var(--myspace-blue);
+}
+
+.game-thumbnail-wrapper {
+    width: 100%;
+    height: 140px;
+    background-color: #f0f0f0;
+    border-bottom: 1px solid var(--myspace-border-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.game-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.game-info {
+    padding: var(--myspace-spacing-md);
+    background-color: var(--myspace-light-blue);
+    /* Light blue background for info area */
+}
+
+.game-title {
+    font-size: var(--myspace-font-size-md);
+    font-weight: bold;
+    margin-bottom: var(--myspace-spacing-sm);
+    color: var(--myspace-link);
+}
+
+.game-title:hover {
+    color: var(--myspace-link-hover);
+    text-decoration: underline;
+}
+
+.game-description {
+    font-size: var(--myspace-font-size-base);
+    color: var(--myspace-text-main);
+    line-height: 1.3;
+}
+
+/* Player Styles */
+.game-player-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: var(--myspace-bg-main);
+}
+
+.game-player-header {
+    /* Keeping dark mode header for player focus, or switch to MySpace Blue? */
+    /* Let's stick to the MySpace Blue header pattern */
+    background: var(--myspace-blue);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    color: white;
+    font-family: var(--myspace-font-family);
+    border-bottom: 2px solid var(--myspace-blue-dark);
+}
+
+.back-button {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--myspace-font-size-md);
+}
+
+.back-button:hover {
+    text-decoration: underline;
+    color: var(--myspace-orange);
+    /* Highlight on hover */
+}
+
+.game-player-controls {
+    /* Using design tokens for local overrides */
+    font-family: var(--myspace-font-family);
+}
+
+.external-link-button {
+    /* Custom button style, similar to standard buttons */
+    background-color: var(--myspace-bg-content) !important;
+    color: var(--myspace-text-main) !important;
+    border: 1px solid var(--myspace-border-blue) !important;
+}
+
+.external-link-button:hover {
+    background-color: var(--myspace-light-blue) !important;
+    color: var(--myspace-link-hover) !important;
+}
+
+.game-frame-wrapper {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    border-top: 1px solid var(--myspace-border-blue);
+}
+
+.game-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: white;
+}
+
+/* Helper Utilities for Player Controls */
+.player-controls-bar {
+    padding: var(--myspace-spacing-md) var(--myspace-spacing-lg);
+    background: var(--myspace-bg-content);
+    border-bottom: 1px solid var(--myspace-border-blue);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--myspace-font-family);
+}
+
+.player-controls-left {
+    display: flex;
+    align-items: center;
+    gap: var(--myspace-spacing-md);
+}
+
+.player-breadcrumbs-link {
+    text-decoration: none;
+    font-weight: bold;
+    color: var(--myspace-text-secondary);
+}
+
+.player-breadcrumbs-link:hover {
+    color: var(--myspace-link-hover);
+    text-decoration: underline;
+}
+
+.player-breadcrumbs-separator {
+    color: #ccc;
+}
+
+.player-app-title {
+    font-weight: bold;
+    color: var(--myspace-text-main);
+}
+
+.player-warning-banner {
+    padding: var(--myspace-spacing-sm);
+    background: #fff3cd;
+    /* Standard warning yellow, keeping specific for visibility */
+    color: #856404;
+    font-size: var(--myspace-font-size-sm);
+    text-align: center;
+    border-bottom: 1px solid #ffeeba;
+    font-family: var(--myspace-font-family);
+}
+
+.not-found-container {
+    padding: 50px;
+    text-align: center;
+}

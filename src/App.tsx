@@ -59,6 +59,8 @@ const CalendarPage = lazy(() =>
 const RecipesPage = lazy(() =>
   import('./components/Recipe/RecipesPage').then((m) => ({ default: m.RecipesPage }))
 );
+
+// HEAD Imports
 const BadgesPage = lazy(() =>
   import('./components/Badges/BadgesPage').then((m) => ({ default: m.BadgesPage }))
 );
@@ -69,6 +71,24 @@ const ConversationPage = lazy(() =>
   import('./components/Messages/ConversationPage').then((m) => ({ default: m.ConversationPage }))
 );
 import { NotificationProvider } from './context/NotificationContext';
+
+// feature/rooms Imports
+const RoomsPage = lazy(() =>
+  import('./components/Rooms/RoomsPage').then((m) => ({ default: m.RoomsPage }))
+);
+const RoomPage = lazy(() =>
+  import('./components/Rooms/RoomPage').then((m) => ({ default: m.RoomPage }))
+);
+const RoomAppPlayer = lazy(() =>
+  import('./components/Rooms/RoomAppPlayer').then((m) => ({ default: m.RoomAppPlayer }))
+);
+const GamesPage = lazy(() =>
+  import('./components/Games/GamesPage').then((m) => ({ default: m.GamesPage }))
+);
+const GamePlayerPage = lazy(() =>
+  import('./components/Games/GamePlayerPage').then((m) => ({ default: m.GamePlayerPage }))
+);
+
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 
 function App() {
@@ -126,9 +146,18 @@ function App() {
                   <Route path="/film" element={<FilmPage />} />
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="/recipes" element={<RecipesPage />} />
+
+                  {/* HEAD Routes */}
                   <Route path="/badges" element={<BadgesPage />} />
                   <Route path="/messages" element={<MessagesPage />} />
                   <Route path="/messages/:pubkey" element={<ConversationPage />} />
+
+                  {/* feature/rooms Routes */}
+                  <Route path="/rooms" element={<RoomsPage />} />
+                  <Route path="/rooms/app/:appId" element={<RoomAppPlayer />} />
+                  <Route path="/room/:pubkey/:identifier" element={<RoomPage />} />
+                  <Route path="/games" element={<GamesPage />} />
+                  <Route path="/game/:gameId" element={<GamePlayerPage />} />
                 </Routes>
               </Suspense>
             </ErrorBoundary>

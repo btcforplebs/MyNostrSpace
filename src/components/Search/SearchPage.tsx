@@ -34,7 +34,7 @@ export const SearchPage = () => {
       setPostResults([]);
 
       try {
-        const queryLower = query.toLowerCase();
+
         const searchRelaySet = NDKRelaySet.fromRelayUrls(APP_RELAYS.SEARCH, ndk);
 
         // Fetch profiles (kind 0) from search relays with higher limit
@@ -50,29 +50,22 @@ export const SearchPage = () => {
           try {
             const profile = JSON.parse(event.content);
             // We still filter client-side just in case some relays ignore NIP-50 and return random stuff
-            const name = (profile.name || '').toLowerCase();
-            const displayName = (profile.display_name || '').toLowerCase();
-            const about = (profile.about || '').toLowerCase();
+            // Trust NIP-50 results from the relay, simplified parsing
+            const name = profile.name || '';
+            const displayName = profile.display_name || '';
 
-            // Check if any field matches the query
-            if (
-              name.includes(queryLower) ||
-              displayName.includes(queryLower) ||
-              about.includes(queryLower)
-            ) {
-              // Deduplicate by pubkey (keep latest)
-              const existing = foundProfiles.get(event.pubkey);
-              if (!existing || (event.created_at || 0) > (existing.createdAt || 0)) {
-                foundProfiles.set(event.pubkey, {
-                  id: event.pubkey,
-                  pubkey: event.pubkey,
-                  type: 'profile',
-                  title: profile.name || profile.display_name,
-                  image: profile.picture,
-                  content: profile.about || '',
-                  createdAt: event.created_at,
-                });
-              }
+            // Deduplicate by pubkey (keep latest)
+            const existing = foundProfiles.get(event.pubkey);
+            if (!existing || (event.created_at || 0) > (existing.createdAt || 0)) {
+              foundProfiles.set(event.pubkey, {
+                id: event.pubkey,
+                pubkey: event.pubkey,
+                type: 'profile',
+                title: displayName || name,
+                image: profile.picture,
+                content: profile.about || '',
+                createdAt: event.created_at,
+              });
             }
           } catch {
             // ignore malformed
@@ -92,16 +85,13 @@ export const SearchPage = () => {
           if (isBlockedUser(event.pubkey)) return;
           if (hasBlockedKeyword(event.content)) return;
 
-          const contentLower = event.content.toLowerCase();
-          if (contentLower.includes(queryLower)) {
-            foundPosts.set(event.id, {
-              id: event.id,
-              pubkey: event.pubkey,
-              type: 'note',
-              content: event.content,
-              createdAt: event.created_at,
-            });
-          }
+          foundPosts.set(event.id, {
+            id: event.id,
+            pubkey: event.pubkey,
+            type: 'note',
+            content: event.content,
+            createdAt: event.created_at,
+          });
         });
 
         // Sort and set results

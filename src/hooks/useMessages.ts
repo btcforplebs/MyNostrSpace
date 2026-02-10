@@ -83,6 +83,22 @@ export function useMessages(
 
       (async () => {
         try {
+          // Check if message already exists in cache to avoid re-decryption
+          const existingMessage = await db.messages.get(event.id);
+
+          if (existingMessage) {
+            // Message exists in cache, just add to state if not there
+            const cachedMessage: CachedDMMessage = {
+              ...existingMessage,
+              // Ensure these computed fields are correct even if DB data is older schema
+              isOutgoing: event.pubkey === userPubkey,
+            };
+
+            messageBuffer.current.push(cachedMessage);
+            scheduleFlush();
+            return;
+          }
+
           if (!ndk?.signer) {
             console.warn('No signer available for DM decryption');
             return;
@@ -105,9 +121,8 @@ export function useMessages(
             return;
           }
 
-          // Check if message already exists and preserve read status
-          const existingMessage = await db.messages.get(event.id);
-          const readStatus = existingMessage?.read ?? false;
+          // Read status for NEW messages is always false (unless we sent it)
+          const isOutgoing = event.pubkey === userPubkey;
 
           const cachedMessage: CachedDMMessage = {
             id: event.id,
@@ -116,8 +131,8 @@ export function useMessages(
             senderPubkey: event.pubkey,
             originalTimestamp: event.created_at || Math.floor(Date.now() / 1000),
             receivedAt: Math.floor(Date.now() / 1000),
-            isOutgoing: event.pubkey === userPubkey,
-            read: readStatus,
+            isOutgoing,
+            read: isOutgoing, // Outgoing messages are implicitly read
           };
 
           // Add to buffer for batching
@@ -137,7 +152,7 @@ export function useMessages(
     [ndk, userPubkey, scheduleFlush]
   );
 
-useEffect(() => {
+  useEffect(() => {
     if (!userPubkey || !ndk || !ndk.signer) {
       setLoading(false);
       return;

@@ -29,7 +29,8 @@ const POPULAR_SITES: ExternalLink[] = [
 
 const CATEGORIES = [
   { name: 'Videos', link: '/videos', icon: '📺' },
-  { name: 'Audio Rooms', link: '/audio-rooms', icon: '🎙️' },
+  { name: 'Rooms', link: '/rooms', icon: '🎙️' },
+  { name: 'Games', link: '/games', icon: '🎮' },
   { name: 'Music', link: '/music', icon: '🎵' },
   { name: 'Marketplace', link: '/marketplace', icon: '🛍️' },
   { name: 'Livestreams', link: '/livestreams', icon: '🔴' },

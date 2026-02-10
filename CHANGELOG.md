@@ -2,6 +2,15 @@
 
 All notable changes to the MyNostrSpace project will be documented in this file.
 
+## [Unreleased] - 2026-02-10
+
+### 🚀 New Features
+
+#### **Browse Page Update**
+- **Categories Update**:
+  - Renamed "**Audio Rooms**" to "**Rooms**" to better reflect content diversity.
+  - Added "**Games**" category pointing to `/games`.
+
 ## [Unreleased] - 2026-02-08
 
 ### 🐛 Bug Fixes

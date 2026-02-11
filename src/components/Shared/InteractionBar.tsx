@@ -1,24 +1,34 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { nip19 } from 'nostr-tools';
 import { useNostr } from '../../context/NostrContext';
 import { subscribeToStats, updateStats, getStats, type EventStats } from '../../hooks/statsCache';
+import { uploadToBlossom } from '../../services/blossom';
+import './FeedItem.css';
 
 interface InteractionBarProps {
   event: NDKEvent;
   onCommentClick?: () => void;
+  commentCount?: number;
 }
 
-export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onCommentClick }) => {
+export const InteractionBar: React.FC<InteractionBarProps> = ({
+  event,
+  onCommentClick,
+  commentCount,
+}) => {
   const { ndk, user, login } = useNostr();
-  const [stats, setStats] = useState<EventStats>(() => getStats(event.id) || {
-    likes: 0,
-    comments: 0,
-    reposts: 0,
-    zaps: 0,
-    likedByMe: false,
-    repostedByMe: false,
-  });
+  const [stats, setStats] = useState<EventStats>(
+    () =>
+      getStats(event.id) || {
+        likes: 0,
+        comments: 0,
+        reposts: 0,
+        zaps: 0,
+        likedByMe: false,
+        repostedByMe: false,
+      }
+  );
   const [showQuoteForm, setShowQuoteForm] = useState(false);
   const [quoteText, setQuoteText] = useState('');
   const [isQuoting, setIsQuoting] = useState(false);
@@ -26,6 +36,10 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
   const [isZapping, setIsZapping] = useState(false);
   const [showRepostConfirm, setShowRepostConfirm] = useState(false);
   const elementRef = useRef<HTMLDivElement>(null);
+
+  // New state for file upload
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Subscribe to batched stats
   useEffect(() => {
@@ -38,46 +52,52 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
     return unsubscribe;
   }, [ndk, event.id, user?.pubkey]);
 
-  const handleLike = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!user) {
-      await login();
-      return;
-    }
-    if (stats.likedByMe) return;
+  const handleLike = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!user) {
+        await login();
+        return;
+      }
+      if (stats.likedByMe) return;
 
-    try {
-      const reaction = new NDKEvent(ndk);
-      reaction.kind = 7;
-      reaction.content = '+';
-      reaction.tags = [
-        ['e', event.id],
-        ['p', event.pubkey],
-        ['client', 'MyNostrSpace'],
-      ];
-      await reaction.publish();
-      updateStats(event.id, (prev) => ({
-        ...prev,
-        likes: prev.likes + 1,
-        likedByMe: true,
-      }));
-    } catch (error) {
-      console.error('Failed to like:', error);
-    }
-  };
+      try {
+        const reaction = new NDKEvent(ndk);
+        reaction.kind = 7;
+        reaction.content = '+';
+        reaction.tags = [
+          ['e', event.id],
+          ['p', event.pubkey],
+          ['client', 'MyNostrSpace'],
+        ];
+        await reaction.publish();
+        updateStats(event.id, (prev) => ({
+          ...prev,
+          likes: prev.likes + 1,
+          likedByMe: true,
+        }));
+      } catch (error) {
+        console.error('Failed to like:', error);
+      }
+    },
+    [user, login, stats.likedByMe, ndk, event.id, event.pubkey]
+  );
 
-  const handleRepost = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!user) {
-      await login();
-      return;
-    }
-    if (stats.repostedByMe) return;
+  const handleRepost = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!user) {
+        await login();
+        return;
+      }
+      if (stats.repostedByMe) return;
 
-    setShowRepostConfirm(true);
-  };
+      setShowRepostConfirm(true);
+    },
+    [user, login, stats.repostedByMe]
+  );
 
-  const confirmRepost = async () => {
+  const confirmRepost = useCallback(async () => {
     setShowRepostConfirm(false);
     try {
       const repost = new NDKEvent(ndk);
@@ -97,139 +117,169 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
     } catch (error) {
       console.error('Failed to repost:', error);
     }
-  };
+  }, [ndk, event]);
 
-  const handleQuote = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!user) {
-      await login();
-      return;
-    }
-    if (!quoteText.trim()) return;
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !ndk) return;
 
-    setIsQuoting(true);
+    setIsUploading(true);
     try {
-      const nevent = nip19.neventEncode({ id: event.id, author: event.pubkey });
-      const quote = new NDKEvent(ndk);
-      quote.kind = 1;
-      quote.content = `${quoteText}\n\nnostr:${nevent}`;
-      quote.tags = [
-        ['e', event.id, '', 'mention'],
-        ['p', event.pubkey],
-        ['q', event.id],
-        ['client', 'MyNostrSpace'],
-      ];
-      await quote.publish();
-      setQuoteText('');
-      setShowQuoteForm(false);
-      alert('Quote posted!');
+      const result = await uploadToBlossom(ndk, file);
+      const url = result.url;
+      setQuoteText((prev) => (prev ? `${prev}\n${url}` : url));
     } catch (error) {
-      console.error('Failed to quote:', error);
-      alert('Failed to post quote');
+      console.error('Upload failed:', error);
+      alert('Failed to upload image');
     } finally {
-      setIsQuoting(false);
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleZap = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!user) {
-      await login();
-      return;
-    }
+  const triggerUpload = () => {
+    fileInputRef.current?.click();
+  };
 
-    const amount = prompt('Enter amount in sats to zap:', '21');
-    if (!amount) return;
+  const handleQuote = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!user) {
+        await login();
+        return;
+      }
+      if (!quoteText.trim()) return;
 
-    setIsZapping(true);
-    setZapInvoice(null);
+      setIsQuoting(true);
+      try {
+        const nevent = nip19.neventEncode({ id: event.id, author: event.pubkey });
+        const quote = new NDKEvent(ndk);
+        quote.kind = 1;
+        quote.content = `${quoteText}\n\nnostr:${nevent}`;
+        quote.tags = [
+          ['e', event.id, '', 'mention'],
+          ['p', event.pubkey],
+          ['q', event.id],
+          ['client', 'MyNostrSpace'],
+        ];
+        await quote.publish();
+        setQuoteText('');
+        setShowQuoteForm(false);
+        alert('Quote posted!');
+      } catch (error) {
+        console.error('Failed to quote:', error);
+        alert('Failed to post quote');
+      } finally {
+        setIsQuoting(false);
+      }
+    },
+    [user, login, quoteText, ndk, event]
+  );
 
-    try {
-      const amountInMSats = parseInt(amount) * 1000;
-      if (isNaN(amountInMSats) || amountInMSats <= 0) {
-        alert('Invalid amount');
+  const handleZap = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!user) {
+        await login();
         return;
       }
 
-      console.log(`Initiating zap of ${amount} sats for event ${event.id}`);
+      const amount = prompt('Enter amount in sats to zap:', '21');
+      if (!amount) return;
 
-      if (!event.author.profile) {
-        await event.author.fetchProfile();
-      }
+      setIsZapping(true);
+      setZapInvoice(null);
 
-      const profile = event.author.profile;
-      const lud16 = profile?.lud16 || profile?.lud06;
-
-      if (!lud16) {
-        alert("This user hasn't set up a Lightning address (lud16).");
-        return;
-      }
-
-      let lnurl = '';
-      if (lud16.includes('@')) {
-        const [name, domain] = lud16.split('@');
-        lnurl = `https://${domain}/.well-known/lnurlp/${name}`;
-      } else {
-        lnurl = lud16;
-      }
-
-      const lnurlRes = await fetch(lnurl);
-      const lnurlData = await lnurlRes.json();
-      const callback = lnurlData.callback;
-
-      if (!callback) {
-        throw new Error('No callback found in LNURL data');
-      }
-
-      const zapRequest = new NDKEvent(ndk);
-      zapRequest.kind = 9734;
-      zapRequest.content = 'Zap from MyNostrSpace';
-      zapRequest.tags = [
-        ['relays', ...ndk.pool.relays.keys()],
-        ['amount', amountInMSats.toString()],
-        ['lnurl', lud16],
-        ['p', event.author.pubkey],
-        ['e', event.id],
-        ['client', 'MyNostrSpace'],
-      ];
-
-      await zapRequest.sign();
-      const zapRequestJson = JSON.stringify(zapRequest.rawEvent());
-
-      const cbUrl = new URL(callback);
-      cbUrl.searchParams.append('amount', amountInMSats.toString());
-      cbUrl.searchParams.append('nostr', zapRequestJson);
-      cbUrl.searchParams.append('lnurl', lud16);
-
-      const invoiceRes = await fetch(cbUrl.toString());
-      const invoiceData = await invoiceRes.json();
-
-      if (invoiceData.pr) {
-        setZapInvoice(invoiceData.pr);
-        console.log('Zap invoice generated:', invoiceData.pr);
-
-        if ((window.nostr as unknown as { zap?: (invoice: string) => Promise<void> | void })?.zap) {
-          try {
-            await (
-              window.nostr as unknown as { zap: (invoice: string) => Promise<void> | void }
-            ).zap(invoiceData.pr);
-            updateStats(event.id, (prev) => ({ ...prev, zaps: prev.zaps + 1 }));
-            setZapInvoice(null);
-            alert('Zap successful!');
-          } catch (err) {
-            console.log('Auto-zap failed, showing QR', err);
-          }
+      try {
+        const amountInMSats = parseInt(amount) * 1000;
+        if (isNaN(amountInMSats) || amountInMSats <= 0) {
+          alert('Invalid amount');
+          return;
         }
-      } else {
-        throw new Error(invoiceData.reason || 'Failed to get invoice');
+
+        console.log(`Initiating zap of ${amount} sats for event ${event.id}`);
+
+        if (!event.author.profile) {
+          await event.author.fetchProfile();
+        }
+
+        const profile = event.author.profile;
+        const lud16 = profile?.lud16 || profile?.lud06;
+
+        if (!lud16) {
+          alert("This user hasn't set up a Lightning address (lud16).");
+          return;
+        }
+
+        let lnurl = '';
+        if (lud16.includes('@')) {
+          const [name, domain] = lud16.split('@');
+          lnurl = `https://${domain}/.well-known/lnurlp/${name}`;
+        } else {
+          lnurl = lud16;
+        }
+
+        const lnurlRes = await fetch(lnurl);
+        const lnurlData = await lnurlRes.json();
+        const callback = lnurlData.callback;
+
+        if (!callback) {
+          throw new Error('No callback found in LNURL data');
+        }
+
+        const zapRequest = new NDKEvent(ndk);
+        zapRequest.kind = 9734;
+        zapRequest.content = 'Zap from MyNostrSpace';
+        zapRequest.tags = [
+          ['relays', ...ndk.pool.relays.keys()],
+          ['amount', amountInMSats.toString()],
+          ['lnurl', lud16],
+          ['p', event.author.pubkey],
+          ['e', event.id],
+          ['client', 'MyNostrSpace'],
+        ];
+
+        await zapRequest.sign();
+        const zapRequestJson = JSON.stringify(zapRequest.rawEvent());
+
+        const cbUrl = new URL(callback);
+        cbUrl.searchParams.append('amount', amountInMSats.toString());
+        cbUrl.searchParams.append('nostr', zapRequestJson);
+        cbUrl.searchParams.append('lnurl', lud16);
+
+        const invoiceRes = await fetch(cbUrl.toString());
+        const invoiceData = await invoiceRes.json();
+
+        if (invoiceData.pr) {
+          setZapInvoice(invoiceData.pr);
+          console.log('Zap invoice generated:', invoiceData.pr);
+
+          if (
+            (window.nostr as unknown as { zap?: (invoice: string) => Promise<void> | void })?.zap
+          ) {
+            try {
+              await (
+                window.nostr as unknown as { zap: (invoice: string) => Promise<void> | void }
+              ).zap(invoiceData.pr);
+              updateStats(event.id, (prev) => ({ ...prev, zaps: prev.zaps + 1 }));
+              setZapInvoice(null);
+              alert('Zap successful!');
+            } catch (err) {
+              console.log('Auto-zap failed, showing QR', err);
+            }
+          }
+        } else {
+          throw new Error(invoiceData.reason || 'Failed to get invoice');
+        }
+      } catch (error: unknown) {
+        console.error('Zap flow failed:', error);
+        alert(`Zap failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsZapping(false);
       }
-    } catch (error: unknown) {
-      console.error('Zap flow failed:', error);
-      alert(`Zap failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsZapping(false);
-    }
-  };
+    },
+    [user, login, ndk, event]
+  );
 
   return (
     <div
@@ -247,7 +297,10 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
       <a
         href="#"
         onClick={handleLike}
-        style={{ color: stats.likedByMe ? '#f04e30' : '#003399', fontWeight: stats.likedByMe ? 'bold' : 'normal' }}
+        style={{
+          color: stats.likedByMe ? '#f04e30' : '#003399',
+          fontWeight: stats.likedByMe ? 'bold' : 'normal',
+        }}
       >
         {stats.likedByMe ? '♥ Liked' : 'like'} ({stats.likes})
       </a>
@@ -260,7 +313,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         }}
         style={{ color: '#003399' }}
       >
-        comment ({stats.comments})
+        comment ({Math.max(stats.comments, commentCount || 0)})
       </a>
       <span className="interaction-separator">|</span>
       <a
@@ -289,34 +342,40 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({ event, onComment
         {isZapping ? 'zapping...' : `zap (${stats.zaps})`}
       </a>
       {showQuoteForm && (
-        <div
-          style={{
-            flexBasis: '100%',
-            marginTop: '8px',
-            padding: '8px',
-            background: '#f9f9f9',
-            border: '1px solid #ccc',
-            minWidth: '300px',
-          }}
-        >
+        <div className="myspace-form-container" style={{ flexBasis: '100%' }}>
           <textarea
             className="nostr-input"
             value={quoteText}
             onChange={(e) => setQuoteText(e.target.value)}
             placeholder="Add your thoughts..."
-            style={{ width: '100%', minHeight: '80px', fontSize: '9pt', boxSizing: 'border-box' }}
+            style={{ minHeight: '80px' }}
           />
-          <div style={{ textAlign: 'right', marginTop: '5px' }}>
+          <div className="myspace-button-group">
             <button
+              type="button"
+              className="myspace-button-secondary"
+              onClick={triggerUpload}
+              disabled={isUploading || isQuoting}
+            >
+              Add Photo
+            </button>
+            <button
+              className="myspace-button"
               onClick={handleQuote}
               disabled={isQuoting || !quoteText.trim()}
-              style={{ fontSize: '8pt', padding: '2px 8px', cursor: 'pointer' }}
             >
               {isQuoting ? 'Posting...' : 'Post Quote'}
             </button>
           </div>
         </div>
       )}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        style={{ display: 'none' }}
+      />
       {zapInvoice && (
         <div
           className="zap-modal"

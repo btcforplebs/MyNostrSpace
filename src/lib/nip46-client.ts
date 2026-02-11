@@ -274,7 +274,7 @@ export class NIP46Client {
       nip44Encrypt: async (recipient: NDKUser, plaintext: string): Promise<string> => {
         try {
           return await this.rpc('nip44_encrypt', [recipient.pubkey, plaintext]);
-        } catch (err) {
+        } catch {
           // Fallback to nip04 if nip44 not available
           return this.rpc('nip04_encrypt', [recipient.pubkey, plaintext]);
         }
@@ -283,7 +283,7 @@ export class NIP46Client {
       nip44Decrypt: async (sender: NDKUser, ciphertext: string): Promise<string> => {
         try {
           return await this.rpc('nip44_decrypt', [sender.pubkey, ciphertext]);
-        } catch (err) {
+        } catch {
           // Fallback to nip04 if nip44 not available
           return this.rpc('nip04_decrypt', [sender.pubkey, ciphertext]);
         }

@@ -22,7 +22,7 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
         return {
           pubkey: msg.pubkey, // Fallback to event pubkey if no request found
           amount: amount,
-          content: ''
+          content: '',
         };
       }
 
@@ -40,7 +40,7 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
       return {
         pubkey: zapperPubkey,
         amount,
-        content
+        content,
       };
     } catch (e) {
       console.error('Failed to parse zap receipt', e);
@@ -60,32 +60,35 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
   // Determine display name
   const displayName = String(
     profile?.name ||
-    profile?.display_name ||
-    msg.author?.profile?.name ||
-    msg.author?.profile?.display_name ||
-    displayPubkey.slice(0, 8)
+      profile?.display_name ||
+      msg.author?.profile?.name ||
+      msg.author?.profile?.display_name ||
+      displayPubkey.slice(0, 8)
   );
 
   // Get profile picture
   const profilePicture = String(
     profile?.picture ||
-    profile?.image ||
-    (zapperInfo ? '' : (msg.author?.profile?.picture || msg.author?.profile?.image)) ||
-    `https://robohash.org/${displayPubkey}`
+      profile?.image ||
+      (zapperInfo ? '' : msg.author?.profile?.picture || msg.author?.profile?.image) ||
+      `https://robohash.org/${displayPubkey}`
   );
 
   if (zapperInfo) {
     return (
-      <div className="chat-message zap-message" style={{
-        display: 'flex',
-        gap: '8px',
-        alignItems: 'flex-start',
-        marginBottom: '10px',
-        background: 'rgba(255, 215, 0, 0.1)',
-        padding: '8px',
-        border: '1px solid #ffd700',
-        borderRadius: '4px'
-      }}>
+      <div
+        className="chat-message zap-message"
+        style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'flex-start',
+          marginBottom: '10px',
+          background: 'rgba(255, 215, 0, 0.1)',
+          padding: '8px',
+          border: '1px solid #ffd700',
+          borderRadius: '4px',
+        }}
+      >
         <Link to={`/p/${zapperInfo.pubkey}`} style={{ flexShrink: 0 }}>
           <img
             src={profilePicture}
@@ -95,7 +98,7 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
               height: '32px',
               borderRadius: '50%',
               objectFit: 'cover',
-              border: '1px solid #ffd700'
+              border: '1px solid #ffd700',
             }}
             onError={(e) => {
               e.currentTarget.src = `https://robohash.org/${zapperInfo.pubkey}`;
@@ -104,15 +107,18 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
         </Link>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div>
-            <span className="zap-badge" style={{
-              background: '#ffd700',
-              color: '#000',
-              fontSize: '0.7rem',
-              padding: '1px 4px',
-              borderRadius: '2px',
-              fontWeight: 'bold',
-              marginRight: '6px'
-            }}>
+            <span
+              className="zap-badge"
+              style={{
+                background: '#ffd700',
+                color: '#000',
+                fontSize: '0.7rem',
+                padding: '1px 4px',
+                borderRadius: '2px',
+                fontWeight: 'bold',
+                marginRight: '6px',
+              }}
+            >
               ZAP {zapperInfo.amount} sats
             </span>
             <span className="chat-author">
@@ -123,12 +129,18 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
                 {displayName}
               </Link>
             </span>
-            <span className="chat-time" style={{ color: '#999', fontSize: '0.75em', marginLeft: '6px' }}>
+            <span
+              className="chat-time"
+              style={{ color: '#999', fontSize: '0.75em', marginLeft: '6px' }}
+            >
               {timeString}
             </span>
           </div>
           {zapperInfo.content && (
-            <div className="chat-text" style={{ wordBreak: 'break-word', fontStyle: 'italic', marginTop: '2px' }}>
+            <div
+              className="chat-text"
+              style={{ wordBreak: 'break-word', fontStyle: 'italic', marginTop: '2px' }}
+            >
               "{zapperInfo.content}"
             </div>
           )}
@@ -138,7 +150,10 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
   }
 
   return (
-    <div className="chat-message" style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '8px' }}>
+    <div
+      className="chat-message"
+      style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '8px' }}
+    >
       <Link to={`/p/${msg.pubkey}`} style={{ flexShrink: 0 }}>
         <img
           src={profilePicture}
@@ -148,7 +163,7 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
             height: '32px',
             borderRadius: '50%',
             objectFit: 'cover',
-            border: '1px solid #ccc'
+            border: '1px solid #ccc',
           }}
           onError={(e) => {
             e.currentTarget.src = `https://robohash.org/${msg.pubkey}`;
@@ -165,7 +180,10 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
               {displayName}
             </Link>
           </span>
-          <span className="chat-time" style={{ color: '#999', fontSize: '0.75em', marginLeft: '6px' }}>
+          <span
+            className="chat-time"
+            style={{ color: '#999', fontSize: '0.75em', marginLeft: '6px' }}
+          >
             {timeString}
           </span>
         </div>

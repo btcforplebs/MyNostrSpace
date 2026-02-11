@@ -1,5 +1,6 @@
 import type NDK from '@nostr-dev-kit/ndk';
 import type { NDKFilter } from '@nostr-dev-kit/ndk';
+import { NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 
 export interface EventStats {
   likes: number;
@@ -75,95 +76,180 @@ export function subscribeToStats(
   };
 }
 
+const BATCH_INTERVAL = 500; // Collect for 500ms
+const MAX_BATCH_SIZE = 10; // Process 10 events at a time
+const MAX_CONCURRENT_STATS = 3; // Only fetch stats for 3 events in parallel
+
 function scheduleBatchFetch(): void {
-  if (batchTimeout) return; // Already scheduled
+  if (batchTimeout) return;
 
   batchTimeout = setTimeout(() => {
     batchTimeout = null;
     executeBatchFetch();
-  }, 150); // Wait 150ms to collect more event IDs
+  }, BATCH_INTERVAL);
 }
+
+// Simple semaphore for concurrency control
+let activeFetches = 0;
+const fetchQueue: (() => void)[] = [];
+
+const runThrottled = (fn: () => Promise<void>) => {
+  if (activeFetches < MAX_CONCURRENT_STATS) {
+    activeFetches++;
+    fn().finally(() => {
+      activeFetches--;
+      if (fetchQueue.length > 0) {
+        const next = fetchQueue.shift();
+        if (next) runThrottled(next as any); // Type cast for simplicity in this helper
+      }
+    });
+  } else {
+    fetchQueue.push(fn as any);
+  }
+};
+
+import { ANTIPRIMAL_RELAY } from '../utils/antiprimal';
 
 async function executeBatchFetch(): Promise<void> {
   if (pendingEventIds.size === 0 || !currentNdk) return;
 
-  const eventIds = Array.from(pendingEventIds);
+  const allEventIds = Array.from(pendingEventIds);
   pendingEventIds = new Set();
+  const currentNdkRef = currentNdk;
+  const currentUserPubkeyRef = currentUserPubkey;
 
-  try {
-    // Single query for ALL pending event IDs
-    const filter: NDKFilter = {
-      '#e': eventIds,
-      kinds: [7, 1, 6, 9735],
-    };
+  // Initialize cache entries
+  allEventIds.forEach((id) => {
+    let entry = cache.get(id);
+    if (!entry) {
+      entry = { stats: { ...defaultStats }, subscribers: new Set() };
+      cache.set(id, entry);
+    } else if (!entry.stats) {
+      entry.stats = { ...defaultStats };
+    }
+  });
 
-    const relatedEvents = await currentNdk.fetchEvents(filter);
+  // Split into chunks to avoid massive parallel spikes
+  for (let i = 0; i < allEventIds.length; i += MAX_BATCH_SIZE) {
+    const chunk = allEventIds.slice(i, i + MAX_BATCH_SIZE);
 
-    // Initialize stats for all requested events
-    const statsMap = new Map<string, EventStats>();
-    eventIds.forEach((id) => {
-      statsMap.set(id, { ...defaultStats });
-    });
+    // Process chunk's "By Me" interactions (can be batched easily)
+    if (currentUserPubkeyRef) {
+      fetchUserInteractions(chunk, currentNdkRef, currentUserPubkeyRef);
+    }
 
-    // Process all related events
-    relatedEvents.forEach((e) => {
-      // Find which event this relates to
-      const eTag = e.tags.find((t) => t[0] === 'e');
-      if (!eTag) return;
-
-      const targetEventId = eTag[1];
-      const stats = statsMap.get(targetEventId);
-      if (!stats) return;
-
-      if (e.kind === 7) {
-        stats.likes++;
-        if (currentUserPubkey && e.pubkey === currentUserPubkey) {
-          stats.likedByMe = true;
-        }
-      } else if (e.kind === 6) {
-        stats.reposts++;
-        if (currentUserPubkey && e.pubkey === currentUserPubkey) {
-          stats.repostedByMe = true;
-        }
-      } else if (e.kind === 1) {
-        stats.comments++;
-      } else if (e.kind === 9735) {
-        stats.zaps++;
-      }
-    });
-
-    // Update cache and notify subscribers
-    statsMap.forEach((stats, eventId) => {
-      const entry = cache.get(eventId);
-      if (entry) {
-        entry.stats = stats;
-        entry.subscribers.forEach((callback) => {
-          try {
-            callback(stats);
-          } catch (err) {
-            console.error('Error in stats subscriber:', err);
-          }
-        });
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching batched stats:', error);
-    // On error, clear pending so components can retry
-    eventIds.forEach((id) => {
-      const entry = cache.get(id);
-      if (entry && !entry.stats) {
-        entry.stats = { ...defaultStats };
-        entry.subscribers.forEach((cb) => cb(entry.stats!));
-      }
+    // Process chunk's global counts (must be throttled)
+    chunk.forEach((id) => {
+      runThrottled(() => fetchEventCounts(id, currentNdkRef));
     });
   }
 }
 
+async function fetchUserInteractions(eventIds: string[], ndk: NDK, pubkey: string) {
+  try {
+    const myEvents = await ndk.fetchEvents(
+      {
+        kinds: [7, 6],
+        '#e': eventIds,
+        authors: [pubkey],
+      },
+      { cacheUsage: NDKSubscriptionCacheUsage.PARALLEL }
+    );
+
+    myEvents.forEach((e) => {
+      const targetId = e.tags.find((t) => t[0] === 'e')?.[1];
+      if (!targetId) return;
+
+      updateStats(targetId, (prev) => ({
+        ...prev,
+        likedByMe: prev.likedByMe || (e.kind === 7 && e.content !== '-'),
+        repostedByMe: prev.repostedByMe || e.kind === 6,
+      }));
+    });
+  } catch (err) {
+    console.error('Error fetching user interactions:', err);
+  }
+}
+
+async function fetchEventCounts(id: string, ndk: NDK) {
+  try {
+    const antiprimalRelaySet = NDKRelaySet.fromRelayUrls(
+      [ANTIPRIMAL_RELAY, 'wss://relay.nostr.band'],
+      ndk
+    );
+
+    // Try to find a relay that supports COUNT (NIP-45)
+    // We'll use a standard subscription but keep it extremely short-lived
+    // and only for THIS specific event.
+    const [likes, comments, reposts, zaps] = await Promise.all([
+      countEvents(ndk, { kinds: [7], '#e': [id] }, antiprimalRelaySet),
+      countEvents(ndk, { kinds: [1], '#e': [id] }, antiprimalRelaySet),
+      countEvents(ndk, { kinds: [6, 16], '#e': [id] }, antiprimalRelaySet),
+      countEvents(ndk, { kinds: [9735], '#e': [id] }, antiprimalRelaySet),
+    ]);
+
+    updateStats(id, (prev) => ({
+      ...prev,
+      likes,
+      comments,
+      reposts,
+      zaps,
+    }));
+  } catch (err) {
+    console.error(`Error fetching counts for ${id}:`, err);
+  }
+}
+
+async function countEvents(ndk: NDK, filter: NDKFilter, relaySet: NDKRelaySet): Promise<number> {
+  return new Promise((resolve) => {
+    // 1. Try NIP-45 COUNT if possible via direct relay access
+    // This is much faster and lighter if supported
+    const relays = Array.from(relaySet.relays);
+    const relayWithCount = relays.find((r) => (r as any).count !== undefined);
+
+    if (relayWithCount) {
+      (relayWithCount as any)
+        .count([filter], { id: Math.random().toString(36).substring(7) })
+        .then((res: any) => resolve(typeof res === 'number' ? res : res.count || 0))
+        .catch(() => {
+          // Fallback to manual count if COUNT fails
+          manualCount(ndk, filter, relaySet, resolve);
+        });
+    } else {
+      manualCount(ndk, filter, relaySet, resolve);
+    }
+  });
+}
+
+function manualCount(
+  ndk: NDK,
+  filter: NDKFilter,
+  relaySet: NDKRelaySet,
+  resolve: (n: number) => void
+) {
+  const sub = ndk.subscribe(filter, {
+    closeOnEose: true,
+    groupable: false,
+    relaySet,
+  });
+
+  let count = 0;
+  sub.on('event', () => {
+    count++;
+  });
+  sub.on('eose', () => {
+    sub.stop();
+    resolve(count);
+  });
+
+  setTimeout(() => {
+    sub.stop();
+    resolve(count);
+  }, 2000); // 2s timeout for manual count
+}
+
 // Update stats after user interaction (like, repost, etc.)
-export function updateStats(
-  eventId: string,
-  updater: (prev: EventStats) => EventStats
-): void {
+export function updateStats(eventId: string, updater: (prev: EventStats) => EventStats): void {
   const entry = cache.get(eventId);
   if (entry && entry.stats) {
     entry.stats = updater(entry.stats);

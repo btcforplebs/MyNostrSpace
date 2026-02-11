@@ -179,10 +179,7 @@ export async function clearAllMessages(): Promise<void> {
 /**
  * Get messages since a specific timestamp
  */
-export async function getMessagesSince(
-  pubkey: string,
-  since: number
-): Promise<CachedDMMessage[]> {
+export async function getMessagesSince(pubkey: string, since: number): Promise<CachedDMMessage[]> {
   const messages = await db.messages
     .where('conversationWith')
     .equals(pubkey)
@@ -194,7 +191,9 @@ export async function getMessagesSince(
 /**
  * Get the most recent messages for conversation preview
  */
-export async function getLastMessageForConversation(pubkey: string): Promise<CachedDMMessage | undefined> {
+export async function getLastMessageForConversation(
+  pubkey: string
+): Promise<CachedDMMessage | undefined> {
   const messages = await db.messages.where('conversationWith').equals(pubkey).toArray();
   return messages.length > 0 ? messages[messages.length - 1] : undefined;
 }

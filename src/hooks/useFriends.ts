@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { NDKUser } from '@nostr-dev-kit/ndk';
 import { useNostr } from '../context/NostrContext';
+import { useBlockList } from './useBlockList';
 
 export const useFriends = (pubkey?: string) => {
   const { ndk } = useNostr();
+  const { allBlockedPubkeys } = useBlockList();
   const [friends, setFriends] = useState<string[]>([]); // Now returns pubkeys
   const [loading, setLoading] = useState(true);
 
@@ -93,5 +95,9 @@ export const useFriends = (pubkey?: string) => {
     }
   };
 
-  return { friends, loading, followUser, fetchProfiles };
+  const filteredFriends = useMemo(() => {
+    return friends.filter((pk) => !allBlockedPubkeys.has(pk));
+  }, [friends, allBlockedPubkeys]);
+
+  return { friends: filteredFriends, loading, followUser, fetchProfiles };
 };

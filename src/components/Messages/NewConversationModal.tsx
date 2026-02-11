@@ -37,7 +37,11 @@ function decodePubkey(input: string): string | null {
   return null;
 }
 
-export const NewConversationModal = ({ isOpen, onClose, onStartConversation }: NewConversationModalProps) => {
+export const NewConversationModal = ({
+  isOpen,
+  onClose,
+  onStartConversation,
+}: NewConversationModalProps) => {
   const [input, setInput] = useState('');
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -150,7 +154,11 @@ export const NewConversationModal = ({ isOpen, onClose, onStartConversation }: N
           <button className="modal-btn modal-btn-cancel" onClick={onClose} disabled={loading}>
             Cancel
           </button>
-          <button className="modal-btn modal-btn-primary" onClick={handleStart} disabled={!pubkey || loading}>
+          <button
+            className="modal-btn modal-btn-primary"
+            onClick={handleStart}
+            disabled={!pubkey || loading}
+          >
             {loading ? 'Starting...' : 'Start Conversation'}
           </button>
         </div>

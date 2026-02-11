@@ -15,7 +15,9 @@ export interface SignerEncryptionMethods {
  * Get encryption methods from the current signer
  * Supports both NIP-07 (extension) and NIP-46 (remote signer)
  */
-export async function getSignerEncryption(ndk: NDK | null): Promise<SignerEncryptionMethods | null> {
+export async function getSignerEncryption(
+  ndk: NDK | null
+): Promise<SignerEncryptionMethods | null> {
   if (!ndk || !ndk.signer) {
     return null;
   }
@@ -27,22 +29,20 @@ export async function getSignerEncryption(ndk: NDK | null): Promise<SignerEncryp
     return {
       encrypt: async (recipientPubKey: string, plaintext: string) => {
         try {
-          return await (signer as any).encrypt(
-            { pubkey: recipientPubKey } as any,
-            plaintext
-          );
+          return await (signer as any).encrypt({ pubkey: recipientPubKey } as any, plaintext);
         } catch (err) {
-          throw new Error(`NIP-46 encryption failed: ${err instanceof Error ? err.message : String(err)}`);
+          throw new Error(
+            `NIP-46 encryption failed: ${err instanceof Error ? err.message : String(err)}`
+          );
         }
       },
       decrypt: async (senderPubKey: string, ciphertext: string) => {
         try {
-          return await (signer as any).decrypt(
-            { pubkey: senderPubKey } as any,
-            ciphertext
-          );
+          return await (signer as any).decrypt({ pubkey: senderPubKey } as any, ciphertext);
         } catch (err) {
-          throw new Error(`NIP-46 decryption failed: ${err instanceof Error ? err.message : String(err)}`);
+          throw new Error(
+            `NIP-46 decryption failed: ${err instanceof Error ? err.message : String(err)}`
+          );
         }
       },
       isNip46: true,
@@ -56,10 +56,7 @@ export async function getSignerEncryption(ndk: NDK | null): Promise<SignerEncryp
       return {
         encrypt: async (recipientPubKey: string, plaintext: string) => {
           try {
-            const encrypted = await (window.nostr as any).nip04.encrypt(
-              recipientPubKey,
-              plaintext
-            );
+            const encrypted = await (window.nostr as any).nip04.encrypt(recipientPubKey, plaintext);
             return encrypted;
           } catch (err) {
             throw new Error(
@@ -69,10 +66,7 @@ export async function getSignerEncryption(ndk: NDK | null): Promise<SignerEncryp
         },
         decrypt: async (senderPubKey: string, ciphertext: string) => {
           try {
-            const decrypted = await (window.nostr as any).nip04.decrypt(
-              senderPubKey,
-              ciphertext
-            );
+            const decrypted = await (window.nostr as any).nip04.decrypt(senderPubKey, ciphertext);
             return decrypted;
           } catch (err) {
             throw new Error(

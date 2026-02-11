@@ -6,9 +6,10 @@ import { RichTextRenderer } from './RichTextRenderer';
 
 interface EmbeddedNoteProps {
   id: string;
+  depth?: number;
 }
 
-export const EmbeddedNote = ({ id }: EmbeddedNoteProps) => {
+export const EmbeddedNote = ({ id, depth = 0 }: EmbeddedNoteProps) => {
   const { ndk } = useNostr();
   const navigate = useNavigate();
   const [event, setEvent] = useState<NDKEvent | null>(null);
@@ -106,7 +107,7 @@ export const EmbeddedNote = ({ id }: EmbeddedNoteProps) => {
         {event.author.profile?.name || event.author.pubkey.slice(0, 8)} said:
       </div>
       <div style={{ color: '#333' }}>
-        <RichTextRenderer content={event.content} />
+        <RichTextRenderer content={event.content} depth={depth} />
       </div>
       <div style={{ fontSize: '7.5pt', color: '#888', marginTop: '8px' }}>
         {new Date(event.created_at! * 1000).toLocaleString()}

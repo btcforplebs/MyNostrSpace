@@ -8,6 +8,7 @@ import {
   NDKRelaySet,
 } from '@nostr-dev-kit/ndk';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
+import { filterRelays } from '../../utils/relay';
 import { Navbar } from '../Shared/Navbar';
 import { FeedItem } from '../Shared/FeedItem';
 import { SEO } from '../Shared/SEO';
@@ -18,75 +19,79 @@ import { Avatar } from '../Shared/Avatar';
 import { VideoThumbnail } from '../Shared/VideoThumbnail';
 import { useNotifications } from '../../context/NotificationContext';
 import { useProfile } from '../../hooks/useProfile';
-import { subscribeToProfile } from '../../hooks/profileCache';
-import { getTotalUnreadCount } from '../../services/messageCache';
-import { useMessages } from '../../hooks/useMessages';
+import { useBlockList } from '../../hooks/useBlockList';
+
 import './HomePage.css';
 
 // Single notification item - shows who did what to your post
-const NotificationItem = memo(({
-  event,
-  onClick,
-}: {
-  event: NDKEvent;
-  onClick: (link: string) => void;
-}) => {
-  const { profile } = useProfile(event.pubkey);
+const NotificationItem = memo(
+  ({ event, onClick }: { event: NDKEvent; onClick: (link: string) => void }) => {
+    const { profile } = useProfile(event.pubkey);
 
-  const authorName = profile?.name || profile?.displayName || event.pubkey.slice(0, 8);
-  const targetId = event.tags.find((t) => t[0] === 'e')?.[1];
+    const authorName = profile?.name || profile?.displayName || event.pubkey.slice(0, 8);
+    const targetId = event.tags.find((t) => t[0] === 'e')?.[1];
 
-  // Determine action text
-  let actionText = '';
-  let actionIcon = '';
-  if (event.kind === 7) {
-    actionIcon = '♥';
-    actionText = 'liked your post';
-  } else if (event.kind === 6) {
-    actionIcon = '↻';
-    actionText = 'reposted your post';
-  } else if (event.kind === 1) {
-    actionIcon = '💬';
-    actionText = 'replied to your post';
-  } else if (event.kind === 9735) {
-    actionIcon = '⚡';
-    actionText = 'zapped your post';
-  }
+    // Determine action text
+    let actionText = '';
+    let actionIcon = '';
+    if (event.kind === 7) {
+      actionIcon = '♥';
+      actionText = 'liked your post';
+    } else if (event.kind === 6) {
+      actionIcon = '↻';
+      actionText = 'reposted your post';
+    } else if (event.kind === 1) {
+      actionIcon = '💬';
+      actionText = 'replied to your post';
+    } else if (event.kind === 9735) {
+      actionIcon = '⚡';
+      actionText = 'zapped your post';
+    } else if (event.kind === 3) {
+      actionIcon = '👤';
+      actionText = 'followed you';
+    }
 
-  return (
-    <div
-      className="notification-item clickable"
-      onClick={() => onClick(`/thread/${targetId}`)}
-    >
-      <Avatar pubkey={event.pubkey} src={profile?.picture} size={36} />
-      <div className="notification-content">
-        <div className="notification-action-line">
-          <span className="notification-icon">{actionIcon}</span>
-          <Link
-            to={`/p/${event.pubkey}`}
-            className="notification-user-name"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {authorName}
-          </Link>
-          <span className="notification-action"> {actionText}</span>
-        </div>
-
-        {/* Show brief reply preview if it's a reply */}
-        {event.kind === 1 && event.content && (
-          <div className="notification-reply-preview">
-            {event.content.slice(0, 100)}
-            {event.content.length > 100 && '...'}
+    return (
+      <div
+        className="notification-item clickable"
+        onClick={() => {
+          if (event.kind === 3) {
+            onClick(`/p/${event.pubkey}`);
+          } else if (targetId) {
+            onClick(`/thread/${targetId}`);
+          }
+        }}
+      >
+        <Avatar pubkey={event.pubkey} src={profile?.picture} size={36} />
+        <div className="notification-content">
+          <div className="notification-action-line">
+            <span className="notification-icon">{actionIcon}</span>
+            <Link
+              to={`/p/${event.pubkey}`}
+              className="notification-user-name"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {authorName}
+            </Link>
+            <span className="notification-action"> {actionText}</span>
           </div>
-        )}
 
-        <div className="notification-time">
-          {new Date((event.created_at || 0) * 1000).toLocaleString()}
+          {/* Show brief reply preview if it's a reply */}
+          {event.kind === 1 && event.content && (
+            <div className="notification-reply-preview">
+              {event.content.slice(0, 100)}
+              {event.content.length > 100 && '...'}
+            </div>
+          )}
+
+          <div className="notification-time">
+            {new Date((event.created_at || 0) * 1000).toLocaleString()}
+          </div>
         </div>
       </div>
-    </div>
-  );
-});
+    );
+  }
+);
 
 interface MusicTrack {
   title: string;
@@ -139,14 +144,43 @@ const HomePage = () => {
     try {
       // 1. Get User's Preferred Relays (Kind 10002)
       const relayEvent = await ndk.fetchEvent({ kinds: [10002], authors: [user.pubkey] });
-      const relayUrls = relayEvent
-        ? relayEvent.tags.filter((t) => t[0] === 'r').map((t) => t[1])
+      const userRelays = relayEvent
+        ? filterRelays(relayEvent.tags.filter((t) => t[0] === 'r').map((t) => t[1]))
         : [];
 
-      const targetRelays =
-        relayUrls.length > 0 ? NDKRelaySet.fromRelayUrls(relayUrls, ndk) : undefined;
+      // 2. Combine with forceful relays for better stats (Antiprimal is key for history/counts)
+      const allRelays = [
+        ...userRelays,
+        'wss://antiprimal.net',
+        'wss://relay.damus.io',
+        'wss://nos.lol',
+      ];
 
-      // 2. Start Subscriptions (Streaming)
+      const targetRelays = NDKRelaySet.fromRelayUrls(allRelays, ndk);
+
+      // Track unique IDs to prevent duplicates affecting counts
+      const uniqueFollowers = new Set<string>();
+      const uniquePostIds = new Set<string>();
+      const uniqueZapIds = new Set<string>();
+
+      // 2. Start Subscriptions (Streaming) with Throttled Updates
+      let currentFollowers = 0;
+      let currentPosts = 0;
+      let currentZaps = 0;
+      let updateTimeout: ReturnType<typeof setTimeout> | null = null;
+
+      const scheduleUpdate = () => {
+        if (updateTimeout) return;
+        updateTimeout = setTimeout(() => {
+          setStats({
+            followers: currentFollowers,
+            posts: currentPosts,
+            zaps: currentZaps,
+          });
+          updateTimeout = null;
+        }, 500); // Update UI every 500ms at most
+      };
+
       const followersSub = ndk.subscribe(
         { kinds: [3], '#p': [user.pubkey] },
         { closeOnEose: true, relaySet: targetRelays }
@@ -162,17 +196,26 @@ const HomePage = () => {
         { closeOnEose: true, relaySet: targetRelays }
       );
 
-      followersSub.on('event', () => {
-        setStats((prev) => ({ ...prev, followers: (prev.followers || 0) + 1 }));
+      followersSub.on('event', (ev: NDKEvent) => {
+        if (!uniqueFollowers.has(ev.pubkey) && !allBlockedPubkeys.has(ev.pubkey)) {
+          uniqueFollowers.add(ev.pubkey);
+          currentFollowers = uniqueFollowers.size;
+          scheduleUpdate();
+        }
       });
 
       postsSub.on('event', (ev: NDKEvent) => {
-        if (!ev.tags.some((t) => t[0] === 'e')) {
-          setStats((prev) => ({ ...prev, posts: (prev.posts || 0) + 1 }));
+        if (!uniquePostIds.has(ev.id)) {
+          uniquePostIds.add(ev.id);
+          currentPosts = uniquePostIds.size;
+          scheduleUpdate();
         }
       });
 
       zapsSub.on('event', (ev: NDKEvent) => {
+        if (uniqueZapIds.has(ev.id)) return;
+        uniqueZapIds.add(ev.id);
+
         let amt = 0;
         const amountTag = ev.tags.find((t) => t[0] === 'amount');
         if (amountTag) {
@@ -193,14 +236,27 @@ const HomePage = () => {
           }
         }
         if (amt > 0) {
-          setStats((prev) => ({ ...prev, zaps: Math.floor((prev.zaps || 0) + amt) }));
+          currentZaps = Math.floor(currentZaps + amt);
+          scheduleUpdate();
         }
       });
 
       let finishedCount = 0;
       const onDone = () => {
         finishedCount++;
-        if (finishedCount >= 3) setLoadingStats(false);
+        if (finishedCount >= 3) {
+          setLoadingStats(false);
+          // Final flush to ensure latest numbers are shown
+          if (updateTimeout) {
+            clearTimeout(updateTimeout);
+            setStats({
+              followers: currentFollowers,
+              posts: currentPosts,
+              zaps: currentZaps,
+            });
+            updateTimeout = null;
+          }
+        }
       };
 
       followersSub.on('eose', onDone);
@@ -208,7 +264,7 @@ const HomePage = () => {
       zapsSub.on('eose', onDone);
 
       // Safety timeout
-      setTimeout(() => setLoadingStats(false), 15000);
+      setTimeout(() => setLoadingStats(false), 20000); // Increased timeout for more relays
     } catch (e) {
       console.error('Error starting stats stream:', e);
       setLoadingStats(false);
@@ -223,7 +279,9 @@ const HomePage = () => {
   const [currentMusicIndex, setCurrentMusicIndex] = useState(0);
   const [shouldAutoplayMusic, setShouldAutoplayMusic] = useState(false);
   const [streamEvents, setStreamEvents] = useState<NDKEvent[]>([]);
-  const [viewMode, setViewMode] = useState<'feed' | 'media' | 'blog' | 'music' | 'streams' | 'notifications'>('feed');
+  const [viewMode, setViewMode] = useState<
+    'feed' | 'media' | 'blog' | 'music' | 'streams' | 'notifications'
+  >('feed');
   const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
   // Pagination State
   const [feedUntil, setFeedUntil] = useState<number | null>(null);
@@ -243,8 +301,9 @@ const HomePage = () => {
   const loadMoreStreamsTriggerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(3);
   const { markAsRead, lastSeen } = useNotifications();
+  const { allBlockedPubkeys } = useBlockList();
   const [hasNewNotifs, setHasNewNotifs] = useState(false);
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const sessionStartTimeRef = useRef(Math.floor(Date.now() / 1000));
 
   useEffect(() => {
     const handleResize = () => {
@@ -260,17 +319,10 @@ const HomePage = () => {
   }, []);
 
   // Helper to dedupe and sort feed events (used by flushBuffer and pending posts)
-  const dedupAndSortFeed = (
-    newEvents: NDKEvent[],
-    existingEvents: NDKEvent[]
-  ): NDKEvent[] => {
+  const dedupAndSortFeed = (newEvents: NDKEvent[], existingEvents: NDKEvent[]): NDKEvent[] => {
     const combined = [...newEvents, ...existingEvents];
-    const unique = Array.from(
-      new Map(combined.map((item) => [item.id, item])).values()
-    );
-    return unique
-      .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
-      .slice(0, 100);
+    const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+    return unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 100);
   };
 
   const getCanonicalUrl = (url: string) => {
@@ -439,18 +491,21 @@ const HomePage = () => {
     });
   }, []);
 
-  const MOODS = useMemo(() => [
-    'None',
-    'Happy',
-    'Sad',
-    'Angry',
-    'Confused',
-    'Excited',
-    'Sleepy',
-    'Bored',
-    'Hyper',
-    'Creative',
-  ], []);
+  const MOODS = useMemo(
+    () => [
+      'None',
+      'Happy',
+      'Sad',
+      'Angry',
+      'Confused',
+      'Excited',
+      'Sleepy',
+      'Bored',
+      'Hyper',
+      'Creative',
+    ],
+    []
+  );
 
   const handleMusicSelect = (index: number) => {
     setCurrentMusicIndex(index);
@@ -486,7 +541,7 @@ const HomePage = () => {
         const followPubkeys = Array.from(followedUsersSet || new Set()).map((u) => u.pubkey);
         if (!followPubkeys.includes(user.pubkey)) followPubkeys.push(user.pubkey);
         followsCacheRef.current = followPubkeys;
-      } catch (e) {
+      } catch {
         // Fallback to just self if follows fails
         followsCacheRef.current = [user.pubkey];
       }
@@ -572,7 +627,15 @@ const HomePage = () => {
       setIsLoadingMoreMedia(false);
       fetchingRef.current = false;
     }
-  }, [mediaUntil, ndk, getFollows, isLoadingMoreMedia, hasMoreMedia]);
+  }, [
+    mediaUntil,
+    ndk,
+    getFollows,
+    isLoadingMoreMedia,
+    hasMoreMedia,
+    addMediaItems,
+    processMediaEvent,
+  ]);
 
   // Initial Feed Subscription
   useEffect(() => {
@@ -626,27 +689,12 @@ const HomePage = () => {
 
         if (apiEvent.kind === 1 && apiEvent.tags.some((t) => t[0] === 'e')) return;
 
-        const isNewPost =
-          feedEoseRef.current && (apiEvent.created_at || 0) > eoseTimestampRef.current;
-
-        if (isNewPost) {
-          // Pre-fetch the author's profile into our cache so it's ready when shown
-          const unsub = subscribeToProfile(apiEvent.pubkey, ndk, () => { });
-          // Unsubscribe after a delay - profile will remain in cache
-          setTimeout(() => unsub(), 100);
-
-          setPendingPosts((prev) => {
-            if (prev.find((e) => e.id === apiEvent.id)) return prev;
-            return [apiEvent, ...prev].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-          });
-        } else {
-          eventBuffer.push(apiEvent);
-          if (!flushTimeout) {
-            flushTimeout = setTimeout(() => {
-              flushBuffer();
-              flushTimeout = null;
-            }, 300); // Batch updates every 300ms
-          }
+        eventBuffer.push(apiEvent);
+        if (!flushTimeout) {
+          flushTimeout = setTimeout(() => {
+            flushBuffer();
+            flushTimeout = null;
+          }, 300); // Batch updates every 300ms
         }
       });
       sub.on('eose', () => {
@@ -658,33 +706,6 @@ const HomePage = () => {
           if (prev.length > 0) {
             const oldest = prev[prev.length - 1];
             if (oldest.created_at) setFeedUntil(oldest.created_at - 1);
-
-            // Defer profile pre-fetch to avoid blocking the main thread
-            if (typeof requestIdleCallback !== 'undefined') {
-              requestIdleCallback(() => {
-                const uniqueAuthors = [...new Set(prev.slice(0, 20).map((e) => e.pubkey))];
-                uniqueAuthors.forEach((pk) => {
-                  // Fetch one profile at a time with delays to avoid overwhelming the relays
-                  setTimeout(() => {
-                    ndk?.getUser({ pubkey: pk }).fetchProfile({
-                      cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
-                    }).catch(() => { });
-                  }, 50);
-                });
-              });
-            } else {
-              // Fallback for browsers that don't support requestIdleCallback
-              setTimeout(() => {
-                const uniqueAuthors = [...new Set(prev.slice(0, 20).map((e) => e.pubkey))];
-                uniqueAuthors.forEach((pk, idx) => {
-                  setTimeout(() => {
-                    ndk?.getUser({ pubkey: pk }).fetchProfile({
-                      cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
-                    }).catch(() => { });
-                  }, idx * 50);
-                });
-              }, 100);
-            }
           }
           return prev;
         });
@@ -752,7 +773,6 @@ const HomePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ndk, user, viewMode, getFollows]);
 
-
   // Blogs and Streams
   useEffect(() => {
     if (!ndk || !user || (viewMode !== 'blog' && viewMode !== 'streams')) return;
@@ -764,13 +784,23 @@ const HomePage = () => {
       sub.on('event', (ev) => {
         if (viewMode === 'blog') {
           setBlogEvents((prev) => {
-            if (prev.find((e) => e.id === ev.id)) return prev;
-            return [...prev, ev].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+            const dTag = ev.getMatchingTags('d')[0]?.[1];
+            if (!dTag) return prev; // Ignore if no d tag for replaceable
+            const filtered = prev.filter((e) => {
+              const eDTag = e.getMatchingTags('d')[0]?.[1];
+              return !(e.pubkey === ev.pubkey && eDTag === dTag);
+            });
+            return [...filtered, ev].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
           });
         } else if (viewMode === 'streams') {
           setStreamEvents((prev) => {
-            if (prev.find((e) => e.id === ev.id)) return prev;
-            return [...prev, ev].sort((a, b) => {
+            const dTag = ev.getMatchingTags('d')[0]?.[1];
+            if (!dTag) return prev; // Ignore if no d tag
+            const filtered = prev.filter((e) => {
+              const eDTag = e.getMatchingTags('d')[0]?.[1];
+              return !(e.pubkey === ev.pubkey && eDTag === dTag);
+            });
+            return [...filtered, ev].sort((a, b) => {
               const aStatus = a.tags.find((t) => t[0] === 'status')?.[1] || 'ended';
               const bStatus = b.tags.find((t) => t[0] === 'status')?.[1] || 'ended';
               if (aStatus === 'live' && bStatus !== 'live') return -1;
@@ -814,7 +844,7 @@ const HomePage = () => {
 
     const startNotificationSub = async () => {
       const filter: NDKFilter = {
-        kinds: [1, 6, 7, 9735],
+        kinds: [1, 3, 6, 7, 9735],
         '#p': [user.pubkey],
         limit: 30, // Reduced from 50 to avoid excessive initial fetches
       };
@@ -830,19 +860,33 @@ const HomePage = () => {
         const buffer = [...notifBuffer];
         notifBuffer = [];
 
-        // Batch fetch profiles for notification authors using profile cache
-        const uniqueAuthors = [...new Set(buffer.map((e) => e.pubkey))];
-        uniqueAuthors.forEach((pk) => {
-          const unsub = subscribeToProfile(pk, ndk, () => { });
-          setTimeout(() => unsub(), 100);
-        });
-
         setNotifications((prev) => {
           const combined = [...buffer, ...prev];
-          const unique = Array.from(
-            new Map(combined.map((item) => [item.id, item])).values()
-          );
-          const sorted = unique
+
+          // First, dedupe by ID
+          const uniqueById = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+
+          // Then, specific handling for Kind 3 (Contacts):
+          // Only keep the latest Kind 3 event per author to avoid spam from profile updates
+          const kind3sByAuthor = new Map<string, NDKEvent>();
+          uniqueById.forEach((ev) => {
+            if (ev.kind === 3) {
+              const existing = kind3sByAuthor.get(ev.pubkey);
+              if (!existing || (ev.created_at || 0) > (existing.created_at || 0)) {
+                kind3sByAuthor.set(ev.pubkey, ev);
+              }
+            }
+          });
+
+          // Filter out "stale" Kind 3s (keep only the latest for each author)
+          const filtered = uniqueById.filter((ev) => {
+            if (ev.kind === 3) {
+              return kind3sByAuthor.get(ev.pubkey)?.id === ev.id;
+            }
+            return true;
+          });
+
+          const sorted = filtered
             .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
             .slice(0, 50);
 
@@ -855,16 +899,54 @@ const HomePage = () => {
         });
       };
 
-      sub.on('event', (ev: NDKEvent) => {
-        // Skip notifications from yourself (self-replies, self-likes, etc.)
-        if (ev.pubkey === user.pubkey) return;
+      sub.on('event', async (ev: NDKEvent) => {
+        // 0. LOCAL FILTER: Ensure this event is actually meant for us
+        const isTargetedToUs =
+          ev.tags.some((t) => (t[0] === 'p' || t[0] === 'e') && t[1] === user.pubkey) ||
+          (ev.kind === 3 && ev.tags.some((t) => t[0] === 'p' && t[1] === user.pubkey));
+
+        if (!isTargetedToUs) return;
+
+        // Skip notifications from yourself OR BLOCKED USERS
+        if (ev.pubkey === user.pubkey || allBlockedPubkeys.has(ev.pubkey)) return;
+
+        const isHistorical = (ev.created_at || 0) < sessionStartTimeRef.current;
+
+        // Smart Follower Check (Kind 3 Diff)
+        if (ev.kind === 3) {
+          try {
+            // Only proceed if we are in the CURRENT list
+            const isFollowedNow = ev.tags.some((t) => t[0] === 'p' && t[1] === user.pubkey);
+            if (!isFollowedNow) return;
+
+            // 1. Fetch history from a reliable relay (Antiprimal)
+            const antiprimalRelay = NDKRelaySet.fromRelayUrls(['wss://antiprimal.net'], ndk);
+            const prevEvent = await ndk.fetchEvent(
+              {
+                kinds: [3],
+                authors: [ev.pubkey],
+                until: (ev.created_at || 0) - 1,
+                limit: 1,
+              },
+              { relaySet: antiprimalRelay }
+            );
+
+            if (isHistorical && !prevEvent) return;
+
+            const wasFollowed = prevEvent?.tags.some((t) => t[0] === 'p' && t[1] === user.pubkey);
+            if (wasFollowed) return;
+          } catch (e) {
+            console.error('Error checking previous follow list:', e);
+            return;
+          }
+        }
 
         notifBuffer.push(ev);
         if (!notifFlushTimeout) {
           notifFlushTimeout = setTimeout(() => {
             flushNotifications();
             notifFlushTimeout = null;
-          }, 500); // Increased from 300ms to batch more notifications
+          }, 500);
         }
       });
 
@@ -877,30 +959,7 @@ const HomePage = () => {
     return () => {
       if (sub) sub.stop();
     };
-  }, [ndk, user]);
-
-  // Subscribe to messages in the background
-  useMessages(user?.pubkey || null, ndk);
-
-  // Fetch unread message count periodically
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchUnread = async () => {
-      try {
-        const count = await getTotalUnreadCount();
-        setUnreadMessageCount(count);
-      } catch (err) {
-        console.error('Failed to fetch unread message count:', err);
-      }
-    };
-
-    fetchUnread();
-
-    // Refresh count every 5 seconds
-    const interval = setInterval(fetchUnread, 5000);
-    return () => clearInterval(interval);
-  }, [user]);
+  }, [ndk, user, allBlockedPubkeys, lastSeen]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -1086,17 +1145,6 @@ const HomePage = () => {
                 </div>
               </div>
 
-              {unreadMessageCount > 0 && (
-                <div className="mail-box">
-                  <div className="mail-box-header">Alerts</div>
-                  <div className="mail-box-body">
-                    <div className="mail-text clickable" onClick={() => navigate('/messages')}>
-                      📬 You've Got Mail!
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div className="home-box">
                 <div className="home-box-header">My Apps</div>
                 <div className="home-box-body">
@@ -1126,7 +1174,6 @@ const HomePage = () => {
                       <span className="app-icon">🖼️</span> Photos
                     </li>
                   </ul>
-
                 </div>
               </div>
             </div>
@@ -1257,15 +1304,6 @@ const HomePage = () => {
                       <div
                         className="new-posts-banner"
                         onClick={() => {
-                          // Ensure profiles are in our cache before showing posts
-                          const uniqueAuthors = [...new Set(pendingPosts.map((e) => e.pubkey))];
-                          uniqueAuthors.forEach((pk) => {
-                            if (ndk) {
-                              const unsub = subscribeToProfile(pk, ndk, () => { });
-                              setTimeout(() => unsub(), 100);
-                            }
-                          });
-
                           const sorted = dedupAndSortFeed(pendingPosts, feed);
                           setFeed(sorted);
                           setPendingPosts([]);
@@ -1321,7 +1359,13 @@ const HomePage = () => {
                                   style={{ aspectRatio: isExpanded ? '16/9' : 'auto' }}
                                 >
                                   {item.type === 'image' ? (
-                                    <img src={item.url} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: 'auto' }} />
+                                    <img
+                                      src={item.url}
+                                      alt=""
+                                      loading="lazy"
+                                      decoding="async"
+                                      style={{ width: '100%', height: 'auto' }}
+                                    />
                                   ) : isExpanded ? (
                                     ytMatch ? (
                                       <iframe
@@ -1350,7 +1394,13 @@ const HomePage = () => {
                                         loading="lazy"
                                       />
                                     ) : (
-                                      <video src={item.url} controls autoPlay preload="metadata" style={{ width: '100%', height: '100%' }} />
+                                      <video
+                                        src={item.url}
+                                        controls
+                                        autoPlay
+                                        preload="metadata"
+                                        style={{ width: '100%', height: '100%' }}
+                                      />
                                     )
                                   ) : (
                                     <div
@@ -1426,13 +1476,41 @@ const HomePage = () => {
 
                 {viewMode === 'streams' && (
                   <div style={{ padding: '15px' }}>
-                    {streamEvents.slice(0, displayedStreamsCount).map((ev) => (
-                      <div key={ev.id} className="stream-item">
-                        <Link to={`/stream/${ev.pubkey}/${ev.getMatchingTags('d')[0]?.[1]}`}>
-                          {ev.tags.find((t) => t[0] === 'title')?.[1] || 'Live Stream'}
-                        </Link>
-                      </div>
-                    ))}
+                    <div className="streams-list">
+                      {streamEvents.length === 0 && (
+                        <div style={{ padding: '20px', width: '100%', textAlign: 'center' }}>
+                          No active livestreams from people you follow.
+                        </div>
+                      )}
+                      {streamEvents.slice(0, displayedStreamsCount).map((stream) => {
+                        const title = stream.getMatchingTags('title')[0]?.[1] || 'Untitled Stream';
+                        const image = stream.getMatchingTags('image')[0]?.[1];
+                        const dTag = stream.getMatchingTags('d')[0]?.[1];
+                        const summary =
+                          stream.getMatchingTags('summary')[0]?.[1] || stream.content || '';
+                        const hostPubkey = stream.getMatchingTags('p')[0]?.[1] || stream.pubkey;
+                        const url = `/live/${hostPubkey}/${dTag}`;
+
+                        return (
+                          <Link key={stream.id} to={url} className="stream-list-item">
+                            <div className="stream-list-thumb-container">
+                              {image ? (
+                                <img src={image} alt={title} className="stream-list-thumb" />
+                              ) : (
+                                <div className="stream-list-no-image">LIVE</div>
+                              )}
+                              <div className="live-badge-overlay">LIVE</div>
+                            </div>
+                            <div className="stream-list-info">
+                              <div className="stream-list-title">{title}</div>
+                              <div className="stream-list-host">Host: {hostPubkey.slice(0, 8)}</div>
+                              <div className="stream-list-summary">{summary}</div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+
                     {/* Intersection observer trigger for streams */}
                     <div
                       ref={loadMoreStreamsTriggerRef}
@@ -1492,7 +1570,7 @@ const HomePage = () => {
       <BlogEditor
         isOpen={isBlogModalOpen}
         onClose={() => setIsBlogModalOpen(false)}
-        onPostComplete={() => { }}
+        onPostComplete={() => {}}
       />
     </div>
   );

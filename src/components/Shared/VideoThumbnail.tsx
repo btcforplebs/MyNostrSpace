@@ -7,7 +7,12 @@ interface VideoThumbnailProps {
   className?: string;
 }
 
-export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ src, poster, style, className }) => {
+export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
+  src,
+  poster,
+  style,
+  className,
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasError, setHasError] = useState(false);
   const [isVisible, setIsVisible] = useState(!!poster); // Assume visible if poster provided
@@ -86,7 +91,13 @@ export const VideoThumbnail: React.FC<VideoThumbnailProps> = ({ src, poster, sty
       preload={isVisible ? 'metadata' : 'none'}
       muted
       playsInline
-      style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#f0f0f0', ...style }}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        backgroundColor: '#f0f0f0',
+        ...style,
+      }}
       className={className}
     />
   );

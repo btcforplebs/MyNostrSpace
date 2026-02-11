@@ -25,6 +25,7 @@ import { FeedItem } from '../Shared/FeedItem';
 import './ProfilePage.css';
 import { isBlockedUser } from '../../utils/blockedUsers';
 import { AwardBadgeModal } from '../Badges/AwardBadgeModal';
+import { ANTIPRIMAL_RELAY, PRIMAL_BOT_PUBKEY } from '../../utils/antiprimal';
 
 // --- Tab Sub-Components ---
 
@@ -32,20 +33,72 @@ const ProfileRecipes = ({ pubkey }: { pubkey: string }) => {
   const { ndk } = useNostr();
   const [recipes, setRecipes] = useState<NDKEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [until, setUntil] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+
+  const fetchRecipes = useCallback(
+    async (untilTimestamp?: number) => {
+      if (!ndk || !pubkey) return;
+
+      try {
+        const filter: NDKFilter = {
+          kinds: [30023 as number],
+          authors: [pubkey],
+          '#t': ['zapcooking', 'nostrcooking'],
+          limit: 25,
+        };
+        if (untilTimestamp) filter.until = untilTimestamp;
+
+        const events = await ndk.fetchEvents(filter);
+        const sorted = Array.from(events).sort((a, b) => b.created_at! - a.created_at!);
+
+        if (sorted.length < 25) setHasMore(false);
+
+        if (sorted.length > 0) {
+          setUntil(sorted[sorted.length - 1].created_at! - 1);
+          setRecipes((prev) => {
+            const combined = [...prev, ...sorted];
+            const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+            return unique.sort((a, b) => b.created_at! - a.created_at!);
+          });
+        } else {
+          setHasMore(false);
+        }
+      } catch (e) {
+        console.error('Error fetching recipes:', e);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [ndk, pubkey]
+  );
 
   useEffect(() => {
-    if (!ndk || !pubkey) return;
-    const fetchRecipes = async () => {
-      const events = await ndk.fetchEvents({
-        kinds: [30023 as number],
-        authors: [pubkey],
-        '#t': ['zapcooking', 'nostrcooking'], // Filter for recipes
-      });
-      setRecipes(Array.from(events));
-      setLoading(false);
-    };
     fetchRecipes();
-  }, [ndk, pubkey]);
+  }, [fetchRecipes]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!loadingMore && hasMore && until) {
+      setLoadingMore(true);
+      fetchRecipes(until);
+    }
+  }, [loadingMore, hasMore, until, fetchRecipes]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+    if (loadMoreTriggerRef.current) observer.observe(loadMoreTriggerRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, handleLoadMore]);
 
   if (loading) return <div>Loading recipes...</div>;
   if (recipes.length === 0) return <div>No recipes found.</div>;
@@ -87,6 +140,12 @@ const ProfileRecipes = ({ pubkey }: { pubkey: string }) => {
           </div>
         );
       })}
+      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
+      {loadingMore && (
+        <div style={{ textAlign: 'center', padding: '10px', color: '#666', fontSize: '10pt' }}>
+          Loading more...
+        </div>
+      )}
     </div>
   );
 };
@@ -95,26 +154,76 @@ const ProfileBlog = ({ pubkey }: { pubkey: string }) => {
   const { ndk } = useNostr();
   const [posts, setPosts] = useState<NDKEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [until, setUntil] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+
+  const fetchPosts = useCallback(
+    async (untilTimestamp?: number) => {
+      if (!ndk || !pubkey) return;
+
+      try {
+        const filter: NDKFilter = {
+          kinds: [30023 as number],
+          authors: [pubkey],
+          limit: 25,
+        };
+        if (untilTimestamp) filter.until = untilTimestamp;
+
+        const events = await ndk.fetchEvents(filter);
+        const blogPosts = Array.from(events).filter((evt) => {
+          const tags = evt.tags.map((t) => t[1]);
+          return !tags.includes('zapcooking') && !tags.includes('nostrcooking');
+        });
+
+        const sorted = blogPosts.sort((a, b) => b.created_at! - a.created_at!);
+
+        if (sorted.length < 25) setHasMore(false);
+
+        if (sorted.length > 0) {
+          setUntil(sorted[sorted.length - 1].created_at! - 1);
+          setPosts((prev) => {
+            const combined = [...prev, ...sorted];
+            const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+            return unique.sort((a, b) => b.created_at! - a.created_at!);
+          });
+        } else {
+          setHasMore(false);
+        }
+      } catch (e) {
+        console.error('Error fetching blog posts:', e);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [ndk, pubkey]
+  );
 
   useEffect(() => {
-    if (!ndk || !pubkey) return;
-    const fetchPosts = async () => {
-      const events = await ndk.fetchEvents({
-        kinds: [30023 as number],
-        authors: [pubkey],
-      });
-
-      // Filter out obvious recipes if we want strict separation
-      const blogPosts = Array.from(events).filter((evt) => {
-        const tags = evt.tags.map((t) => t[1]);
-        return !tags.includes('zapcooking') && !tags.includes('nostrcooking');
-      });
-
-      setPosts(blogPosts);
-      setLoading(false);
-    };
     fetchPosts();
-  }, [ndk, pubkey]);
+  }, [fetchPosts]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!loadingMore && hasMore && until) {
+      setLoadingMore(true);
+      fetchPosts(until);
+    }
+  }, [loadingMore, hasMore, until, fetchPosts]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+    if (loadMoreTriggerRef.current) observer.observe(loadMoreTriggerRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, handleLoadMore]);
 
   if (loading) return <div>Loading posts...</div>;
   if (posts.length === 0) return <div>No blog posts found.</div>;
@@ -140,6 +249,12 @@ const ProfileBlog = ({ pubkey }: { pubkey: string }) => {
           </div>
         );
       })}
+      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
+      {loadingMore && (
+        <div style={{ textAlign: 'center', padding: '10px', color: '#666', fontSize: '10pt' }}>
+          Loading more...
+        </div>
+      )}
     </div>
   );
 };
@@ -151,6 +266,7 @@ const ProfileFeed = ({ pubkey }: { pubkey: string }) => {
   const [until, setUntil] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
   const fetchFeed = useCallback(
     async (untilTimestamp?: number) => {
@@ -160,7 +276,7 @@ const ProfileFeed = ({ pubkey }: { pubkey: string }) => {
         const filter: NDKFilter = {
           kinds: [1],
           authors: [pubkey],
-          limit: 10,
+          limit: 25,
         };
         if (untilTimestamp) {
           filter.until = untilTimestamp;
@@ -169,7 +285,7 @@ const ProfileFeed = ({ pubkey }: { pubkey: string }) => {
         const fetched = await ndk.fetchEvents(filter);
         const newEvents = Array.from(fetched).sort((a, b) => b.created_at! - a.created_at!);
 
-        if (newEvents.length < 10) {
+        if (newEvents.length < 25) {
           setHasMore(false);
         }
 
@@ -198,12 +314,30 @@ const ProfileFeed = ({ pubkey }: { pubkey: string }) => {
     fetchFeed();
   }, [fetchFeed]);
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     if (!loadingMore && hasMore && until) {
       setLoadingMore(true);
       fetchFeed(until);
     }
-  };
+  }, [loadingMore, hasMore, until, fetchFeed]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (loadMoreTriggerRef.current) {
+      observer.observe(loadMoreTriggerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, handleLoadMore]);
 
   if (loading) return <div>Loading feed...</div>;
 
@@ -217,23 +351,10 @@ const ProfileFeed = ({ pubkey }: { pubkey: string }) => {
           <FeedItem key={event.id} event={event} />
         ))}
       </div>
-      {hasMore && events.length > 0 && (
-        <div style={{ textAlign: 'center', padding: '10px' }}>
-          <button
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            style={{
-              padding: '5px 15px',
-              cursor: 'pointer',
-              backgroundColor: '#eee',
-              border: '1px solid #ccc',
-              borderRadius: '3px',
-              fontWeight: 'bold',
-              color: '#333',
-            }}
-          >
-            {loadingMore ? 'Loading...' : 'Load More'}
-          </button>
+      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
+      {loadingMore && (
+        <div style={{ textAlign: 'center', padding: '10px', color: '#666', fontSize: '10pt' }}>
+          Loading more...
         </div>
       )}
     </div>
@@ -348,7 +469,7 @@ const ProfilePhotos = ({ pubkey }: { pubkey: string }) => {
     if (!ndk || !pubkey) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    const filter: NDKFilter = { kinds: [1], authors: [pubkey], limit: 20 };
+    const filter: NDKFilter = { kinds: [1], authors: [pubkey], limit: 25 };
     const sub = ndk.subscribe(filter, {
       closeOnEose: false,
       cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
@@ -372,7 +493,7 @@ const ProfilePhotos = ({ pubkey }: { pubkey: string }) => {
       kinds: [1],
       authors: [pubkey],
       until: oldestTimestamp - 1,
-      limit: 50,
+      limit: 25,
     };
     const sub = ndk.subscribe(filter, { closeOnEose: true });
     sub.on('event', handleEvent);
@@ -383,6 +504,25 @@ const ProfilePhotos = ({ pubkey }: { pubkey: string }) => {
       if (loadTrackerRef.current === 0) setHasMore(false);
     });
   }, [ndk, pubkey, photos, loadingMore, hasMore, handleEvent, processBuffer]);
+
+  // Intersection Observer for infinite scroll
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && photos.length > 0) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (loadMoreTriggerRef.current) {
+      observer.observe(loadMoreTriggerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, handleLoadMore, photos.length]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -432,15 +572,10 @@ const ProfilePhotos = ({ pubkey }: { pubkey: string }) => {
         ))}
       </div>
 
-      {hasMore && (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <button
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            style={{ padding: '8px 16px', cursor: 'pointer' }}
-          >
-            {loadingMore ? 'Loading...' : 'Load More'}
-          </button>
+      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
+      {loadingMore && (
+        <div style={{ textAlign: 'center', padding: '20px', color: '#666', fontSize: '10pt' }}>
+          Loading more photos...
         </div>
       )}
 
@@ -495,6 +630,7 @@ const ProfileVideos = ({ pubkey }: { pubkey: string }) => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [until, setUntil] = useState<number | null>(null);
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
   const fetchVideos = useCallback(
     async (untilTimestamp?: number) => {
@@ -504,19 +640,31 @@ const ProfileVideos = ({ pubkey }: { pubkey: string }) => {
         const filter: NDKFilter = {
           kinds: [1, 1063],
           authors: [pubkey],
-          limit: 10,
+          limit: 25,
         };
         if (untilTimestamp) {
           filter.until = untilTimestamp;
         }
 
         const events = await ndk.fetchEvents(filter);
-        const videoItems: VideoItem[] = [];
+        const sortedEvents = Array.from(events).sort(
+          (a, b) => (b.created_at || 0) - (a.created_at || 0)
+        );
 
+        if (sortedEvents.length < 25) {
+          setHasMore(false);
+        }
+
+        if (sortedEvents.length > 0) {
+          setUntil((sortedEvents[sortedEvents.length - 1].created_at || 0) - 1);
+        } else {
+          setHasMore(false);
+        }
+
+        const videoItems: VideoItem[] = [];
         for (const event of events) {
           let url = '';
           let thumb = '';
-          const title = 'Untitled Video'; // Could parse title tag if available
 
           if (event.kind === 1063) {
             url = event.tags.find((t) => t[0] === 'url')?.[1] || '';
@@ -545,7 +693,9 @@ const ProfileVideos = ({ pubkey }: { pubkey: string }) => {
             // Fallback to content regex if no imeta video found
             if (!url) {
               // Video regex - handles URLs with query params like video.mp4?token=xxx
-              const vidMatch = content.match(/(https?:\/\/\S+\.(?:mp4|mov|webm|avi|mkv|m3u8))(\?\S*)?/i);
+              const vidMatch = content.match(
+                /(https?:\/\/\S+\.(?:mp4|mov|webm|avi|mkv|m3u8))(\?\S*)?/i
+              );
               const ytMatch = content.match(
                 /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
               );
@@ -564,33 +714,16 @@ const ProfileVideos = ({ pubkey }: { pubkey: string }) => {
               id: event.id,
               url,
               thumb,
-              title,
+              title: '',
               created_at: event.created_at || 0,
             });
           }
         }
 
-        const sortedNewVideos = videoItems.sort((a, b) => b.created_at - a.created_at);
-
-        // Always update `until` based on all fetched events, not just videos found.
-        // This allows pagination to continue through events that don't contain videos.
-        const eventsArray = Array.from(events);
-        if (eventsArray.length > 0) {
-          const oldestEvent = eventsArray.reduce((oldest, e) =>
-            (e.created_at || 0) < (oldest.created_at || 0) ? e : oldest
-          );
-          setUntil((oldestEvent.created_at || 0) - 1);
-        }
-
-        // Set hasMore to false only when we've exhausted events
-        if (events.size < 10) {
-          setHasMore(false);
-        }
-
         // Add any videos found to state
-        if (sortedNewVideos.length > 0) {
+        if (videoItems.length > 0) {
           setVideos((prev) => {
-            const combined = [...prev, ...sortedNewVideos];
+            const combined = [...prev, ...videoItems];
             // Dedupe
             const unique = Array.from(new Map(combined.map((v) => [v.id, v])).values());
             return unique.sort((a, b) => b.created_at - a.created_at);
@@ -611,12 +744,25 @@ const ProfileVideos = ({ pubkey }: { pubkey: string }) => {
     fetchVideos();
   }, [fetchVideos]);
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     if (!loadingMore && hasMore && until) {
       setLoadingMore(true);
       fetchVideos(until);
     }
-  };
+  }, [loadingMore, hasMore, until, fetchVideos]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && videos.length > 0) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+    if (loadMoreTriggerRef.current) observer.observe(loadMoreTriggerRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, handleLoadMore, videos.length]);
 
   if (loading) return <div>Loading videos...</div>;
   if (videos.length === 0) return <div>No videos found.</div>;
@@ -659,29 +805,21 @@ const ProfileVideos = ({ pubkey }: { pubkey: string }) => {
                   style={{ width: '100%', height: '100%' }}
                 />
               ) : (
-                <video src={video.url} controls preload="metadata" style={{ width: '100%', height: '100%' }} />
+                <video
+                  src={video.url}
+                  controls
+                  preload="metadata"
+                  style={{ width: '100%', height: '100%' }}
+                />
               )}
             </div>
           );
         })}
       </div>
-      {hasMore && videos.length > 0 && (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <button
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            style={{
-              padding: '5px 15px',
-              cursor: 'pointer',
-              backgroundColor: '#eee',
-              border: '1px solid #ccc',
-              borderRadius: '3px',
-              fontWeight: 'bold',
-              color: '#333',
-            }}
-          >
-            {loadingMore ? 'Loading...' : 'Load More'}
-          </button>
+      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
+      {loadingMore && (
+        <div style={{ textAlign: 'center', padding: '20px', color: '#666', fontSize: '10pt' }}>
+          Loading more videos...
         </div>
       )}
     </div>
@@ -694,20 +832,70 @@ const ProfileLivestreams = ({ pubkey }: { pubkey: string }) => {
   const { ndk } = useNostr();
   const [streams, setStreams] = useState<NDKEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [until, setUntil] = useState<number | null>(null);
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+
+  const fetchStreams = useCallback(
+    async (untilTimestamp?: number) => {
+      if (!ndk || !pubkey) return;
+      try {
+        const filter: NDKFilter = {
+          kinds: [30311 as NDKKind],
+          authors: [pubkey],
+          limit: 25,
+        };
+        if (untilTimestamp) filter.until = untilTimestamp;
+
+        const events = await ndk.fetchEvents(filter);
+        const sorted = Array.from(events).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+
+        if (sorted.length < 25) setHasMore(false);
+
+        if (sorted.length > 0) {
+          setUntil((sorted[sorted.length - 1].created_at || 0) - 1);
+          setStreams((prev) => {
+            const combined = [...prev, ...sorted];
+            const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+            return unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+          });
+        } else {
+          setHasMore(false);
+        }
+      } catch (e) {
+        console.error('Error fetching livestreams:', e);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [ndk, pubkey]
+  );
 
   useEffect(() => {
-    if (!ndk || !pubkey) return;
-    const fetchStreams = async () => {
-      const events = await ndk.fetchEvents({
-        kinds: [30311 as NDKKind],
-        authors: [pubkey],
-        limit: 20,
-      });
-      setStreams(Array.from(events).sort((a, b) => (b.created_at || 0) - (a.created_at || 0)));
-      setLoading(false);
-    };
     fetchStreams();
-  }, [ndk, pubkey]);
+  }, [fetchStreams]);
+
+  const handleLoadMore = useCallback(() => {
+    if (!loadingMore && hasMore && until) {
+      setLoadingMore(true);
+      fetchStreams(until);
+    }
+  }, [loadingMore, hasMore, until, fetchStreams]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && streams.length > 0) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+    if (loadMoreTriggerRef.current) observer.observe(loadMoreTriggerRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, handleLoadMore, streams.length]);
 
   if (loading) return <div>Loading streams...</div>;
   if (streams.length === 0) return <div>No livestreams found.</div>;
@@ -765,6 +953,12 @@ const ProfileLivestreams = ({ pubkey }: { pubkey: string }) => {
           </Link>
         );
       })}
+      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
+      {loadingMore && (
+        <div style={{ textAlign: 'center', padding: '10px', color: '#666', fontSize: '10pt' }}>
+          Loading more streams...
+        </div>
+      )}
     </div>
   );
 };
@@ -849,7 +1043,8 @@ const ProfileBadges = ({ pubkey }: { pubkey: string }) => {
         try {
           const profile = await ndk.getUser({ pubkey: badge.issuerPubkey }).fetchProfile();
           if (profile) {
-            badge.issuerName = profile.name || profile.displayName || badge.issuerPubkey.slice(0, 8);
+            badge.issuerName =
+              profile.name || profile.displayName || badge.issuerPubkey.slice(0, 8);
           }
         } catch {
           badge.issuerName = badge.issuerPubkey.slice(0, 8);
@@ -903,7 +1098,7 @@ const ProfileBadges = ({ pubkey }: { pubkey: string }) => {
 // --- Main ProfilePage ---
 
 const ProfilePage = () => {
-  const { user, ndk, relays } = useNostr();
+  const { user, ndk } = useNostr();
   const navigate = useNavigate();
   const { pubkey: identifier } = useParams<{ pubkey: string }>();
   const { hexPubkey, loading: resolving } = useResolvedPubkey(identifier);
@@ -1021,75 +1216,58 @@ const ProfilePage = () => {
     };
 
     checkAll();
-  }, [ndk, hexPubkey]);
+  }, [ndk, hexPubkey, user?.pubkey]);
 
   const fetchStats = async () => {
     if (loadingStats || !ndk || !hexPubkey) return;
     setLoadingStats(true);
 
-    // Reset stats to 0 to start counting up
-    setStats({ followers: 0, posts: 0, zaps: 0 });
-
     try {
-      // 1. Use app-wide relay configuration (user's settings or defaults)
-      const relaySet = relays.length > 0 ? NDKRelaySet.fromRelayUrls(relays, ndk) : undefined;
+      // Use Antiprimal for instant stats (NIP-85 Kind 30382)
+      const antiprimalRelaySet = NDKRelaySet.fromRelayUrls([ANTIPRIMAL_RELAY], ndk);
 
-      // 2. Start Subscriptions with configured relays
-      const subOptions = { closeOnEose: true, relaySet };
-
-      const followersSub = ndk.subscribe({ kinds: [3], '#p': [hexPubkey] }, subOptions);
-      const postsSub = ndk.subscribe({ kinds: [1], authors: [hexPubkey] }, subOptions);
-      const zapsSub = ndk.subscribe({ kinds: [9735], '#p': [hexPubkey] }, subOptions);
-
-      followersSub.on('event', () => {
-        setStats((prev) => ({ ...prev, followers: (prev.followers || 0) + 1 }));
-      });
-
-      postsSub.on('event', (ev: NDKEvent) => {
-        if (!ev.tags.some((t) => t[0] === 'e')) {
-          setStats((prev) => ({ ...prev, posts: (prev.posts || 0) + 1 }));
+      const statsEvent = await ndk.fetchEvent(
+        {
+          kinds: [30382 as number],
+          authors: [PRIMAL_BOT_PUBKEY],
+          '#d': [hexPubkey],
+        },
+        {
+          relaySet: antiprimalRelaySet,
+          cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
         }
-      });
+      );
 
-      zapsSub.on('event', (ev: NDKEvent) => {
-        let amt = 0;
-        const amountTag = ev.tags.find((t) => t[0] === 'amount');
-        if (amountTag) {
-          amt = parseInt(amountTag[1]) / 1000;
-        } else {
-          const bolt11 = ev.tags.find((t) => t[0] === 'bolt11')?.[1];
-          if (bolt11) {
-            const match = bolt11.match(/lnbc(\d+)([pnum])1/);
-            if (match) {
-              let val = parseInt(match[1]);
-              const multiplier = match[2];
-              if (multiplier === 'm') val *= 100000;
-              else if (multiplier === 'u') val *= 100;
-              else if (multiplier === 'n') val *= 0.1;
-              else if (multiplier === 'p') val *= 0.0001;
-              amt = val;
-            }
-          }
+      if (statsEvent) {
+        try {
+          const content = JSON.parse(statsEvent.content);
+          setStats({
+            followers: content.followers_count || content.followers || 0,
+            posts: content.note_count || content.notes || 0,
+            zaps: content.zaps_received || content.zap_count || 0,
+          });
+        } catch (e) {
+          console.warn('Failed to parse Primal stats JSON', e);
+          // Fallback to parsing tags if content isn't JSON
+          let followers = 0;
+          let posts = 0;
+          let zaps = 0;
+
+          statsEvent.tags.forEach((tag) => {
+            if (tag[0] === 'followers') followers = parseInt(tag[1]) || 0;
+            if (tag[0] === 'notes' || tag[0] === 'note_count') posts = parseInt(tag[1]) || 0;
+            if (tag[0] === 'zaps_received' || tag[0] === 'zap_count') zaps = parseInt(tag[1]) || 0;
+          });
+
+          setStats({ followers, posts, zaps });
         }
-        if (amt > 0) {
-          setStats((prev) => ({ ...prev, zaps: Math.floor((prev.zaps || 0) + amt) }));
-        }
-      });
-
-      let finishedCount = 0;
-      const onDone = () => {
-        finishedCount++;
-        if (finishedCount >= 3) setLoadingStats(false);
-      };
-
-      followersSub.on('eose', onDone);
-      postsSub.on('eose', onDone);
-      zapsSub.on('eose', onDone);
-
-      // Safety timeout
-      setTimeout(() => setLoadingStats(false), 20000);
+      } else {
+        // Fallback or just set to 0 if not found
+        setStats({ followers: 0, posts: 0, zaps: 0 });
+      }
     } catch (e) {
-      console.error('Error starting stats stream:', e);
+      console.error('Error fetching stats:', e);
+    } finally {
       setLoadingStats(false);
     }
   };
@@ -1113,10 +1291,16 @@ const ProfilePage = () => {
       <div className="profile-container">
         <Navbar />
         <div className="profile-body" style={{ padding: '40px', textAlign: 'center' }}>
-          <h2 className="section-header" style={{ background: '#cc0000', color: 'white' }}>Profile Blocked</h2>
-          <p style={{ marginTop: '20px' }}>Content from this user has been blocked according to your settings.</p>
+          <h2 className="section-header" style={{ background: '#cc0000', color: 'white' }}>
+            Profile Blocked
+          </h2>
+          <p style={{ marginTop: '20px' }}>
+            Content from this user has been blocked according to your settings.
+          </p>
           <div style={{ marginTop: '20px' }}>
-            <Link to="/" style={{ color: '#003399', fontWeight: 'bold' }}>&laquo; Back to Home</Link>
+            <Link to="/" style={{ color: '#003399', fontWeight: 'bold' }}>
+              &laquo; Back to Home
+            </Link>
           </div>
         </div>
       </div>
@@ -1162,12 +1346,21 @@ const ProfilePage = () => {
         <div className="left-column">
           <div className="profile-pic-box">
             <div
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                gap: '10px',
+                flexWrap: 'wrap',
+              }}
             >
               <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {displayName}
                 {profile?.nip05 && (
-                  <span title={profile.nip05} style={{ color: '#0099ff', fontSize: '0.6em', verticalAlign: 'middle' }}>
+                  <span
+                    title={profile.nip05}
+                    style={{ color: '#0099ff', fontSize: '0.6em', verticalAlign: 'middle' }}
+                  >
                     ✓
                   </span>
                 )}
@@ -1180,26 +1373,6 @@ const ProfilePage = () => {
                   >
                     [ Edit Profile ]
                   </Link>
-                )}
-                {user?.pubkey !== hexPubkey && user?.pubkey && hexPubkey && (
-                  <button
-                    onClick={() => navigate(`/messages/${hexPubkey}`)}
-                    style={{
-                      fontSize: '8pt',
-                      padding: '4px 10px',
-                      backgroundColor: '#0066cc',
-                      color: 'white',
-                      border: '1px solid #0052a3',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      textDecoration: 'none',
-                    }}
-                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#0052a3')}
-                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#0066cc')}
-                  >
-                    ✉️ Send Message
-                  </button>
                 )}
               </div>
             </div>
@@ -1315,7 +1488,6 @@ const ProfilePage = () => {
             <br />
             http://mynostrspace.com/p/{npub || hexPubkey}
           </div>
-
 
           <div className="interests-box">
             <h3 className="section-header">{displayName}'s Interests</h3>
@@ -1510,6 +1682,11 @@ const ProfilePage = () => {
               {/* Comment Wall */}
               <div className="comment-wall-section" style={{ marginTop: '20px' }}>
                 <CommentWall pubkey={hexPubkey || ''} />
+              </div>
+
+              {/* Home Feed (Recent Activity) */}
+              <div className="profile-section-tab" style={{ marginTop: '20px' }}>
+                <ProfileFeed pubkey={hexPubkey || ''} />
               </div>
             </>
           )}

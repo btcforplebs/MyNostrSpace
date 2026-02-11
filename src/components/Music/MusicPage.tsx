@@ -62,67 +62,67 @@ export const MusicPage = () => {
         <div className="home-content mp-content">
           <h2 className="mp-section-header">Top Music on Wavlake (Last 7 Days)</h2>
 
-        {!loading && tracks.length > 0 && (
-          <div className="sticky-player-container">
-            <WavlakePlayer
-              tracks={tracks}
-              currentTrackIndex={currentTrackIndex}
-              onTrackSelect={setCurrentTrackIndex}
-              hidePlaylist={true}
-              autoplay={shouldAutoplay}
-            />
-          </div>
-        )}
+          {!loading && tracks.length > 0 && (
+            <div className="sticky-player-container">
+              <WavlakePlayer
+                tracks={tracks}
+                currentTrackIndex={currentTrackIndex}
+                onTrackSelect={setCurrentTrackIndex}
+                hidePlaylist={true}
+                autoplay={shouldAutoplay}
+              />
+            </div>
+          )}
 
-        {loading ? (
-          <div style={{ padding: '20px', textAlign: 'center' }}>Loading top tracks...</div>
-        ) : (
-          <div className="music-grid">
-            {tracks.map((track, index) => (
-              <div
-                key={track.id}
-                className={`music-card ${currentTrackIndex === index ? 'active-track' : ''}`}
-                onClick={() => handleTrackSelect(index)}
-              >
-                <div className="album-art-wrapper">
-                  <img
-                    src={
-                      track.albumArtUrl ||
-                      `https://robohash.org/${track.id}.png?set=set4&bgset=bg2&size=150x150`
-                    }
-                    alt={`${track.title} Album Art`}
-                    className="album-art"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        `https://robohash.org/${track.id}.png?set=set4&bgset=bg2&size=150x150`;
-                    }}
-                  />
+          {loading ? (
+            <div style={{ padding: '20px', textAlign: 'center' }}>Loading top tracks...</div>
+          ) : (
+            <div className="music-grid">
+              {tracks.map((track, index) => (
+                <div
+                  key={track.id}
+                  className={`music-card ${currentTrackIndex === index ? 'active-track' : ''}`}
+                  onClick={() => handleTrackSelect(index)}
+                >
+                  <div className="album-art-wrapper">
+                    <img
+                      src={
+                        track.albumArtUrl ||
+                        `https://robohash.org/${track.id}.png?set=set4&bgset=bg2&size=150x150`
+                      }
+                      alt={`${track.title} Album Art`}
+                      className="album-art"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          `https://robohash.org/${track.id}.png?set=set4&bgset=bg2&size=150x150`;
+                      }}
+                    />
+                  </div>
+                  <div className="track-info">
+                    <a
+                      href={track.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="track-title"
+                      title={track.title}
+                    >
+                      {track.title}
+                    </a>
+
+                    <span className="track-artist" title={track.artist}>
+                      {track.artist}
+                    </span>
+                  </div>
                 </div>
-                <div className="track-info">
-                  <a
-                    href={track.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="track-title"
-                    title={track.title}
-                  >
-                    {track.title}
-                  </a>
+              ))}
+            </div>
+          )}
 
-                  <span className="track-artist" title={track.artist}>
-                    {track.artist}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!loading && tracks.length === 0 && (
-          <div style={{ padding: '20px', textAlign: 'center' }}>
-            No tracks found right now. Check back later!
-          </div>
-        )}
+          {!loading && tracks.length === 0 && (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              No tracks found right now. Check back later!
+            </div>
+          )}
         </div>
       </div>
     </div>

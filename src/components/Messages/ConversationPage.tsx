@@ -30,13 +30,13 @@ export const ConversationPage = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to messages (uses NDK signer for decryption)
-  const { messages: allMessages, loading } = useMessages(
-    loggedInUser?.pubkey || null,
-    ndk
-  );
+  const { messages: allMessages, loading } = useMessages(loggedInUser?.pubkey || null, ndk);
 
   // Filter messages for this conversation
-  const { messages: conversationMessages, unreadCount } = useConversation(conversationWith || null, allMessages);
+  const { messages: conversationMessages, unreadCount } = useConversation(
+    conversationWith || null,
+    allMessages
+  );
 
   // Validate URL param
   if (!conversationWith) {
@@ -85,7 +85,9 @@ export const ConversationPage = () => {
           content
         );
       } catch (encryptErr) {
-        throw new Error(`Encryption failed: ${encryptErr instanceof Error ? encryptErr.message : String(encryptErr)}`);
+        throw new Error(
+          `Encryption failed: ${encryptErr instanceof Error ? encryptErr.message : String(encryptErr)}`
+        );
       }
 
       if (!encryptedContent) {
@@ -121,8 +123,7 @@ export const ConversationPage = () => {
         read: true,
       });
     } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : 'Failed to send message';
+      const errorMsg = err instanceof Error ? err.message : 'Failed to send message';
       setError(errorMsg);
       console.error('Send error:', err);
     } finally {
@@ -143,42 +144,51 @@ export const ConversationPage = () => {
         <Navbar />
         <div className="conversation-page">
           <div className="conversation-header">
-          <button className="back-button" onClick={() => navigate('/messages')}>
-            ← Messages
-          </button>
-          <div className="header-info">
-            <h2>{displayName}</h2>
-            {loading && <span className="loading-indicator">Loading...</span>}
-          </div>
-        </div>
-
-        <div className="conversation-messages">
-          <div className="nip04-privacy-banner">
-            <p><strong>ℹ️ Privacy Notice:</strong> These messages use NIP-04 encryption. Your message content is encrypted, but other users can see <strong>who you are messaging</strong>. For metadata-private messaging, NIP-17 will be available when signers support NIP-44 encryption.</p>
+            <button className="back-button" onClick={() => navigate('/messages')}>
+              ← Messages
+            </button>
+            <div className="header-info">
+              <h2>{displayName}</h2>
+              {loading && <span className="loading-indicator">Loading...</span>}
+            </div>
           </div>
 
-          {error && (
-            <div className="conversation-error-banner">
-              <p><strong>⚠️ Messaging Issue:</strong></p>
-              <p>{error}</p>
+          <div className="conversation-messages">
+            <div className="nip04-privacy-banner">
+              <p>
+                <strong>ℹ️ Privacy Notice:</strong> These messages use NIP-04 encryption. Your
+                message content is encrypted, but other users can see{' '}
+                <strong>who you are messaging</strong>. For metadata-private messaging, NIP-17 will
+                be available when signers support NIP-44 encryption.
+              </p>
             </div>
-          )}
 
-          {loading && conversationMessages.length === 0 && (
-            <div className="loading-state">
-              <p>Loading messages...</p>
-            </div>
-          )}
+            {error && (
+              <div className="conversation-error-banner">
+                <p>
+                  <strong>⚠️ Messaging Issue:</strong>
+                </p>
+                <p>{error}</p>
+              </div>
+            )}
 
-          {conversationMessages.length === 0 && !loading && !error ? (
-            <div className="no-messages">
-              <p>No messages yet. Start the conversation!</p>
-            </div>
-          ) : (
-            conversationMessages.map((message) => <MessageItem key={message.id} message={message} />)
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+            {loading && conversationMessages.length === 0 && (
+              <div className="loading-state">
+                <p>Loading messages...</p>
+              </div>
+            )}
+
+            {conversationMessages.length === 0 && !loading && !error ? (
+              <div className="no-messages">
+                <p>No messages yet. Start the conversation!</p>
+              </div>
+            ) : (
+              conversationMessages.map((message) => (
+                <MessageItem key={message.id} message={message} />
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
           <MessageComposer onSend={handleSendMessage} disabled={sending || !loggedInUser} />
         </div>

@@ -35,7 +35,6 @@ export const SearchPage = () => {
       setPostResults([]);
 
       try {
-
         const searchRelaySet = NDKRelaySet.fromRelayUrls(APP_RELAYS.SEARCH, ndk);
 
         // Fetch profiles (kind 0) from search relays with higher limit
@@ -125,22 +124,16 @@ export const SearchPage = () => {
       <div className="search-page-container">
         <h2 className="section-header">Search Results for "{query}"</h2>
 
-        {loading && (
-          <div className="search-loading">Searching the cosmos...</div>
-        )}
+        {loading && <div className="search-loading">Searching the cosmos...</div>}
 
         {!loading && profileResults.length === 0 && postResults.length === 0 && (
-          <div className="search-no-results">
-            No results found. Try a different term.
-          </div>
+          <div className="search-no-results">No results found. Try a different term.</div>
         )}
 
         {/* People Section */}
         {!loading && (
           <div className="search-section">
-            <div className="search-section-header">
-              👤 People ({profileResults.length})
-            </div>
+            <div className="search-section-header">👤 People ({profileResults.length})</div>
             <div className="search-section-body">
               {profileResults.length === 0 ? (
                 <div className="search-section-empty">No profiles found</div>
@@ -168,7 +161,10 @@ export const SearchPage = () => {
                       >
                         <span>{profile.title || profile.pubkey.slice(0, 8)}</span>
                         {profile.nip05 && (
-                          <span title={profile.nip05} style={{ color: '#0099ff', fontSize: '1.1em' }}>
+                          <span
+                            title={profile.nip05}
+                            style={{ color: '#0099ff', fontSize: '1.1em' }}
+                          >
                             ✓
                           </span>
                         )}
@@ -187,9 +183,7 @@ export const SearchPage = () => {
         {/* Posts Section */}
         {!loading && (
           <div className="search-section">
-            <div className="search-section-header">
-              📝 Posts ({postResults.length})
-            </div>
+            <div className="search-section-header">📝 Posts ({postResults.length})</div>
             <div className="search-section-body">
               {postResults.length === 0 ? (
                 <div className="search-section-empty">No posts found</div>

@@ -60,7 +60,12 @@ const NoteMedia = ({ content }: { content: string }) => {
         <img
           src={url}
           alt="Note Attachment"
-          style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain', border: '1px solid #ccc' }}
+          style={{
+            maxWidth: '100%',
+            maxHeight: '300px',
+            objectFit: 'contain',
+            border: '1px solid #ccc',
+          }}
         />
       </div>
     );
@@ -70,7 +75,12 @@ const NoteMedia = ({ content }: { content: string }) => {
   if (['mp4', 'mov', 'webm'].includes(extension || '')) {
     return (
       <div style={{ marginTop: '10px', textAlign: 'center' }}>
-        <video src={url} controls preload="metadata" style={{ maxWidth: '100%', maxHeight: '300px' }} />
+        <video
+          src={url}
+          controls
+          preload="metadata"
+          style={{ maxWidth: '100%', maxHeight: '300px' }}
+        />
       </div>
     );
   }
@@ -130,7 +140,12 @@ export const BrowsePage = () => {
           try {
             const content = JSON.parse(event.content);
             if (!content.name && !content.picture && !content.display_name) continue;
-            if (hasBlockedKeyword(content.about || '') || hasBlockedKeyword(content.name || '') || hasBlockedKeyword(content.display_name || '')) continue;
+            if (
+              hasBlockedKeyword(content.about || '') ||
+              hasBlockedKeyword(content.name || '') ||
+              hasBlockedKeyword(content.display_name || '')
+            )
+              continue;
             processedProfiles.push({
               pubkey: event.pubkey,
               name: content.name || content.display_name,
@@ -148,7 +163,12 @@ export const BrowsePage = () => {
         const noteEvents = await ndk.fetchEvents(noteFilter);
 
         const notesArray = Array.from(noteEvents)
-          .filter((event) => !event.tags.some((tag) => tag[0] === 'e') && !isBlockedUser(event.pubkey) && !hasBlockedKeyword(event.content))
+          .filter(
+            (event) =>
+              !event.tags.some((tag) => tag[0] === 'e') &&
+              !isBlockedUser(event.pubkey) &&
+              !hasBlockedKeyword(event.content)
+          )
           .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
           .slice(0, 20);
 
@@ -192,7 +212,14 @@ export const BrowsePage = () => {
             <div className="content-box-header">Popular Sites</div>
             <div className="galaxy-grid" style={{ gridTemplateColumns: '1fr' }}>
               {POPULAR_SITES.map((site) => (
-                <a key={site.url} href={site.url} target="_blank" rel="noopener noreferrer" className="galaxy-item" style={{ flexDirection: 'row', justifyContent: 'center' }}>
+                <a
+                  key={site.url}
+                  href={site.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="galaxy-item"
+                  style={{ flexDirection: 'row', justifyContent: 'center' }}
+                >
                   <span>{site.name}</span>
                 </a>
               ))}
@@ -208,28 +235,28 @@ export const BrowsePage = () => {
             <div className="people-grid">
               {profiles.length > 0
                 ? profiles.map((profile) => (
-                  <div key={profile.pubkey} className="person-item">
-                    <Link to={`/p/${profile.pubkey}`} className="person-link">
-                      <div className="person-name">
-                        {profile.name || 'User'}
-                      </div>
-                      <div className="person-pic">
-                        <img
-                          src={profile.picture || `https://robohash.org/${profile.pubkey}?set=set4`}
-                          alt=""
-                        />
-                      </div>
-                    </Link>
-                  </div>
-                ))
-                : [...Array(8)].map((_, i) => (
-                  <div key={i} className="person-item">
-                    <div className="skeleton skeleton-name"></div>
-                    <div className="person-pic">
-                      <div className="skeleton skeleton-pic"></div>
+                    <div key={profile.pubkey} className="person-item">
+                      <Link to={`/p/${profile.pubkey}`} className="person-link">
+                        <div className="person-name">{profile.name || 'User'}</div>
+                        <div className="person-pic">
+                          <img
+                            src={
+                              profile.picture || `https://robohash.org/${profile.pubkey}?set=set4`
+                            }
+                            alt=""
+                          />
+                        </div>
+                      </Link>
                     </div>
-                  </div>
-                ))}
+                  ))
+                : [...Array(8)].map((_, i) => (
+                    <div key={i} className="person-item">
+                      <div className="skeleton skeleton-name"></div>
+                      <div className="person-pic">
+                        <div className="skeleton skeleton-pic"></div>
+                      </div>
+                    </div>
+                  ))}
             </div>
           </div>
 
@@ -238,7 +265,11 @@ export const BrowsePage = () => {
             <div className="content-box-header">Global Feed</div>
             <div className="global-feed-list" style={{ maxHeight: '600px' }}>
               {recentNotes.map((note) => (
-                <div key={note.id} className="feed-item" style={{ flexDirection: 'column', gap: '5px' }}>
+                <div
+                  key={note.id}
+                  className="feed-item"
+                  style={{ flexDirection: 'column', gap: '5px' }}
+                >
                   <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                     <span className="feed-time">
                       {new Date((note.created_at || 0) * 1000).toLocaleDateString()}
@@ -253,7 +284,9 @@ export const BrowsePage = () => {
                   </div>
                 </div>
               ))}
-              {!loading && recentNotes.length === 0 && <div style={{ padding: '10px' }}>No notes found.</div>}
+              {!loading && recentNotes.length === 0 && (
+                <div style={{ padding: '10px' }}>No notes found.</div>
+              )}
             </div>
           </div>
         </div>

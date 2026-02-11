@@ -46,7 +46,8 @@ export function encryptNip44(
   senderPrivKey: Uint8Array | string,
   recipientPubKey: string
 ): string {
-  const privKeyBytes = typeof senderPrivKey === 'string' ? hexToBytes(senderPrivKey) : senderPrivKey;
+  const privKeyBytes =
+    typeof senderPrivKey === 'string' ? hexToBytes(senderPrivKey) : senderPrivKey;
   const conversationKey = getConversationKey(privKeyBytes, recipientPubKey);
   return nip44Encrypt(plaintext, conversationKey);
 }
@@ -63,7 +64,8 @@ export function decryptNip44(
   receiverPrivKey: Uint8Array | string,
   senderPubKey: string
 ): string {
-  const privKeyBytes = typeof receiverPrivKey === 'string' ? hexToBytes(receiverPrivKey) : receiverPrivKey;
+  const privKeyBytes =
+    typeof receiverPrivKey === 'string' ? hexToBytes(receiverPrivKey) : receiverPrivKey;
   const conversationKey = getConversationKey(privKeyBytes, senderPubKey);
   return nip44Decrypt(ciphertext, conversationKey);
 }
@@ -74,10 +76,7 @@ export function decryptNip44(
  * @param pubKey Public key (hex string)
  * @returns Conversation key for use with NIP-44 encrypt/decrypt
  */
-export function getConversationKeyNip44(
-  privKey: Uint8Array | string,
-  pubKey: string
-): Uint8Array {
+export function getConversationKeyNip44(privKey: Uint8Array | string, pubKey: string): Uint8Array {
   const privKeyBytes = typeof privKey === 'string' ? hexToBytes(privKey) : privKey;
   return getConversationKey(privKeyBytes, pubKey);
 }

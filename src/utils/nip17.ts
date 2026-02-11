@@ -148,7 +148,8 @@ export async function createGiftWrappedDM(
   senderPrivKey: Uint8Array | string,
   ndk: NDK
 ): Promise<NDKEvent[]> {
-  const senderPrivKeyBytes = typeof senderPrivKey === 'string' ? fromHex(senderPrivKey) : senderPrivKey;
+  const senderPrivKeyBytes =
+    typeof senderPrivKey === 'string' ? fromHex(senderPrivKey) : senderPrivKey;
   const senderPubKey = getPublicKey(senderPrivKeyBytes);
 
   // 1. Create the rumor (kind 14)
@@ -218,7 +219,11 @@ export function unwrapGiftWrap(
 
     // 2. Decrypt the seal content (which contains the rumor)
     // The seal was encrypted with our pubkey, so we can decrypt it
-    const ruminorJson = decryptNip44(sealEvent.content, receiverPrivKeyBytes, sealEvent.pubkey || event.pubkey);
+    const ruminorJson = decryptNip44(
+      sealEvent.content,
+      receiverPrivKeyBytes,
+      sealEvent.pubkey || event.pubkey
+    );
     const [, ruminorEvent] = JSON.parse(ruminorJson);
 
     if (ruminorEvent.kind !== 14) {

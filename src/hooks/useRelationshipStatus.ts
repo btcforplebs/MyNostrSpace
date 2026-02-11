@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNostr } from '../context/NostrContext';
 
-export type RelationshipStatus = 'is you!' | 'is in your following list' | 'is blocked' | 'is in your web of trust' | 'is outside your web of trust';
+export type RelationshipStatus =
+  | 'is you!'
+  | 'is in your following list'
+  | 'is blocked'
+  | 'is in your web of trust'
+  | 'is outside your web of trust';
 
-export const useRelationshipStatus = (targetPubkey?: string): { status: RelationshipStatus | null; loading: boolean } => {
+export const useRelationshipStatus = (
+  targetPubkey?: string
+): { status: RelationshipStatus | null; loading: boolean } => {
   const { ndk, user } = useNostr();
   const [status, setStatus] = useState<RelationshipStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,8 +39,8 @@ export const useRelationshipStatus = (targetPubkey?: string): { status: Relation
 
         if (blockedEvent) {
           const blockedPubkeys = blockedEvent.tags
-            .filter(tag => tag[0] === 'p')
-            .map(tag => tag[1]);
+            .filter((tag) => tag[0] === 'p')
+            .map((tag) => tag[1]);
 
           if (blockedPubkeys.includes(targetPubkey)) {
             setStatus('is blocked');
@@ -45,7 +52,7 @@ export const useRelationshipStatus = (targetPubkey?: string): { status: Relation
         // Check if user is following the target
         const currentUser = ndk.getUser({ pubkey: user.pubkey });
         const follows = await currentUser.follows();
-        const isFollowing = Array.from(follows).some(u => u.pubkey === targetPubkey);
+        const isFollowing = Array.from(follows).some((u) => u.pubkey === targetPubkey);
 
         if (isFollowing) {
           setStatus('is in your following list');
@@ -54,7 +61,7 @@ export const useRelationshipStatus = (targetPubkey?: string): { status: Relation
         }
 
         // Check if target is in the web of trust (followed by people you follow)
-        const followingPubkeys = Array.from(follows).map(u => u.pubkey);
+        const followingPubkeys = Array.from(follows).map((u) => u.pubkey);
 
         // Check if any of the people you follow are following the target
         let isInWebOfTrust = false;
@@ -62,7 +69,7 @@ export const useRelationshipStatus = (targetPubkey?: string): { status: Relation
           try {
             const followerUser = ndk.getUser({ pubkey: followerPubkey });
             const followerFollows = await followerUser.follows();
-            if (Array.from(followerFollows).some(u => u.pubkey === targetPubkey)) {
+            if (Array.from(followerFollows).some((u) => u.pubkey === targetPubkey)) {
               isInWebOfTrust = true;
               break;
             }

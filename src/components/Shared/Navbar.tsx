@@ -46,7 +46,10 @@ export const Navbar = () => {
 
         <div className="header-right">
           <div className="header-links">
-            <Link to="/help">Help</Link> |{' '}
+            <a href="https://www.joinnostr.com" target="_blank" rel="noopener noreferrer">
+              Help
+            </a>{' '}
+            |{' '}
             {user ? (
               <a
                 href="#"
@@ -97,9 +100,8 @@ export const Navbar = () => {
           {user && (
             <>
               {' '}
-              | <Link to="/messages">Messages</Link>
-              {' '}
-              | <Link to={`/p/${user.pubkey}`}>My Profile</Link>
+              | <Link to="/messages">Messages</Link> |{' '}
+              <Link to={`/p/${user.pubkey}`}>My Profile</Link>
             </>
           )}
         </div>

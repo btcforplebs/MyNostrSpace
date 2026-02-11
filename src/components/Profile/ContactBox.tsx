@@ -1,6 +1,8 @@
-import { Mail, Send, UserPlus, Star, MessageSquare, Ban, Users, Trophy } from 'lucide-react';
+import { Mail, Send, UserPlus, Star, Ban, Users, Trophy } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import './ProfilePage.css';
 import { useFriends } from '../../hooks/useFriends';
+import { useBlockList } from '../../hooks/useBlockList';
 
 interface ContactBoxProps {
   name?: string;
@@ -10,16 +12,27 @@ interface ContactBoxProps {
 }
 
 export const ContactBox = ({ name, pubkey, onAwardBadge, showAwardButton }: ContactBoxProps) => {
+  const navigate = useNavigate();
   const { followUser } = useFriends(pubkey); // We typically pass the Profile owner's pubkey to useFriends to viewing their friends, but here we just need the function.
   // Actually, useFriends(pubkey) fetches THAT pubkey's friends.
   // The followUser function inside useFriends uses `ndk.activeUser`.
   // So valid to call it, but maybe cleaner to have a separate hook or just use useFriends without arg?
   // Let's just use it.
+  const { blockUser } = useBlockList();
 
   const handleAddFriend = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (pubkey) {
       await followUser(pubkey);
+    }
+  };
+
+  const handleBlock = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (pubkey) {
+      if (window.confirm(`Are you sure you want to block ${name || 'this user'}?`)) {
+        await blockUser(pubkey);
+      }
     }
   };
 
@@ -33,7 +46,9 @@ export const ContactBox = ({ name, pubkey, onAwardBadge, showAwardButton }: Cont
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              alert('Coming soon!');
+              if (pubkey) {
+                navigate(`/messages/${pubkey}`);
+              }
             }}
           >
             Send Message
@@ -69,27 +84,10 @@ export const ContactBox = ({ name, pubkey, onAwardBadge, showAwardButton }: Cont
             Add to Favorites
           </a>
         </div>
-        <div className="contact-item">
-          <MessageSquare size={16} />{' '}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              alert('Coming soon!');
-            }}
-          >
-            Instant Message
-          </a>
-        </div>
+
         <div className="contact-item">
           <Ban size={16} />{' '}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              alert('Coming soon!');
-            }}
-          >
+          <a href="#" onClick={handleBlock}>
             Block User
           </a>
         </div>

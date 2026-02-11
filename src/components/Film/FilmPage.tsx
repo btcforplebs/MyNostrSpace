@@ -10,11 +10,7 @@ import './FilmPage.css';
 const MOVIE_PUBKEY = '5cd5f8052c6791e4879f0e4db913465d711d5f5fe0c0ab99049c6064c5a395a2';
 
 // Critical relays for movie content
-const FILM_RELAYS = [
-  'wss://nostr.mom',
-  'wss://nos.lol',
-  'wss://relay.damus.io',
-];
+const FILM_RELAYS = ['wss://nostr.mom', 'wss://nos.lol', 'wss://relay.damus.io'];
 
 interface Movie {
   id: string;
@@ -100,7 +96,7 @@ export const FilmPage = () => {
         limit: 2000, // Significantly increased limit
       };
 
-      // Use the global pool. If we needed specific relays, we could try to add them, 
+      // Use the global pool. If we needed specific relays, we could try to add them,
       // but explicitRelayUrls on NDK constructor is the cleanest way for isolated instances.
       // Since we are using the global one, we trust its pool.
       // However, we might want to ensure we have coverage.
@@ -159,11 +155,11 @@ export const FilmPage = () => {
 
       sub.on('eose', () => {
         flushBuffer();
-        // Force loading off on EOSE if we haven't found anything yet? 
+        // Force loading off on EOSE if we haven't found anything yet?
         // flushBuffer handles it.
       });
     },
-    [loading] // eslint-disable-line react-hooks/exhaustive-deps
+    [loading]
   );
 
   useEffect(() => {
@@ -181,7 +177,10 @@ export const FilmPage = () => {
 
       // Debug logs
       setTimeout(() => {
-        console.log('DEBUG: Connected relays:', ndk.pool.connectedRelays().map(r => r.url));
+        console.log(
+          'DEBUG: Connected relays:',
+          ndk.pool.connectedRelays().map((r) => r.url)
+        );
         console.log('DEBUG: FILM_RELAYS:', FILM_RELAYS);
       }, 2000);
 
@@ -199,47 +198,47 @@ export const FilmPage = () => {
         <Navbar />
 
         <div className="home-content fp-content">
-        <div
-          className="fp-header-row"
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-        >
-          <h2 className="section-header">My Private Movie Collection</h2>
-          {!loading && <div style={{ color: '#666' }}>Found {movies.length} films</div>}
-        </div>
-
-        {loading && movies.length === 0 ? (
-          <div className="loading-spiral">Loading latest films...</div>
-        ) : (
-          <div className="film-grid">
-            {movies.map((movie) => (
-              <div key={movie.id} className="film-card" onClick={() => setSelectedMovie(movie)}>
-                <div className="film-poster-wrapper">
-                  {movie.poster ? (
-                    <img
-                      src={movie.poster}
-                      alt={movie.title}
-                      className="film-poster"
-                      loading="lazy"
-                      onError={(e) => {
-                        // Fallback for broken images
-                        (e.target as HTMLImageElement).src =
-                          'https://via.placeholder.com/300x450?text=No+Poster';
-                      }}
-                    />
-                  ) : (
-                    <div className="film-poster-placeholder">
-                      <span>{movie.title}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="film-info">
-                  <h3 className="film-title">{movie.title}</h3>
-                  <div className="film-year">{movie.year}</div>
-                </div>
-              </div>
-            ))}
+          <div
+            className="fp-header-row"
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+          >
+            <h2 className="section-header">My Private Movie Collection</h2>
+            {!loading && <div style={{ color: '#666' }}>Found {movies.length} films</div>}
           </div>
-        )}
+
+          {loading && movies.length === 0 ? (
+            <div className="loading-spiral">Loading latest films...</div>
+          ) : (
+            <div className="film-grid">
+              {movies.map((movie) => (
+                <div key={movie.id} className="film-card" onClick={() => setSelectedMovie(movie)}>
+                  <div className="film-poster-wrapper">
+                    {movie.poster ? (
+                      <img
+                        src={movie.poster}
+                        alt={movie.title}
+                        className="film-poster"
+                        loading="lazy"
+                        onError={(e) => {
+                          // Fallback for broken images
+                          (e.target as HTMLImageElement).src =
+                            'https://via.placeholder.com/300x450?text=No+Poster';
+                        }}
+                      />
+                    ) : (
+                      <div className="film-poster-placeholder">
+                        <span>{movie.title}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="film-info">
+                    <h3 className="film-title">{movie.title}</h3>
+                    <div className="film-year">{movie.year}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

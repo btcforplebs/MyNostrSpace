@@ -8,6 +8,10 @@
 export const BLOCKED_PUBKEYS: Set<string> = new Set([
   // 美图Bot
   '6d088b653a1bffe728b9b17e5c7afcfc18d85f70502feac83400524eb6a8d5e9',
+  '7f0e64b52ef56bec2b588d460fc63125f567db2c014d1ecce806d8d5b4209e2e',
+  'b05ddaa79926f85b23723a8938cfe432d84ec0d7a9b3137d979af6d0877da8a7',
+  '9557955355f5f11d64dc1c2d7d136d5811904fdc592a950cb4091d05417ffba1',
+  '78b512a29311693e5357c4cf2e8a3552ed58af3d8582da439df45ed524df9bfe',
 ]);
 
 /**
@@ -57,8 +61,8 @@ export const BLOCKED_TAGS: string[] = ['nsfw', 'explicit', 'porn', 'xxx', 'conte
 /**
  * Check if a pubkey is blocked
  */
-export const isBlockedUser = (pubkey: string): boolean => {
-  return BLOCKED_PUBKEYS.has(pubkey);
+export const isBlockedUser = (pubkey: string, extraBlocks?: Set<string>): boolean => {
+  return BLOCKED_PUBKEYS.has(pubkey) || (extraBlocks?.has(pubkey) ?? false);
 };
 
 /**
@@ -67,5 +71,5 @@ export const isBlockedUser = (pubkey: string): boolean => {
 export const hasBlockedKeyword = (content: string): boolean => {
   if (!content) return false;
   const lowerContent = content.toLowerCase();
-  return BLOCKED_KEYWORDS.some(kw => lowerContent.includes(kw.toLowerCase()));
+  return BLOCKED_KEYWORDS.some((kw) => lowerContent.includes(kw.toLowerCase()));
 };

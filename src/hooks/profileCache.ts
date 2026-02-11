@@ -34,11 +34,7 @@ export function getProfile(pubkey: string): ExtendedProfile | null {
   return entry?.profile ?? null;
 }
 
-export function subscribeToProfile(
-  pubkey: string,
-  ndk: NDK,
-  callback: Subscriber
-): () => void {
+export function subscribeToProfile(pubkey: string, ndk: NDK, callback: Subscriber): () => void {
   const normalizedKey = normalizeKey(pubkey, ndk);
 
   let entry = cache.get(normalizedKey);
@@ -70,11 +66,7 @@ export function subscribeToProfile(
   };
 }
 
-async function fetchProfile(
-  normalizedKey: string,
-  ndk: NDK,
-  entry: CacheEntry
-): Promise<void> {
+async function fetchProfile(normalizedKey: string, ndk: NDK, entry: CacheEntry): Promise<void> {
   try {
     const user = ndk.getUser({ pubkey: normalizedKey });
 
@@ -126,4 +118,42 @@ export function updateCachedProfile(pubkey: string, profile: ExtendedProfile): v
       fetchPromise: null,
     });
   }
+}
+
+// Bulk load profiles from cache into memory
+export async function warmupCache(pubkeys: string[], ndk: NDK): Promise<number> {
+  const uniqueKeys = [...new Set(pubkeys)].filter((pk) => !cache.has(pk));
+  let loadedCount = 0;
+
+  // Process in chunks to avoid blocking the UI
+  const chunkSize = 50;
+  for (let i = 0; i < uniqueKeys.length; i += chunkSize) {
+    const chunk = uniqueKeys.slice(i, i + chunkSize);
+
+    await Promise.all(
+      chunk.map(async (pk) => {
+        try {
+          // normalizeKey is internal, so we just use the pubkey directly as NDK handles it
+          // We rely on ndk.getUser to utilize the cache adapter
+          const user = ndk.getUser({ pubkey: pk });
+
+          // We want to fetch from CACHE ONLY (local DB), not network
+          // If it's not in DB, we don't want to spam relays during warmup
+          await user.fetchProfile({ cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST });
+
+          if (user.profile) {
+            updateCachedProfile(user.pubkey, user.profile as ExtendedProfile);
+            loadedCount++;
+          }
+        } catch {
+          // Ignore errors during warmup
+        }
+      })
+    );
+
+    // Small yield to let UI breathe
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  return loadedCount;
 }

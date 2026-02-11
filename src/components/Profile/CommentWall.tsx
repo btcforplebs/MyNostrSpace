@@ -132,7 +132,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
             .then(() => {
               // force update? - usually handled by store
             })
-            .catch(() => { });
+            .catch(() => {});
         });
       } catch (err) {
         console.error('Failed to fetch comments:', err);
@@ -282,7 +282,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
               {comment.author?.profile?.name || comment.pubkey.slice(0, 8)}
             </Link>
 
-            {!isReply && (
+            {!isReply &&
               (() => {
                 const pTags = comment.tags.filter((t) => t[0] === 'p');
                 const eTags = comment.tags.filter((t) => t[0] === 'e');
@@ -290,8 +290,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
                   return <WallRecipient recipientPubkey={pTags[0][1]} />;
                 }
                 return null;
-              })()
-            )}
+              })()}
           </div>
 
           <span className="comment-date">

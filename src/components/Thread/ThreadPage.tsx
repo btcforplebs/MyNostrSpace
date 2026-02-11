@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback, useRef, memo } from 'react';
+import { useEffect, useState, useCallback, useRef, memo, useLayoutEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, type NDKFilter, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
 import { FeedItem } from '../Shared/FeedItem';
 import { isBlockedUser } from '../../utils/blockedUsers';
+import { useCustomLayout } from '../../hooks/useCustomLayout';
 
 interface ThreadNode {
   event: NDKEvent;
@@ -12,24 +13,24 @@ interface ThreadNode {
 }
 
 // Memoized thread item row to prevent unnecessary re-renders
-const ThreadItemRow = memo(({
-  node,
-  depth,
-  onRenderThread
-}: {
-  node: ThreadNode;
-  depth: number;
-  onRenderThread: (nodes: ThreadNode[], depth: number) => React.ReactNode;
-}) => (
-  <div className={depth > 0 ? 'nested-reply' : ''}>
-    <FeedItem event={node.event} hideThreadButton={true} />
-    {node.children.length > 0 && (
-      <div className="reply-children">
-        {onRenderThread(node.children, depth + 1)}
-      </div>
-    )}
-  </div>
-));
+const ThreadItemRow = memo(
+  ({
+    node,
+    depth,
+    onRenderThread,
+  }: {
+    node: ThreadNode;
+    depth: number;
+    onRenderThread: (nodes: ThreadNode[], depth: number) => React.ReactNode;
+  }) => (
+    <div className={depth > 0 ? 'nested-reply' : ''}>
+      <FeedItem event={node.event} hideThreadButton={true} />
+      {node.children.length > 0 && (
+        <div className="reply-children">{onRenderThread(node.children, depth + 1)}</div>
+      )}
+    </div>
+  )
+);
 
 export const ThreadPage = () => {
   const { eventId } = useParams();
@@ -38,38 +39,56 @@ export const ThreadPage = () => {
   const [replies, setReplies] = useState<NDKEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingReplies, setLoadingReplies] = useState(false);
+  const [prevEventId, setPrevEventId] = useState(eventId);
   const repliesRef = useRef<Map<string, NDKEvent>>(new Map());
+
+  // Reset state during render when eventId changes (props-from-state pattern)
+  if (eventId !== prevEventId) {
+    setPrevEventId(eventId);
+    setLoading(true);
+    setRootEvent(null);
+    setReplies([]);
+  }
+
+  // Clear ref in layout effect to avoid "refs during render" error
+  useLayoutEffect(() => {
+    if (eventId !== prevEventId) {
+      repliesRef.current.clear();
+    }
+  }, [eventId, prevEventId]);
+
+  // Get custom layout for the root event author
+  const { layoutCss } = useCustomLayout(rootEvent?.pubkey);
 
   // Build tree from flat replies list
   const buildTree = useCallback((parentId: string, allReplies: NDKEvent[]): ThreadNode[] => {
-    const children = allReplies.filter((reply) => {
-      const eTags = reply.tags.filter((t) => t[0] === 'e');
-      const replyMarkerTag = eTags.find((t) => t[3] === 'reply');
-      const directParentId = replyMarkerTag
-        ? replyMarkerTag[1]
-        : eTags.length > 0
-          ? eTags[eTags.length - 1][1]
-          : null;
-      return directParentId === parentId;
-    });
+    const fetchChildren = (pid: string): ThreadNode[] => {
+      const children = allReplies.filter((reply) => {
+        const eTags = reply.tags.filter((t) => t[0] === 'e');
+        const replyMarkerTag = eTags.find((t) => t[3] === 'reply');
+        const directParentId = replyMarkerTag
+          ? replyMarkerTag[1]
+          : eTags.length > 0
+            ? eTags[eTags.length - 1][1]
+            : null;
+        return directParentId === pid;
+      });
 
-    return children
-      .sort((a, b) => (a.created_at || 0) - (b.created_at || 0))
-      .map((child) => ({
-        event: child,
-        children: buildTree(child.id, allReplies),
-      }));
+      return children
+        .sort((a, b) => (a.created_at || 0) - (b.created_at || 0))
+        .map((child) => ({
+          event: child,
+          children: fetchChildren(child.id),
+        }));
+    };
+
+    return fetchChildren(parentId);
   }, []);
 
   const threadTree = rootEvent ? buildTree(rootEvent.id, replies) : [];
 
   useEffect(() => {
     if (!ndk || !eventId) return;
-
-    setLoading(true);
-    setRootEvent(null);
-    setReplies([]);
-    repliesRef.current.clear();
 
     // Fetch root event
     const rootSub = ndk.subscribe(
@@ -96,10 +115,10 @@ export const ThreadPage = () => {
         '#e': [event.id],
       };
 
-      const replySub = ndk.subscribe(
-        replyFilter,
-        { closeOnEose: false, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
-      );
+      const replySub = ndk.subscribe(replyFilter, {
+        closeOnEose: false,
+        cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+      });
 
       replySub.on('event', (reply: NDKEvent) => {
         if (!repliesRef.current.has(reply.id) && !isBlockedUser(reply.pubkey)) {
@@ -133,14 +152,17 @@ export const ThreadPage = () => {
   }, [ndk, eventId]);
 
   const renderThread = useCallback((nodes: ThreadNode[], depth: number = 0) => {
-    return nodes.map((node) => (
-      <ThreadItemRow
-        key={node.event.id}
-        node={node}
-        depth={depth}
-        onRenderThread={renderThread}
-      />
-    ));
+    const renderNodes = (currentNodes: ThreadNode[], currentDepth: number): React.ReactNode => {
+      return currentNodes.map((node) => (
+        <ThreadItemRow
+          key={node.event.id}
+          node={node}
+          depth={currentDepth}
+          onRenderThread={renderNodes}
+        />
+      ));
+    };
+    return renderNodes(nodes, depth);
   }, []);
 
   return (
@@ -152,7 +174,7 @@ export const ThreadPage = () => {
             <Link
               to="/"
               style={{
-                color: '#003399',
+                color: 'var(--myspace-link)',
                 fontSize: '9pt',
                 fontWeight: 'bold',
                 textDecoration: 'none',
@@ -164,7 +186,7 @@ export const ThreadPage = () => {
 
           <div
             style={{
-              backgroundColor: '#ff9933',
+              backgroundColor: 'var(--myspace-orange)',
               color: 'black',
               padding: '3px 5px',
               fontSize: '10pt',
@@ -178,7 +200,9 @@ export const ThreadPage = () => {
 
           {!loading && !rootEvent && (
             <div style={{ padding: '20px' }}>
-              {isBlockedUser(eventId || '') ? 'Content from this user is blocked.' : 'Event not found.'}
+              {isBlockedUser(eventId || '')
+                ? 'Content from this user is blocked.'
+                : 'Event not found.'}
             </div>
           )}
 
@@ -191,13 +215,17 @@ export const ThreadPage = () => {
               )}
 
               {threadTree.length === 0 && !loadingReplies && (
-                <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
+                <div
+                  style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}
+                >
                   No replies yet.
                 </div>
               )}
 
               {loadingReplies && (
-                <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
+                <div
+                  style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}
+                >
                   Loading replies...
                 </div>
               )}
@@ -208,7 +236,7 @@ export const ThreadPage = () => {
 
       <style>{`
         .thread-page-container {
-          background-color: #e5e5e5;
+          background-color: var(--myspace-bg);
           min-height: 100vh;
           font-family: verdana, arial, sans-serif, helvetica;
           padding: 0;
@@ -216,15 +244,15 @@ export const ThreadPage = () => {
         .thread-page-wrapper {
           max-width: 992px;
           margin: 0 auto;
-          background-color: white;
+          background-color: var(--myspace-bg-content);
           min-height: 100vh;
           box-shadow: 0 0 15px rgba(0,0,0,0.1);
         }
         .thread-content {
           padding: 15px;
-          border: 1px solid #ccc;
+          border: 1px solid var(--myspace-border);
           border-top: none;
-          color: black;
+          color: var(--myspace-text);
         }
         .thread-root {
           padding: 10px;
@@ -238,7 +266,9 @@ export const ThreadPage = () => {
           margin-top: 10px;
         }
       `}</style>
+
+      {/* Inject custom layout CSS LAST so it overrides defaults */}
+      {layoutCss && <style>{layoutCss}</style>}
     </div>
   );
 };
-

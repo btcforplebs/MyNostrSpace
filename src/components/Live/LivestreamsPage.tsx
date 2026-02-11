@@ -18,18 +18,36 @@ export const LivestreamsPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subRef = useRef<any>(null);
 
+  // Track requested profiles to avoid stale closure issues in useEffect
+  const requestedProfiles = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!ndk) return;
 
     const startSubscription = async () => {
-      // Start subscription immediately (don't wait for connections)
-      const liveStreamSub = ndk.subscribe(
-        [
-          { kinds: [30311 as NDKKind], limit: 100 },
-          { kinds: [30311 as NDKKind], authors: [PINNED_PUBKEY] },
-        ],
-        { closeOnEose: false }
-      );
+      // Don't wait for connections
+      const user = ndk.activeUser;
+      let authors: string[] | undefined;
+
+      if (user) {
+        try {
+          const follows = await user.follows();
+          authors = Array.from(follows).map((u) => u.pubkey);
+          // Always include pinned pubkey and self
+          if (!authors.includes(PINNED_PUBKEY)) authors.push(PINNED_PUBKEY);
+          if (!authors.includes(user.pubkey)) authors.push(user.pubkey);
+        } catch (e) {
+          console.error('Error fetching follows', e);
+          authors = [PINNED_PUBKEY, user.pubkey];
+        }
+      }
+
+      const filter =
+        user && authors && authors.length > 0
+          ? { kinds: [30311 as NDKKind], authors, limit: 100 }
+          : { kinds: [30311 as NDKKind], limit: 100 };
+
+      const liveStreamSub = ndk.subscribe(filter, { closeOnEose: false });
 
       let hasReceivedEose = false;
 
@@ -54,8 +72,7 @@ export const LivestreamsPage = () => {
 
         // Exclude Corny Chat and Nostr Nests - they go to Audio Rooms page
         const isAudioRoom =
-          streamingUrl.includes('cornychat') ||
-          streamingUrl.includes('nostrnests');
+          streamingUrl.includes('cornychat') || streamingUrl.includes('nostrnests');
 
         if (isAudioRoom) {
           return; // Skip audio rooms - they belong on Audio Rooms page
@@ -82,8 +99,13 @@ export const LivestreamsPage = () => {
 
         // Add or update the stream
         setLiveStreams((prev) => {
-          // Remove old version if exists
-          const filtered = prev.filter((e) => e.id !== event.id);
+          const dTag = event.getMatchingTags('d')[0]?.[1];
+          // Remove old version if exists (by ID or by d tag + pubkey for replaceable)
+          const filtered = prev.filter((e) => {
+            if (e.id === event.id) return false;
+            const eDTag = e.getMatchingTags('d')[0]?.[1];
+            return !(e.pubkey === event.pubkey && eDTag === dTag);
+          });
           const updated = [...filtered, event];
 
           // Sort: pinned first, then by time
@@ -98,7 +120,14 @@ export const LivestreamsPage = () => {
 
         // Fetch profile for stream host
         const hostPubkey = event.getMatchingTags('p')[0]?.[1] || event.pubkey;
-        if (hostPubkey && !activeProfiles[hostPubkey]) {
+
+        // Use ref to check if already requested to avoid stale closure issues
+        if (hostPubkey && !requestedProfiles.current.has(hostPubkey)) {
+          requestedProfiles.current.add(hostPubkey);
+
+          // Check if we already have it in state (optimization if ref was cleared but state persists)
+          // But since ref persists for lifecycle, this is enough.
+
           event.author
             .fetchProfile()
             .then((profile) => {
@@ -106,7 +135,7 @@ export const LivestreamsPage = () => {
                 setActiveProfiles((curr) => ({ ...curr, [hostPubkey]: profile }));
               }
             })
-            .catch(() => { });
+            .catch(() => {});
         }
       });
 
@@ -123,7 +152,7 @@ export const LivestreamsPage = () => {
     return () => {
       if (subRef.current) subRef.current.stop();
     };
-  }, [ndk, activeProfiles]);
+  }, [ndk]); // Removed activeProfiles to prevent infinite loop
 
   return (
     <div className="home-page-container livestreams-page-container">

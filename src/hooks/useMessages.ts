@@ -7,7 +7,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type NDK from '@nostr-dev-kit/ndk';
 import { NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
-import type { NDKEvent } from '@nostr-dev-kit/ndk';
+import type { NDKEvent, NDKUser, NDKSigner } from '@nostr-dev-kit/ndk';
 import { addMessage, type CachedDMMessage, getAllMessages, db } from '../services/messageCache';
 
 interface UseMessagesReturn {
@@ -25,13 +25,18 @@ const BATCH_DELAY = 300; // milliseconds
  * @param ndk NDK instance
  * @returns Object with messages array, loading state, and errors
  */
-export function useMessages(
-  userPubkey: string | null,
-  ndk: NDK | null
-): UseMessagesReturn {
+export function useMessages(userPubkey: string | null, ndk: NDK | null): UseMessagesReturn {
   const [messages, setMessages] = useState<CachedDMMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !!(userPubkey && ndk && ndk.signer));
   const [error, setError] = useState<string | null>(null);
+  const [prevUserPubkey, setPrevUserPubkey] = useState(userPubkey);
+
+  // Reset state during render if pubkey changes (React recommended pattern)
+  if (userPubkey !== prevUserPubkey) {
+    setPrevUserPubkey(userPubkey);
+    setLoading(!!(userPubkey && ndk && ndk.signer));
+    setError(null);
+  }
 
   const messageBuffer = useRef<CachedDMMessage[]>([]);
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,9 +48,9 @@ export function useMessages(
       setMessages((prev) => {
         const combined = [...prev, ...messageBuffer.current];
         // Deduplicate by ID and sort by timestamp
-        const deduped = Array.from(
-          new Map(combined.map((msg) => [msg.id, msg])).values()
-        ).sort((a, b) => a.originalTimestamp - b.originalTimestamp);
+        const deduped = Array.from(new Map(combined.map((msg) => [msg.id, msg])).values()).sort(
+          (a, b) => a.originalTimestamp - b.originalTimestamp
+        );
         return deduped;
       });
       messageBuffer.current = [];
@@ -107,8 +112,8 @@ export function useMessages(
           // For legacy DMs (kind 4), decrypt using NIP-04
           let content: string;
           try {
-            content = await (ndk.signer as any).decrypt?.(
-              { pubkey: event.pubkey } as any,
+            content = await (ndk.signer as NDKSigner).decrypt!(
+              { pubkey: event.pubkey } as NDKUser,
               event.content
             );
           } catch (decryptErr) {
@@ -154,14 +159,10 @@ export function useMessages(
 
   useEffect(() => {
     if (!userPubkey || !ndk || !ndk.signer) {
-      setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
-      setError(null);
-
       console.log('🔍 Starting message subscription for pubkey:', userPubkey);
 
       // Subscribe to kind 4 (legacy DMs with NIP-04 encryption)
@@ -198,8 +199,11 @@ export function useMessages(
       unsubscribeRef.current = () => sub.stop();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to subscribe to messages';
-      setError(errorMsg);
-      setLoading(false);
+      // Use microtask to avoid synchronous setState in effect body
+      Promise.resolve().then(() => {
+        setError(errorMsg);
+        setLoading(false);
+      });
       console.error('useMessages error:', err);
     }
 

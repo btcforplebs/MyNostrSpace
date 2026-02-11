@@ -142,7 +142,7 @@ export const LiveStreamPage = () => {
           if (!ndk.pool.relays.has(relayUrl)) {
             const relay = ndk.addExplicitRelay(relayUrl);
             if (relay && typeof relay.connect === 'function') {
-              relayPromises.push(relay.connect().catch(() => { }));
+              relayPromises.push(relay.connect().catch(() => {}));
             }
           }
         } catch {
@@ -151,10 +151,7 @@ export const LiveStreamPage = () => {
       }
 
       // Wait a bit for relays to connect before subscribing
-      await Promise.race([
-        Promise.all(relayPromises),
-        new Promise(r => setTimeout(r, 2000))
-      ]);
+      await Promise.race([Promise.all(relayPromises), new Promise((r) => setTimeout(r, 2000))]);
 
       const sub = ndk.subscribe(chatFilter, { closeOnEose: false });
       sub.on('event', (msg: NDKEvent) => {
@@ -301,7 +298,7 @@ export const LiveStreamPage = () => {
       await zapRequest.sign();
 
       // Explicitly publish the zap request so other platforms see it immediately
-      zapRequest.publish().catch(e => console.warn('Failed to publish zap request', e));
+      zapRequest.publish().catch((e) => console.warn('Failed to publish zap request', e));
 
       const zapRequestJson = JSON.stringify(zapRequest.rawEvent());
 

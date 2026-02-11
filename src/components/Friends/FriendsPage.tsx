@@ -110,11 +110,7 @@ const FriendsPage = () => {
         ) : (
           <div className="friends-grid">
             {currentProfiles.map((friend) => (
-              <Link
-                key={friend.pubkey}
-                to={`/p/${friend.npub}`}
-                className="friend-card"
-              >
+              <Link key={friend.pubkey} to={`/p/${friend.npub}`} className="friend-card">
                 <Avatar
                   pubkey={friend.pubkey}
                   src={friend.profile?.image}

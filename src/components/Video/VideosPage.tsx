@@ -23,44 +23,38 @@ interface VideoFile {
 const BLOCKED_TAGS = ['nsfw', 'explicit', 'porn', 'xxx', 'content-warning'];
 
 // Memoized video card component to prevent unnecessary re-renders
-const VideoCard = memo(({ video, onSelect }: { video: VideoFile; onSelect: (video: VideoFile) => void }) => (
-  <div
-    className="vp-video-card"
-    onClick={() => onSelect(video)}
-  >
-    <div className="vp-thumbnail-container">
-      {video.thumbnail ? (
-        <img
-          src={video.thumbnail}
-          alt={video.title}
-          className="vp-video-thumbnail"
-          loading="lazy"
-          decoding="async"
-        />
-      ) : (
-        <VideoThumbnail
-          src={video.url}
-          className="vp-video-thumbnail"
-        />
-      )}
-      <div className="vp-badge">
-        {video.mime?.split('/')[1]?.toUpperCase() || 'MP4'}
+const VideoCard = memo(
+  ({ video, onSelect }: { video: VideoFile; onSelect: (video: VideoFile) => void }) => (
+    <div className="vp-video-card" onClick={() => onSelect(video)}>
+      <div className="vp-thumbnail-container">
+        {video.thumbnail ? (
+          <img
+            src={video.thumbnail}
+            alt={video.title}
+            className="vp-video-thumbnail"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <VideoThumbnail src={video.url} className="vp-video-thumbnail" />
+        )}
+        <div className="vp-badge">{video.mime?.split('/')[1]?.toUpperCase() || 'MP4'}</div>
+      </div>
+      <div className="vp-video-info">
+        <div className="vp-video-title" title={video.title}>
+          {video.title}
+        </div>
+        <Link
+          to={`/p/${video.pubkey}`}
+          className="vp-video-author"
+          onClick={(e) => e.stopPropagation()}
+        >
+          By: {video.authorName || video.pubkey.slice(0, 8)}
+        </Link>
       </div>
     </div>
-    <div className="vp-video-info">
-      <div className="vp-video-title" title={video.title}>
-        {video.title}
-      </div>
-      <Link
-        to={`/p/${video.pubkey}`}
-        className="vp-video-author"
-        onClick={(e) => e.stopPropagation()}
-      >
-        By: {video.authorName || video.pubkey.slice(0, 8)}
-      </Link>
-    </div>
-  </div>
-));
+  )
+);
 
 export const VideosPage = () => {
   const { ndk, user: loggedInUser } = useNostr();
@@ -278,18 +272,18 @@ export const VideosPage = () => {
                   prev.map((v) =>
                     v.pubkey === event.pubkey && !v.authorName
                       ? {
-                        ...v,
-                        authorName:
-                          profile?.name ||
-                          profile?.displayName ||
-                          profile?.nip05 ||
-                          event.pubkey.slice(0, 8),
-                      }
+                          ...v,
+                          authorName:
+                            profile?.name ||
+                            profile?.displayName ||
+                            profile?.nip05 ||
+                            event.pubkey.slice(0, 8),
+                        }
                       : v
                   )
                 );
               })
-              .catch(() => { });
+              .catch(() => {});
           });
         } else {
           // Fallback for browsers without requestIdleCallback
@@ -302,18 +296,18 @@ export const VideosPage = () => {
                   prev.map((v) =>
                     v.pubkey === event.pubkey && !v.authorName
                       ? {
-                        ...v,
-                        authorName:
-                          profile?.name ||
-                          profile?.displayName ||
-                          profile?.nip05 ||
-                          event.pubkey.slice(0, 8),
-                      }
+                          ...v,
+                          authorName:
+                            profile?.name ||
+                            profile?.displayName ||
+                            profile?.nip05 ||
+                            event.pubkey.slice(0, 8),
+                        }
                       : v
                   )
                 );
               })
-              .catch(() => { });
+              .catch(() => {});
           }, 100);
         }
       }
@@ -427,11 +421,7 @@ export const VideosPage = () => {
             <>
               <div className="vp-videos-grid">
                 {videos.map((video) => (
-                  <VideoCard
-                    key={video.id}
-                    video={video}
-                    onSelect={setSelectedVideo}
-                  />
+                  <VideoCard key={video.id} video={video} onSelect={setSelectedVideo} />
                 ))}
               </div>
 

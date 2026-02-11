@@ -18,34 +18,33 @@ interface PhotoFile {
 }
 
 // Memoized photo card component to prevent unnecessary re-renders
-const PhotoCard = memo(({ photo, onSelect }: { photo: PhotoFile; onSelect: (photo: PhotoFile) => void }) => (
-  <div
-    className="pp-photo-card"
-    onClick={() => onSelect(photo)}
-  >
-    <div className="pp-image-container">
-      <img
-        src={photo.url}
-        alt={photo.title}
-        className="pp-photo-image"
-        loading="lazy"
-        decoding="async"
-      />
-    </div>
-    <div className="pp-photo-info">
-      <div className="pp-photo-title" title={photo.title}>
-        {photo.title}
+const PhotoCard = memo(
+  ({ photo, onSelect }: { photo: PhotoFile; onSelect: (photo: PhotoFile) => void }) => (
+    <div className="pp-photo-card" onClick={() => onSelect(photo)}>
+      <div className="pp-image-container">
+        <img
+          src={photo.url}
+          alt={photo.title}
+          className="pp-photo-image"
+          loading="lazy"
+          decoding="async"
+        />
       </div>
-      <Link
-        to={`/p/${photo.pubkey}`}
-        className="pp-photo-author"
-        onClick={(e) => e.stopPropagation()}
-      >
-        By: {photo.authorName || photo.pubkey.slice(0, 8)}
-      </Link>
+      <div className="pp-photo-info">
+        <div className="pp-photo-title" title={photo.title}>
+          {photo.title}
+        </div>
+        <Link
+          to={`/p/${photo.pubkey}`}
+          className="pp-photo-author"
+          onClick={(e) => e.stopPropagation()}
+        >
+          By: {photo.authorName || photo.pubkey.slice(0, 8)}
+        </Link>
+      </div>
     </div>
-  </div>
-));
+  )
+);
 
 export const PhotosPage = () => {
   const { ndk, user: loggedInUser } = useNostr();
@@ -193,18 +192,18 @@ export const PhotosPage = () => {
                     prev.map((p) =>
                       p.pubkey === event.pubkey && !p.authorName
                         ? {
-                          ...p,
-                          authorName:
-                            profile?.name ||
-                            profile?.displayName ||
-                            profile?.nip05 ||
-                            event.pubkey.slice(0, 8),
-                        }
+                            ...p,
+                            authorName:
+                              profile?.name ||
+                              profile?.displayName ||
+                              profile?.nip05 ||
+                              event.pubkey.slice(0, 8),
+                          }
                         : p
                     )
                   );
                 })
-                .catch(() => { });
+                .catch(() => {});
             });
           } else {
             // Fallback for browsers without requestIdleCallback
@@ -217,18 +216,18 @@ export const PhotosPage = () => {
                     prev.map((p) =>
                       p.pubkey === event.pubkey && !p.authorName
                         ? {
-                          ...p,
-                          authorName:
-                            profile?.name ||
-                            profile?.displayName ||
-                            profile?.nip05 ||
-                            event.pubkey.slice(0, 8),
-                        }
+                            ...p,
+                            authorName:
+                              profile?.name ||
+                              profile?.displayName ||
+                              profile?.nip05 ||
+                              event.pubkey.slice(0, 8),
+                          }
                         : p
                     )
                   );
                 })
-                .catch(() => { });
+                .catch(() => {});
             }, 100);
           }
         }
@@ -366,11 +365,7 @@ export const PhotosPage = () => {
                 {columns.map((colPhotos, colIndex) => (
                   <div key={colIndex} className="pp-masonry-column">
                     {colPhotos.map((photo) => (
-                      <PhotoCard
-                        key={photo.id}
-                        photo={photo}
-                        onSelect={setSelectedPhoto}
-                      />
+                      <PhotoCard key={photo.id} photo={photo} onSelect={setSelectedPhoto} />
                     ))}
                   </div>
                 ))}
@@ -419,7 +414,12 @@ export const PhotosPage = () => {
             <button className="pp-close-btn" onClick={() => setSelectedPhoto(null)}>
               ×
             </button>
-            <img src={selectedPhoto.url} alt={selectedPhoto.title} className="pp-modal-image" decoding="async" />
+            <img
+              src={selectedPhoto.url}
+              alt={selectedPhoto.title}
+              className="pp-modal-image"
+              decoding="async"
+            />
             <div className="pp-modal-footer">
               <Link to={`/p/${selectedPhoto.pubkey}`} className="pp-modal-author">
                 By: {selectedPhoto.authorName || selectedPhoto.pubkey.slice(0, 8)}

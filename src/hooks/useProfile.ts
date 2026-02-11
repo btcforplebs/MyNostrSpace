@@ -20,11 +20,22 @@ export const useProfile = (pubkey?: string) => {
     }
     return null;
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !!(pubkey && ndk));
+  const [prevPubkey, setPrevPubkey] = useState(pubkey);
+
+  // Reset state during render if pubkey changes (React recommended pattern)
+  if (pubkey !== prevPubkey) {
+    setPrevPubkey(pubkey);
+    setLoading(!!(pubkey && ndk));
+    if (pubkey && ndk) {
+      setProfile(getProfile(pubkey));
+    } else {
+      setProfile(null);
+    }
+  }
 
   useEffect(() => {
     if (!pubkey || !ndk) {
-      setLoading(false);
       return;
     }
 

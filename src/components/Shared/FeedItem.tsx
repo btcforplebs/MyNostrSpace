@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import './FeedItem.css';
 import { NDKEvent, type NDKFilter, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { RichTextRenderer } from './RichTextRenderer';
 import { InteractionBar } from './InteractionBar';
@@ -99,10 +100,7 @@ const ThreadedComments: React.FC<ThreadedCommentsProps> = ({
             />
             <div style={{ flex: 1 }}>
               <div className="comment-header">
-                <Link
-                  to={`/p/${node.event.pubkey}`}
-                  className="comment-author-name"
-                >
+                <Link to={`/p/${node.event.pubkey}`} className="comment-author-name">
                   {node.event.author.profile?.name ||
                     node.event.author.profile?.displayName ||
                     node.event.author.profile?.display_name ||
@@ -121,13 +119,11 @@ const ThreadedComments: React.FC<ThreadedCommentsProps> = ({
                 onCommentClick={() =>
                   setActiveReplyId(activeReplyId === node.event.id ? null : node.event.id)
                 }
+                commentCount={node.children.length}
               />
 
               {activeReplyId === node.event.id && (
-                <div
-                  className="reply-form"
-                  style={{ marginTop: '10px', background: '#f0f0f0', padding: '8px' }}
-                >
+                <div className="reply-form myspace-form-container">
                   <textarea
                     className="nostr-input"
                     value={replyText}
@@ -139,41 +135,19 @@ const ThreadedComments: React.FC<ThreadedCommentsProps> = ({
                     }}
                     placeholder={`Reply to ${node.event.author.profile?.name || 'user'}...`}
                   />
-                  <div
-                    style={{
-                      textAlign: 'right',
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      gap: '10px',
-                    }}
-                  >
+                  <div className="myspace-button-group">
                     <button
                       type="button"
+                      className="myspace-button-secondary"
                       onClick={() => triggerUpload('reply')}
                       disabled={isUploading || isSubmitting}
-                      style={{
-                        fontSize: '8pt',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#003399',
-                        textDecoration: 'underline',
-                      }}
                     >
                       Add Photo
                     </button>
                     <button
+                      className="myspace-button"
                       onClick={() => handlePostComment(node.event, replyText, false)}
                       disabled={isSubmitting || isUploading}
-                      style={{
-                        fontSize: '8pt',
-                        backgroundColor: '#003399',
-                        color: 'white',
-                        border: '1px solid #003366',
-                        borderRadius: '3px',
-                        padding: '3px 8px',
-                        cursor: 'pointer',
-                      }}
                     >
                       Post Reply
                     </button>
@@ -218,14 +192,17 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
     return isBlockedUser(event.pubkey) || hasBlockedKeyword(event.content);
   }, [event.pubkey, event.content]);
 
-  if (isBlocked) return null;
-
   const wallRecipientTag = useMemo(() => {
     const pTags = event.tags.filter((t: string[]) => t[0] === 'p');
     const eTags = event.tags.filter((t: string[]) => t[0] === 'e');
     // Wall post: Kind 1, No e-tags, exactly 1 p-tag (standard wall post pattern in this client)
     // Only show if the recipient is NOT the author
-    if (event.kind === 1 && eTags.length === 0 && pTags.length === 1 && pTags[0][1] !== event.pubkey) {
+    if (
+      event.kind === 1 &&
+      eTags.length === 0 &&
+      pTags.length === 1 &&
+      pTags[0][1] !== event.pubkey
+    ) {
       return pTags[0][1];
     }
     return null;
@@ -287,10 +264,10 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
 
       // Use subscribe with a timeout instead of fetchEvents for better relay connectivity
       const commentsRef = new Map<string, NDKEvent>();
-      const sub = ndk.subscribe(
-        filter,
-        { closeOnEose: true, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
-      );
+      const sub = ndk.subscribe(filter, {
+        closeOnEose: true,
+        cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+      });
 
       sub.on('event', (reply: NDKEvent) => {
         if (!commentsRef.has(reply.id)) {
@@ -415,6 +392,8 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
     }
   };
 
+  if (isBlocked) return null;
+
   if (event.kind === 6) {
     return (
       <div className="feed-item repost-item" style={{ flexDirection: 'column', gap: '5px' }}>
@@ -501,10 +480,15 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
           <RichTextRenderer content={displayContent} />
         </div>
         <div className="feed-meta">
-          Posted {new Date(event.created_at! * 1000).toLocaleTimeString()}
+          Posted {new Date(event.created_at! * 1000).toLocaleDateString()}{' '}
+          {new Date(event.created_at! * 1000).toLocaleTimeString()}
         </div>
 
-        <InteractionBar event={event} onCommentClick={() => setShowCommentForm(!showCommentForm)} />
+        <InteractionBar
+          event={event}
+          onCommentClick={() => setShowCommentForm(!showCommentForm)}
+          commentCount={comments.length}
+        />
 
         {!hideThreadButton && (
           <div style={{ marginTop: '5px' }}>
@@ -545,15 +529,7 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
         )}
 
         {showCommentForm && (
-          <div
-            className="feed-comment-form"
-            style={{
-              marginTop: '8px',
-              padding: '8px',
-              background: '#f9f9f9',
-              border: '1px solid #ccc',
-            }}
-          >
+          <div className="feed-comment-form myspace-form-container">
             <textarea
               className="nostr-input"
               value={commentText}
@@ -565,41 +541,19 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
               }}
               placeholder="Write a comment..."
             />
-            <div
-              style={{
-                textAlign: 'right',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '10px',
-              }}
-            >
+            <div className="myspace-button-group">
               <button
                 type="button"
+                className="myspace-button-secondary"
                 onClick={() => triggerUpload('comment')}
                 disabled={isUploading || isSubmitting}
-                style={{
-                  fontSize: '8pt',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#003399',
-                  textDecoration: 'underline',
-                }}
               >
                 Add Photo
               </button>
               <button
+                className="myspace-button"
                 onClick={() => handlePostComment(event, commentText, true)}
                 disabled={isSubmitting || isUploading}
-                style={{
-                  fontSize: '8pt',
-                  padding: '4px 10px',
-                  cursor: 'pointer',
-                  backgroundColor: '#003399',
-                  color: 'white',
-                  border: '1px solid #003366',
-                  borderRadius: '10px',
-                }}
               >
                 {isSubmitting ? 'Posting...' : 'Post Comment'}
               </button>

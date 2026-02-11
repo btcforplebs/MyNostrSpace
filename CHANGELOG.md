@@ -2,6 +2,47 @@
 
 All notable changes to the MyNostrSpace project will be documented in this file.
 
+## [Unreleased] - 2026-02-11
+
+### 🐛 Bug Fixes
+
+#### **Thread View Theming**
+- Fixed issue where thread view lost custom theming on page refresh.
+- **Root Cause:** Custom layout CSS was being injected before default component styles, causing defaults to take precedence. Also, specific feed items were missing styles available on other pages.
+- **Solution:** 
+  - Moved custom CSS injection to the end of `ThreadPage.tsx` to ensure proper cascading.
+  - Extracted shared feed styles from `ProfilePage.css` into a modular `FeedItem.css`.
+  - Standardized button and form styles across `FeedItem` and `InteractionBar` using global design tokens.
+- **Files modified:** `ThreadPage.tsx`, `ProfilePage.css`, `FeedItem.css`, `FeedItem.tsx`, `InteractionBar.tsx`
+
+#### **NIP-45 Stats & Homepage Stability**
+- Refactored event interaction counts (Likes, Comments, Reposts, Zaps) to use reliable **NIP-45 COUNT** queries.
+- **Improved Stability**: Implemented a global concurrency limiter (`MAX_CONCURRENT_STATS = 3`) to prevent "subscription storms" that were freezing the homepage.
+- **Optimized Performance**: 
+  - Added a 500ms batch collection window for stats requests.
+  - Limits batch processing to 10 events at a time.
+  - Direct `relay.count` support for relays that natively support NIP-45.
+- **Reliable Fallback**: Added a throttled manual counting mechanism for relays without NIP-45 support.
+- **Files modified:** `statsCache.ts`
+
+### 🎨 UI/UX Enhancements
+
+#### **Quote Box & Button Styling**
+- Standardized the look of the quote box and action buttons in the feed.
+- Quote box now takes full width for better usability.
+- Buttons now use consistent MySpace-themed styling (blue/white) instead of browser defaults or inline styles.
+
+#### **Dynamic Block List & Notification Reliability**
+- **Kind 10000 (Mute List) Support**: Integrated support for fetching and updating user mute lists from Nostr.
+- **Improved Blocking**: Added `useBlockList` hook to centralize blocking logic, ensuring blocked users are filtered from:
+  - Global follower counts and statistics.
+  - Profile friends and follower lists.
+  - Real-time notifications (all kinds).
+- **Follow Notification Fix**: Implemented session-aware filtering for Kind 3 events.
+  - Prevents "notification floods" on startup by verifying only new follow events during the active session.
+  - Uses reliable history fetching via Antiprimal relays to verify follow state changes.
+- **Functional "Block User" Action**: Completed the "Block User" UI in `ContactBox`, allowing users to dynamically mute accounts via Nostr.
+- **Files modified**: `HomePage.tsx`, `useFriends.ts`, `ContactBox.tsx`, `useBlockList.ts`, `blockedUsers.ts`
 ## [Unreleased] - 2026-02-10
 
 ### 🚀 New Features

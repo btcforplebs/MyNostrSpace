@@ -8,7 +8,11 @@ import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useNostr } from '../../context/NostrContext';
 import { useMessages } from '../../hooks/useMessages';
-import { useConversations, formatMessageTime, formatConversationName } from '../../hooks/useConversations';
+import {
+  useConversations,
+  formatMessageTime,
+  formatConversationName,
+} from '../../hooks/useConversations';
 import { useProfile } from '../../hooks/useProfile';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
 import { getTotalUnreadCount, markAllAsRead } from '../../services/messageCache';
@@ -24,10 +28,7 @@ export const MessagesPage = () => {
   const [totalUnread, setTotalUnread] = useState(0);
 
   // Subscribe to messages (uses NDK signer for decryption)
-  const { messages, loading, error } = useMessages(
-    loggedInUser?.pubkey || null,
-    ndk
-  );
+  const { messages, loading, error } = useMessages(loggedInUser?.pubkey || null, ndk);
 
   // Group into conversations
   const conversations = useConversations(messages, loggedInUser?.pubkey || null);
@@ -109,20 +110,22 @@ export const MessagesPage = () => {
         <Navbar />
         <div className="messages-page">
           <div className="messages-header">
-          <h1>Messages {totalUnread > 0 && <span className="unread-badge">{totalUnread}</span>}</h1>
-          <div className="messages-header-buttons">
-            {totalUnread > 0 && (
-              <button className="read-all-btn" onClick={handleMarkAllAsRead}>
-                Mark all as read
+            <h1>
+              Messages {totalUnread > 0 && <span className="unread-badge">{totalUnread}</span>}
+            </h1>
+            <div className="messages-header-buttons">
+              {totalUnread > 0 && (
+                <button className="read-all-btn" onClick={handleMarkAllAsRead}>
+                  Mark all as read
+                </button>
+              )}
+              <button className="new-message-btn" onClick={() => setIsNewConversationOpen(true)}>
+                ✉️ New Message
               </button>
-            )}
-            <button className="new-message-btn" onClick={() => setIsNewConversationOpen(true)}>
-              ✉️ New Message
-            </button>
+            </div>
           </div>
-        </div>
 
-        {renderConversationList()}
+          {renderConversationList()}
 
           <NewConversationModal
             isOpen={isNewConversationOpen}
@@ -155,8 +158,7 @@ const ConversationListItem = ({ conversation, onSelect }: ConversationListItemPr
     <div className="conversation-item" onClick={onSelect}>
       <img
         src={
-          profile?.image ||
-          `https://api.dicebear.com/7.x/avataaars/svg?seed=${conversation.pubkey}`
+          profile?.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${conversation.pubkey}`
         }
         alt={displayName}
         className="conversation-avatar"

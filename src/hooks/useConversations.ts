@@ -23,7 +23,10 @@ export interface Conversation {
  * @param userPubkey Current user's pubkey
  * @returns Sorted array of conversations with metadata
  */
-export function useConversations(messages: CachedDMMessage[], userPubkey: string | null): Conversation[] {
+export function useConversations(
+  messages: CachedDMMessage[],
+  userPubkey: string | null
+): Conversation[] {
   const conversations = useMemo(() => {
     if (!userPubkey || messages.length === 0) {
       return [];
@@ -41,20 +44,22 @@ export function useConversations(messages: CachedDMMessage[], userPubkey: string
     });
 
     // Convert to conversation metadata
-    const conversations: Conversation[] = Array.from(conversationMap.entries()).map(([pubkey, msgs]) => {
-      const lastMsg = msgs[msgs.length - 1];
-      const unreadCount = msgs.filter((m) => !m.read && !m.isOutgoing).length;
+    const conversations: Conversation[] = Array.from(conversationMap.entries()).map(
+      ([pubkey, msgs]) => {
+        const lastMsg = msgs[msgs.length - 1];
+        const unreadCount = msgs.filter((m) => !m.read && !m.isOutgoing).length;
 
-      return {
-        pubkey,
-        lastMessage: truncateMessagePreview(lastMsg.content, 50),
-        lastMessageTime: lastMsg.originalTimestamp,
-        lastMessageSender: lastMsg.senderPubkey,
-        unreadCount,
-        messageCount: msgs.length,
-        isOutgoing: lastMsg.isOutgoing,
-      };
-    });
+        return {
+          pubkey,
+          lastMessage: truncateMessagePreview(lastMsg.content, 50),
+          lastMessageTime: lastMsg.originalTimestamp,
+          lastMessageSender: lastMsg.senderPubkey,
+          unreadCount,
+          messageCount: msgs.length,
+          isOutgoing: lastMsg.isOutgoing,
+        };
+      }
+    );
 
     // Sort by most recent message first
     return conversations.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
@@ -76,7 +81,9 @@ export function useConversation(
 } {
   const conversationMessages = useMemo(() => {
     if (!pubkey) return [];
-    return messages.filter((m) => m.conversationWith === pubkey).sort((a, b) => a.originalTimestamp - b.originalTimestamp);
+    return messages
+      .filter((m) => m.conversationWith === pubkey)
+      .sort((a, b) => a.originalTimestamp - b.originalTimestamp);
   }, [messages, pubkey]);
 
   const unreadCount = useMemo(() => {

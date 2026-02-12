@@ -722,6 +722,94 @@
   text-decoration: underline;
 }
 
+/* Reworked Replies Tab Styles */
+.reply-thread-group {
+  margin-bottom: 25px;
+  padding: 0 10px;
+}
+
+.reply-context-wrapper {
+  margin-bottom: 0;
+}
+
+.reply-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.reply-connector {
+  color: #999;
+  font-size: 24px;
+  margin-top: 15px;
+  font-weight: bold;
+}
+
+.reply-child-card {
+  flex: 1;
+}
+
+.reply-card {
+  border: 1px solid var(--myspace-light-blue);
+  background: white;
+}
+
+.reply-card-header {
+  background-color: var(--myspace-light-blue);
+  padding: 5px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reply-card-author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reply-card-name {
+  color: var(--myspace-link);
+  font-weight: bold;
+  text-decoration: none;
+  font-size: var(--myspace-font-size-md);
+}
+
+.reply-card-body {
+  padding: 15px;
+}
+
+.reply-card-text {
+  font-size: var(--myspace-font-size-base);
+  margin-bottom: 10px;
+  line-height: 1.4;
+  color: #333;
+}
+
+.reply-card-meta {
+  font-size: var(--myspace-font-size-xs);
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.reply-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px dashed var(--myspace-light-blue);
+  padding-top: 8px;
+}
+
+.show-thread-link {
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-link);
+  text-decoration: none;
+}
+
+.show-thread-link:hover {
+  text-decoration: underline;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .home-wrapper {
@@ -1087,6 +1175,7 @@
     max-width: 300px;
   }
 }
+
 /* Replies Feed Threading */
 .reply-thread-group {
   margin-bottom: 25px;
@@ -1134,9 +1223,11 @@
   .reply-child {
     margin-left: 15px;
   }
+
   .reply-child:not(.no-parent):before {
     left: -10px;
   }
+
   .reply-child:not(.no-parent):after {
     left: -15px;
   }

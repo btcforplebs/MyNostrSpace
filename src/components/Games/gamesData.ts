@@ -3,6 +3,7 @@ import wordsImg from '../../assets/words_with_zaps.png';
 import jesterImg from '../../assets/Jestr_chess.png';
 import diceImg from '../../assets/nostr_dice.jpeg';
 import bitariImg from '../../assets/bitari.png';
+import word5Img from '../../assets/word5.png';
 
 export interface Game {
   id: string;
@@ -48,5 +49,12 @@ export const GAMES_LIST: Game[] = [
     description: 'A retro-themed arcade hub featuring Hash-out, Pow-man, and Dip Hopper.',
     url: 'https://bitari2100.vercel.app/arcade',
     thumbnail: bitariImg,
+  },
+  {
+    id: 'word5',
+    title: 'Word5',
+    description: 'A classic 5-letter word puzzle game. Guess the word in 6 tries!',
+    url: 'https://word5.otherstuff.ai',
+    thumbnail: word5Img,
   },
 ];

@@ -23,6 +23,8 @@ import { useBlockList } from '../../hooks/useBlockList';
 import { MentionInput } from '../Shared/MentionInput';
 import { extractMentions } from '../../utils/mentions';
 import { EmbeddedNote } from '../Shared/EmbeddedNote';
+import { RichTextRenderer } from '../Shared/RichTextRenderer';
+import { InteractionBar } from '../Shared/InteractionBar';
 
 import './HomePage.css';
 
@@ -50,7 +52,6 @@ const NotificationItem = memo(
       actionIcon = '⚡';
       actionText = 'zapped your post';
     }
-
 
     return (
       <div
@@ -96,7 +97,42 @@ const NotificationItem = memo(
   }
 );
 
+const ReplyCard = memo(({ event }: { event: NDKEvent }) => {
+  const { profile } = useProfile(event.pubkey);
+  const authorName = profile?.name || profile?.displayName || event.pubkey.slice(0, 8);
 
+  return (
+    <div className="reply-card">
+      <div className="reply-card-header">
+        <div className="reply-card-author">
+          <Avatar
+            pubkey={event.pubkey}
+            src={profile?.picture}
+            size={40}
+            className="reply-card-avatar"
+          />
+          <Link to={`/p/${event.pubkey}`} className="reply-card-name">
+            {authorName}
+          </Link>
+        </div>
+      </div>
+      <div className="reply-card-body">
+        <div className="reply-card-text">
+          <RichTextRenderer content={event.content} />
+        </div>
+        <div className="reply-card-meta">
+          Posted {new Date((event.created_at || 0) * 1000).toLocaleString()}
+        </div>
+        <div className="reply-card-actions">
+          <InteractionBar event={event} onCommentClick={() => {}} />
+          <Link to={`/thread/${event.id}`} className="show-thread-link">
+            Show thread
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 interface MediaItem {
   id: string;
@@ -509,8 +545,6 @@ const HomePage = () => {
     []
   );
 
-
-
   const getFollows = useCallback(async () => {
     if (!ndk || !user) return [];
 
@@ -637,7 +671,8 @@ const HomePage = () => {
   ]);
 
   const loadMoreReplies = useCallback(async () => {
-    if (!repliesUntil || !ndk || isLoadingMoreReplies || !hasMoreReplies || fetchingRef.current) return;
+    if (!repliesUntil || !ndk || isLoadingMoreReplies || !hasMoreReplies || fetchingRef.current)
+      return;
     fetchingRef.current = true;
     setIsLoadingMoreReplies(true);
     try {
@@ -649,7 +684,9 @@ const HomePage = () => {
         until: repliesUntil,
       };
       const events = await ndk.fetchEvents(filter);
-      const newEvents = Array.from(events).filter((e) => e.tags.some((t) => t[0] === 'e' || t[0] === 'q'));
+      const newEvents = Array.from(events).filter((e) =>
+        e.tags.some((t) => t[0] === 'e' || t[0] === 'q')
+      );
 
       if (newEvents.length === 0) {
         setHasMoreReplies(false);
@@ -916,8 +953,6 @@ const HomePage = () => {
     };
   }, [ndk, user, viewMode, getFollows]);
 
-
-
   useEffect(() => {
     if (!ndk || !user) return;
     let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
@@ -992,11 +1027,7 @@ const HomePage = () => {
       sub.on('eose', () => {
         flushNotifications();
       });
-
     };
-
-
-
 
     startNotificationSub();
     return () => {
@@ -1114,7 +1145,7 @@ const HomePage = () => {
 
       // Add mentions
       const mentionedPubkeys = extractMentions(finalContent);
-      mentionedPubkeys.forEach(pubkey => {
+      mentionedPubkeys.forEach((pubkey) => {
         event.tags.push(['p', pubkey]);
       });
 
@@ -1523,8 +1554,6 @@ const HomePage = () => {
                   </div>
                 )}
 
-
-
                 {viewMode === 'streams' && (
                   <div style={{ padding: '15px' }}>
                     <div className="streams-list">
@@ -1588,19 +1617,24 @@ const HomePage = () => {
                       <div style={{ padding: '20px' }}>Loading Replies...</div>
                     )}
                     {replies.length === 0 && !isRepliesLoading && (
-                      <div style={{ padding: '20px' }}>No replies found from people you follow.</div>
+                      <div style={{ padding: '20px' }}>
+                        No replies found from people you follow.
+                      </div>
                     )}
                     {replies.slice(0, displayedRepliesCount).map((event) => {
                       const parentId = event.tags.find((t) => t[0] === 'e')?.[1];
                       return (
                         <div key={event.id} className="reply-thread-group">
                           {parentId && (
-                            <div className="reply-context">
+                            <div className="reply-context-wrapper">
                               <EmbeddedNote id={parentId} />
                             </div>
                           )}
-                          <div className={`reply-child ${!parentId ? 'no-parent' : ''}`}>
-                            <FeedItem event={event} />
+                          <div className="reply-container">
+                            {parentId && <div className="reply-connector">↳</div>}
+                            <div className="reply-child-card">
+                              <ReplyCard event={event} />
+                            </div>
                           </div>
                         </div>
                       );
@@ -1653,9 +1687,9 @@ const HomePage = () => {
       <BlogEditor
         isOpen={isBlogModalOpen}
         onClose={() => setIsBlogModalOpen(false)}
-        onPostComplete={() => { }}
+        onPostComplete={() => {}}
       />
-    </div >
+    </div>
   );
 };
 

@@ -54,7 +54,7 @@ export const GAMES_LIST: Game[] = [
     id: 'word5',
     title: 'Word5',
     description: 'A classic 5-letter word puzzle game. Guess the word in 6 tries!',
-    url: 'https://word5.otherstuff.ai',
+    url: 'https://word5.otherstuff.ai/',
     thumbnail: word5Img,
   },
 ];

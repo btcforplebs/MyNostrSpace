@@ -99,10 +99,6 @@ export const GamePlayerPage = () => {
 
   return (
     <div className="game-player-container">
-      <div className="games-header-area">
-        <Navbar />
-      </div>
-
       <div className="player-controls-bar">
         <div className="player-controls-left">
           <Link to="/games" className="player-breadcrumbs-link">

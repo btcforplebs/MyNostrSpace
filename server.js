@@ -62,7 +62,7 @@ async function fetchNostrData(type, id) {
     }
 
     try {
-        console.log(`[Fetch] ${type}: ${hex}`);
+        console.log(`[Fetch] Searching for ${type}: ${hex} across pool...`);
 
         let filter;
         if (type === 'profile') {
@@ -71,25 +71,32 @@ async function fetchNostrData(type, id) {
             filter = { ids: [hex], limit: 1 };
         }
 
-        // 3-second hard timeout for the relay fetch
-        const event = await fetchWithTimeout(pool.get(RELAYS, filter), 3000);
-        if (!event) return null;
+        // 5-second hard timeout for the relay fetch
+        const event = await fetchWithTimeout(pool.get(RELAYS, filter), 5000);
+        if (!event) {
+            console.log(`[Fetch] No event found for ${hex}`);
+            return null;
+        }
 
         if (type === 'profile') {
             const metadata = JSON.parse(event.content || '{}');
-            const author = metadata.display_name || metadata.name || 'User';
+            const author = metadata.display_name || metadata.name || 'Nostr User';
             return {
                 title: `MyNostrSpace - ${author}`,
                 description: (metadata.about || 'Nostr Profile').slice(0, 160),
                 image: metadata.picture || '/mynostrspace_logo.png'
             };
         } else {
-            // Fetch author profile separately with a shorter timeout
+            // Fetch author profile separately
             const authorHex = event.pubkey;
-            const profileEvent = await fetchWithTimeout(pool.get(RELAYS, { kinds: [0], authors: [authorHex], limit: 1 }), 1500).catch(() => null);
-            const profile = profileEvent ? JSON.parse(profileEvent.content || '{}') : {};
+            console.log(`[Fetch] Searching for author profile: ${authorHex}...`);
+            const profileEvent = await fetchWithTimeout(pool.get(RELAYS, { kinds: [0], authors: [authorHex], limit: 1 }), 5000).catch((err) => {
+                console.warn(`[Fetch Warn] Profile fetch failed for ${authorHex}: ${err.message}`);
+                return null;
+            });
 
-            const author = profile.display_name || profile.name || 'someone';
+            const profile = profileEvent ? JSON.parse(profileEvent.content || '{}') : {};
+            const author = profile.display_name || profile.name || 'Nostr User';
             const snippet = (event.content?.slice(0, 80) || 'Nostr Thread').replace(/\n/g, ' ') + '...';
 
             return {
@@ -99,7 +106,7 @@ async function fetchNostrData(type, id) {
             };
         }
     } catch (e) {
-        console.warn(`[Fetch Error] ${type} ${id}: ${e.message}`);
+        console.error(`[Fetch Error] ${type} ${id}:`, e.message);
         return null;
     }
 }
@@ -121,15 +128,15 @@ app.use(async (req, res) => {
     const threadMatch = req.path.match(/^\/thread\/([a-zA-Z0-9]+)/);
 
     if (isBot && (profileMatch || threadMatch)) {
-        console.log(`[Bot] ${req.path}`);
+        console.log(`[Bot Request] ${req.path} (${userAgent})`);
         const type = profileMatch ? 'profile' : 'thread';
         const id = profileMatch ? profileMatch[1] : threadMatch[1];
-
         const meta = await fetchNostrData(type, id);
+
         if (meta) {
             let html = cachedIndexHtml;
+            console.log(`[Injecting] ${meta.title}`);
             html = html.replace(/<title>.*?<\/title>/, `<title>${meta.title}</title>`);
-
             const tags = [
                 { name: 'description', content: meta.description },
                 { property: 'og:title', content: meta.title },
@@ -140,7 +147,6 @@ app.use(async (req, res) => {
                 { name: 'twitter:description', content: meta.description },
                 { name: 'twitter:image', content: meta.image }
             ];
-
             tags.forEach(t => {
                 const attr = t.name ? `name="${t.name}"` : `property="${t.property}"`;
                 const regex = new RegExp(`<meta ${attr} content=".*?" \\/>`, 'g');
@@ -153,7 +159,6 @@ app.use(async (req, res) => {
             return res.send(html);
         }
     }
-
     res.send(cachedIndexHtml);
 });
 

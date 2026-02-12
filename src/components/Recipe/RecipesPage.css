@@ -1,384 +1,384 @@
 /* RecipesPage.css - Uses design tokens from design-tokens.css */
 
 .rp-page-container {
-    min-height: 100vh;
-    background-color: var(--myspace-bg);
-    font-family: var(--myspace-font-family);
+  min-height: 100vh;
+  background-color: var(--myspace-bg);
+  font-family: var(--myspace-font-family);
 }
 
 .rp-wrapper {
-    max-width: var(--myspace-container-width);
-    margin: 0 auto;
-    background-color: var(--myspace-bg-content);
-    box-shadow: var(--myspace-shadow-md);
+  max-width: var(--myspace-container-width);
+  margin: 0 auto;
+  background-color: var(--myspace-bg-content);
+  box-shadow: var(--myspace-shadow-md);
 }
 
 .rp-content {
-    padding: var(--myspace-spacing-lg);
-    background-color: var(--myspace-bg-content);
+  padding: var(--myspace-spacing-lg);
+  background-color: var(--myspace-bg-content);
 }
 
 /* Header Styling - MySpace Style */
 .rp-section-header {
-    background-color: var(--myspace-orange);
-    color: white;
-    font-size: var(--myspace-font-size-xl);
-    font-weight: bold;
-    padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
-    margin-bottom: var(--myspace-spacing-lg);
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  background-color: var(--myspace-orange);
+  color: white;
+  font-size: var(--myspace-font-size-xl);
+  font-weight: bold;
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  margin-bottom: var(--myspace-spacing-lg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .rp-header-icon {
-    font-size: var(--myspace-font-size-2xl);
+  font-size: var(--myspace-font-size-2xl);
 }
 
 /* Grid Layout */
 .rp-recipes-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: var(--myspace-spacing-lg);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--myspace-spacing-lg);
 }
 
 /* Recipe Card - MySpace Style */
 .rp-recipe-card {
-    background: var(--myspace-bg-content);
-    border: 2px solid var(--myspace-blue);
-    display: flex;
-    flex-direction: column;
-    cursor: pointer;
-    transition: background-color 0.2s;
+  background: var(--myspace-bg-content);
+  border: 2px solid var(--myspace-blue);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
 .rp-recipe-card:hover {
-    background-color: var(--myspace-bg-alt);
-    border-color: var(--myspace-blue-dark);
+  background-color: var(--myspace-bg-alt);
+  border-color: var(--myspace-blue-dark);
 }
 
 .rp-thumbnail-container {
-    position: relative;
-    padding-top: 75%;
-    background-color: var(--myspace-border);
-    overflow: hidden;
-    border-bottom: 1px solid var(--myspace-blue);
+  position: relative;
+  padding-top: 75%;
+  background-color: var(--myspace-border);
+  overflow: hidden;
+  border-bottom: 1px solid var(--myspace-blue);
 }
 
 .rp-recipe-thumbnail {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .rp-recipe-placeholder {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--myspace-gray-200);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--myspace-gray-200);
 }
 
 .rp-placeholder-icon {
-    font-size: 48px;
+  font-size: 48px;
 }
 
 .rp-badge {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: var(--myspace-orange);
-    color: white;
-    padding: 2px 6px;
-    font-size: var(--myspace-font-size-md);
-    font-weight: bold;
-    border: 1px solid var(--myspace-orange-hover);
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: var(--myspace-orange);
+  color: white;
+  padding: 2px 6px;
+  font-size: var(--myspace-font-size-md);
+  font-weight: bold;
+  border: 1px solid var(--myspace-orange-hover);
 }
 
 .rp-time-badge {
-    position: absolute;
-    bottom: 5px;
-    right: 5px;
-    background: rgba(255, 255, 255, 0.9);
-    color: var(--myspace-text);
-    padding: 2px 6px;
-    font-size: var(--myspace-font-size-md);
-    border: 1px solid var(--myspace-text-light);
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--myspace-text);
+  padding: 2px 6px;
+  font-size: var(--myspace-font-size-md);
+  border: 1px solid var(--myspace-text-light);
 }
 
 .rp-recipe-info {
-    padding: var(--myspace-spacing-md);
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+  padding: var(--myspace-spacing-md);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .rp-recipe-title {
-    font-size: 12pt;
-    font-weight: bold;
-    color: var(--myspace-blue-dark);
-    margin-bottom: var(--myspace-spacing-sm);
-    line-height: 1.3;
+  font-size: 12pt;
+  font-weight: bold;
+  color: var(--myspace-blue-dark);
+  margin-bottom: var(--myspace-spacing-sm);
+  line-height: 1.3;
 }
 
 .rp-recipe-summary {
-    font-size: var(--myspace-font-size-lg);
-    color: var(--myspace-gray-700);
-    margin-bottom: 8px;
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    flex: 1;
+  font-size: var(--myspace-font-size-lg);
+  color: var(--myspace-gray-700);
+  margin-bottom: 8px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
 }
 
 .rp-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
 .rp-tag {
-    color: var(--myspace-text-muted);
-    font-size: var(--myspace-font-size-md);
+  color: var(--myspace-text-muted);
+  font-size: var(--myspace-font-size-md);
 }
 
 .rp-recipe-meta {
-    font-size: var(--myspace-font-size-md);
-    color: var(--myspace-text-muted);
-    border-top: 1px dashed var(--myspace-border);
-    padding-top: var(--myspace-spacing-sm);
-    margin-top: auto;
+  font-size: var(--myspace-font-size-md);
+  color: var(--myspace-text-muted);
+  border-top: 1px dashed var(--myspace-border);
+  padding-top: var(--myspace-spacing-sm);
+  margin-top: auto;
 }
 
 .rp-recipe-author {
-    color: var(--myspace-blue-dark);
-    font-weight: bold;
-    text-decoration: none;
+  color: var(--myspace-blue-dark);
+  font-weight: bold;
+  text-decoration: none;
 }
 
 .rp-recipe-author:hover {
-    text-decoration: underline;
-    color: var(--myspace-error);
+  text-decoration: underline;
+  color: var(--myspace-error);
 }
 
 /* Modal Styles - MySpace Profile/Blog Style */
 .rp-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: start;
-    justify-content: center;
-    z-index: 1000;
-    padding: var(--myspace-spacing-xl);
-    overflow-y: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--myspace-spacing-xl);
+  overflow-y: auto;
 }
 
 .rp-modal-content {
-    background: var(--myspace-bg-content);
-    width: 100%;
-    max-width: 800px;
-    border: 2px solid var(--myspace-blue);
-    margin-top: 40px;
-    margin-bottom: 40px;
-    position: relative;
-    box-shadow: var(--myspace-shadow-lg);
+  background: var(--myspace-bg-content);
+  width: 100%;
+  max-width: 800px;
+  border: 2px solid var(--myspace-blue);
+  margin-top: 40px;
+  margin-bottom: 40px;
+  position: relative;
+  box-shadow: var(--myspace-shadow-lg);
 }
 
 .rp-modal-header {
-    background-color: var(--myspace-blue);
-    padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  background-color: var(--myspace-blue);
+  padding: var(--myspace-spacing-sm) var(--myspace-spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .rp-modal-title {
-    font-size: var(--myspace-font-size-xl);
-    font-weight: bold;
-    color: white;
-    margin: 0;
+  font-size: var(--myspace-font-size-xl);
+  font-weight: bold;
+  color: white;
+  margin: 0;
 }
 
 .rp-close-btn {
-    background: none;
-    border: none;
-    font-size: var(--myspace-font-size-2xl);
-    font-weight: bold;
-    color: white;
-    cursor: pointer;
-    padding: 0 var(--myspace-spacing-sm);
+  background: none;
+  border: none;
+  font-size: var(--myspace-font-size-2xl);
+  font-weight: bold;
+  color: white;
+  cursor: pointer;
+  padding: 0 var(--myspace-spacing-sm);
 }
 
 .rp-close-btn:hover {
-    color: var(--myspace-orange);
+  color: var(--myspace-orange);
 }
 
 .rp-modal-scroll {
-    padding: var(--myspace-spacing-lg);
+  padding: var(--myspace-spacing-lg);
 }
 
 /* Detail Styling */
 .rp-detail-header {
-    display: flex;
-    gap: var(--myspace-spacing-lg);
-    margin-bottom: var(--myspace-spacing-xl);
-    padding-bottom: var(--myspace-spacing-lg);
-    border-bottom: 1px dashed var(--myspace-border);
+  display: flex;
+  gap: var(--myspace-spacing-lg);
+  margin-bottom: var(--myspace-spacing-xl);
+  padding-bottom: var(--myspace-spacing-lg);
+  border-bottom: 1px dashed var(--myspace-border);
 }
 
 .rp-detail-image-container {
-    width: 200px;
-    flex-shrink: 0;
-    border: 1px solid var(--myspace-text-light);
-    background: var(--myspace-bg-content);
-    padding: var(--myspace-spacing-xs);
+  width: 200px;
+  flex-shrink: 0;
+  border: 1px solid var(--myspace-text-light);
+  background: var(--myspace-bg-content);
+  padding: var(--myspace-spacing-xs);
 }
 
 .rp-detail-image {
-    width: 100%;
-    height: auto;
-    object-fit: contain;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 .rp-detail-meta {
-    flex: 1;
+  flex: 1;
 }
 
 .rp-meta-item {
-    font-size: 12pt;
-    margin-bottom: 4px;
+  font-size: 12pt;
+  margin-bottom: 4px;
 }
 
 .rp-description {
-    background-color: #ffffcc;
-    border: 1px solid #cccc99;
-    padding: var(--myspace-spacing-md);
-    font-size: 12pt;
-    margin-bottom: var(--myspace-spacing-xl);
-    line-height: 1.5;
+  background-color: #ffffcc;
+  border: 1px solid #cccc99;
+  padding: var(--myspace-spacing-md);
+  font-size: 12pt;
+  margin-bottom: var(--myspace-spacing-xl);
+  line-height: 1.5;
 }
 
 /* Markdown Content Styling */
 .rp-markdown-content {
-    font-size: 12pt;
-    line-height: 1.6;
-    color: var(--myspace-gray-700);
+  font-size: 12pt;
+  line-height: 1.6;
+  color: var(--myspace-gray-700);
 }
 
 .rp-markdown-content h1,
 .rp-markdown-content h2,
 .rp-markdown-content h3 {
-    color: var(--myspace-orange);
-    border-bottom: 1px solid var(--myspace-border);
-    padding-bottom: 2px;
-    margin-top: var(--myspace-spacing-lg);
-    margin-bottom: var(--myspace-spacing-md);
-    font-size: var(--myspace-font-size-xl);
-    font-weight: bold;
+  color: var(--myspace-orange);
+  border-bottom: 1px solid var(--myspace-border);
+  padding-bottom: 2px;
+  margin-top: var(--myspace-spacing-lg);
+  margin-bottom: var(--myspace-spacing-md);
+  font-size: var(--myspace-font-size-xl);
+  font-weight: bold;
 }
 
 .rp-markdown-content p {
-    margin-bottom: 12px;
+  margin-bottom: 12px;
 }
 
 .rp-markdown-content ul,
 .rp-markdown-content ol {
-    margin-left: var(--myspace-spacing-xl);
-    margin-bottom: 12px;
+  margin-left: var(--myspace-spacing-xl);
+  margin-bottom: 12px;
 }
 
 .rp-markdown-content li {
-    margin-bottom: 4px;
+  margin-bottom: 4px;
 }
 
 .rp-markdown-content img {
-    max-width: 100%;
-    border: 1px solid var(--myspace-border);
-    padding: var(--myspace-spacing-xs);
-    background: var(--myspace-bg-content);
-    margin: var(--myspace-spacing-md) 0;
+  max-width: 100%;
+  border: 1px solid var(--myspace-border);
+  padding: var(--myspace-spacing-xs);
+  background: var(--myspace-bg-content);
+  margin: var(--myspace-spacing-md) 0;
 }
 
 .rp-markdown-content strong {
-    color: var(--myspace-text);
+  color: var(--myspace-text);
 }
 
 /* Legacy/Fallback Styling */
 .rp-section-title {
-    font-size: var(--myspace-font-size-xl);
-    font-weight: bold;
-    color: var(--myspace-orange);
-    margin-bottom: var(--myspace-spacing-md);
-    border-bottom: 1px solid var(--myspace-border);
+  font-size: var(--myspace-font-size-xl);
+  font-weight: bold;
+  color: var(--myspace-orange);
+  margin-bottom: var(--myspace-spacing-md);
+  border-bottom: 1px solid var(--myspace-border);
 }
 
 .rp-ingredients-list,
 .rp-steps-list {
-    margin-left: var(--myspace-spacing-xl);
-    font-size: 12pt;
-    line-height: 1.5;
+  margin-left: var(--myspace-spacing-xl);
+  font-size: 12pt;
+  line-height: 1.5;
 }
 
 /* Loading State */
 .rp-loading-state {
-    text-align: center;
-    padding: 40px;
-    color: var(--myspace-text-muted);
-    font-size: 12pt;
+  text-align: center;
+  padding: 40px;
+  color: var(--myspace-text-muted);
+  font-size: 12pt;
 }
 
 .rp-spinner {
-    width: 30px;
-    height: 30px;
-    border: 3px solid var(--myspace-border);
-    border-top-color: var(--myspace-blue);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto var(--myspace-spacing-md);
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--myspace-border);
+  border-top-color: var(--myspace-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto var(--myspace-spacing-md);
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Mobile Styling */
 @media (max-width: 768px) {
-    .rp-wrapper {
-        box-shadow: none;
-    }
+  .rp-wrapper {
+    box-shadow: none;
+  }
 
-    .rp-content {
-        padding: var(--myspace-spacing-sm);
-    }
+  .rp-content {
+    padding: var(--myspace-spacing-sm);
+  }
 
-    .rp-detail-header {
-        flex-direction: column;
-    }
+  .rp-detail-header {
+    flex-direction: column;
+  }
 
-    .rp-detail-image-container {
-        width: 100%;
-        max-width: 300px;
-        margin: 0 auto;
-    }
+  .rp-detail-image-container {
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+  }
 
-    .rp-recipes-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100%, 1fr));
-    }
+  .rp-recipes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100%, 1fr));
+  }
 }

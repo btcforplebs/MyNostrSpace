@@ -1,169 +1,169 @@
 /* Feed Styles - Extracted from ProfilePage.css */
 
 .feed-item {
-    padding: var(--myspace-spacing-md);
-    display: flex;
-    gap: 12px;
-    border: 1px solid var(--myspace-light-blue);
-    border-left: 3px solid var(--myspace-blue);
-    background: var(--myspace-bg-content);
-    margin-bottom: var(--myspace-spacing-md);
+  padding: var(--myspace-spacing-md);
+  display: flex;
+  gap: 12px;
+  border: 1px solid var(--myspace-light-blue);
+  border-left: 3px solid var(--myspace-blue);
+  background: var(--myspace-bg-content);
+  margin-bottom: var(--myspace-spacing-md);
 }
 
 .feed-item:nth-child(even) {
-    background-color: var(--myspace-bg-alt);
+  background-color: var(--myspace-bg-alt);
 }
 
 .feed-user-pic {
-    width: 50px;
-    height: 50px;
-    object-fit: cover;
-    border: 1px solid var(--myspace-border);
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border: 1px solid var(--myspace-border);
 }
 
 .feed-content {
-    flex: 1;
-    min-width: 0;
-    overflow-wrap: break-word;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .feed-header-line {
-    background: var(--myspace-light-blue);
-    padding: var(--myspace-spacing-xs) 6px;
-    margin-bottom: 6px;
+  background: var(--myspace-light-blue);
+  padding: var(--myspace-spacing-xs) 6px;
+  margin-bottom: 6px;
 }
 
 .feed-user-name {
-    color: var(--myspace-link);
-    font-weight: bold;
-    text-decoration: none;
-    font-size: var(--myspace-font-size-md);
+  color: var(--myspace-link);
+  font-weight: bold;
+  text-decoration: none;
+  font-size: var(--myspace-font-size-md);
 }
 
 .feed-mood {
-    font-size: var(--myspace-font-size-base);
-    color: var(--myspace-gray-700);
+  font-size: var(--myspace-font-size-base);
+  color: var(--myspace-gray-700);
 }
 
 .feed-text {
-    font-size: var(--myspace-font-size-base);
-    margin-bottom: 8px;
-    line-height: 1.4;
+  font-size: var(--myspace-font-size-base);
+  margin-bottom: 8px;
+  line-height: 1.4;
 }
 
 .feed-meta {
-    font-size: var(--myspace-font-size-xs);
-    color: var(--myspace-text-light);
-    margin-bottom: var(--myspace-spacing-sm);
+  font-size: var(--myspace-font-size-xs);
+  color: var(--myspace-text-light);
+  margin-bottom: var(--myspace-spacing-sm);
 }
 
 .feed-actions {
-    margin-top: 8px;
-    font-size: var(--myspace-font-size-base);
+  margin-top: 8px;
+  font-size: var(--myspace-font-size-base);
 }
 
 .feed-actions a {
-    color: var(--myspace-link);
-    text-decoration: none;
+  color: var(--myspace-link);
+  text-decoration: none;
 }
 
 .feed-actions a:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 /* Interaction Bar */
 .interaction-bar {
-    display: flex;
-    gap: var(--myspace-spacing-md);
-    font-size: var(--myspace-font-size-base);
+  display: flex;
+  gap: var(--myspace-spacing-md);
+  font-size: var(--myspace-font-size-base);
 }
 
 .interaction-item {
-    display: flex;
-    align-items: center;
-    gap: var(--myspace-spacing-sm);
-    cursor: pointer;
-    color: var(--myspace-link);
+  display: flex;
+  align-items: center;
+  gap: var(--myspace-spacing-sm);
+  cursor: pointer;
+  color: var(--myspace-link);
 }
 
 .interaction-item:hover {
-    text-decoration: underline;
+  text-decoration: underline;
 }
 
 .interaction-icon {
-    font-size: 1.1em;
+  font-size: 1.1em;
 }
 
 .repost-header {
-    font-size: var(--myspace-font-size-sm);
-    color: var(--myspace-text-muted);
-    display: flex;
-    align-items: center;
-    gap: var(--myspace-spacing-sm);
-    margin-bottom: var(--myspace-spacing-sm);
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--myspace-spacing-sm);
+  margin-bottom: var(--myspace-spacing-sm);
 }
 
 .nostr-input {
-    width: 100%;
-    border: 1px solid var(--myspace-border);
-    font-family: var(--myspace-font-family);
-    font-size: var(--myspace-font-size-base);
+  width: 100%;
+  border: 1px solid var(--myspace-border);
+  font-family: var(--myspace-font-family);
+  font-size: var(--myspace-font-size-base);
 }
 
 /* Standardized Form & Button Styles */
 .myspace-form-container {
-    margin-top: 8px;
-    padding: 8px;
-    background: var(--myspace-bg-alt);
-    background-color: #f9f9f9;
-    border: 1px solid var(--myspace-border);
-    width: 100%;
-    box-sizing: border-box;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--myspace-bg-alt);
+  background-color: #f9f9f9;
+  border: 1px solid var(--myspace-border);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .myspace-button {
-    background-color: var(--myspace-link) !important;
-    color: white !important;
-    border: 1px solid var(--myspace-blue-dark) !important;
-    border-radius: 4px;
-    padding: 4px 10px;
-    font-size: var(--myspace-font-size-xs) !important;
-    cursor: pointer;
-    font-weight: bold;
+  background-color: var(--myspace-link) !important;
+  color: white !important;
+  border: 1px solid var(--myspace-blue-dark) !important;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: var(--myspace-font-size-xs) !important;
+  cursor: pointer;
+  font-weight: bold;
 }
 
 .myspace-button:hover {
-    background-color: var(--myspace-link-hover) !important;
-    text-decoration: none;
+  background-color: var(--myspace-link-hover) !important;
+  text-decoration: none;
 }
 
 .myspace-button:disabled {
-    background-color: var(--myspace-gray-500) !important;
-    border-color: var(--myspace-gray-500) !important;
-    cursor: not-allowed;
+  background-color: var(--myspace-gray-500) !important;
+  border-color: var(--myspace-gray-500) !important;
+  cursor: not-allowed;
 }
 
 .myspace-button-secondary {
-    background: transparent !important;
-    background-color: transparent !important;
-    color: var(--myspace-link) !important;
-    border: none !important;
-    text-decoration: underline;
-    cursor: pointer;
-    font-size: var(--myspace-font-size-xs) !important;
-    padding: 4px 8px;
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--myspace-link) !important;
+  border: none !important;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: var(--myspace-font-size-xs) !important;
+  padding: 4px 8px;
 }
 
 .myspace-button-secondary:hover {
-    color: var(--myspace-link-hover) !important;
-    background: transparent !important;
-    text-decoration: underline !important;
+  color: var(--myspace-link-hover) !important;
+  background: transparent !important;
+  text-decoration: underline !important;
 }
 
 .myspace-button-group {
-    text-align: right;
-    margin-top: 5px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
+  text-align: right;
+  margin-top: 5px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }

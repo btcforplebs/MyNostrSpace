@@ -58,7 +58,9 @@
   padding: var(--myspace-spacing-md);
   background: var(--myspace-gray-100);
   cursor: pointer;
-  transition: transform 0.1s, border-color 0.2s;
+  transition:
+    transform 0.1s,
+    border-color 0.2s;
   min-width: 0;
 }
 

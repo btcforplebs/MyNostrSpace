@@ -11,9 +11,11 @@ Welcome to **mynostrspace.com**, the ultimate fusion of 2009 social media nostal
 ## ⚡️ Features
 
 ### Nostr Protocol Support
+
 NIP-01 notes/posts, NIP-02 follow lists, NIP-07 browser extension login, NIP-46 Bunker/remote signer, NIP-10 threaded replies, NIP-23 long-form articles, NIP-25 reactions/likes, NIP-57 zaps, NIP-58 badges (display + awarding), NIP-65 relay lists, NIP-89 client tags, NIP-94 file metadata, NIP-98 authenticated uploads, reposts, zap receipts, profile badges, recipes, custom profile CSS, livestreams, music tracks, relay management, wall posts, quote posts, media uploads via Blossom, nostr: URI rendering
 
 ### MySpace-Style Features
+
 - **🎨 Custom Profile Themes**: Full CSS editor with presets (Classic MySpace, Matrix, Y2K Glitter, Emo/Scene, GeoCities, Cyberpunk)
 - **🖼️ Profile Background Uploads**: Upload custom backgrounds via Blossom
 - **😊 Mood Selector**: Set your mood with every status update
@@ -25,6 +27,7 @@ NIP-01 notes/posts, NIP-02 follow lists, NIP-07 browser extension login, NIP-46 
 - **📑 Tabbed Interface**: Feed, Media, Blog, Music, Live, Notifications
 
 ### Pages & Content
+
 - **Home Feed**: Virtual-scrolled timeline with mood posting
 - **Profile**: Customizable profiles with Photos, Videos, Recipes, Livestreams, Blog tabs
 - **Browse/Discover**: Category grid with people discovery
@@ -43,6 +46,7 @@ NIP-01 notes/posts, NIP-02 follow lists, NIP-07 browser extension login, NIP-46 
 - **Settings**: Relay management and profile editing
 
 ### Performance
+
 - **Virtual Scrolling**: Only renders visible items
 - **Infinite Scroll**: Intersection Observer-based loading
 - **Profile Caching**: Deduplicated requests with shared cache

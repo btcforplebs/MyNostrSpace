@@ -7,18 +7,20 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 ### 🐛 Bug Fixes
 
 #### **Thread View Theming**
+
 - Fixed issue where thread view lost custom theming on page refresh.
 - **Root Cause:** Custom layout CSS was being injected before default component styles, causing defaults to take precedence. Also, specific feed items were missing styles available on other pages.
-- **Solution:** 
+- **Solution:**
   - Moved custom CSS injection to the end of `ThreadPage.tsx` to ensure proper cascading.
   - Extracted shared feed styles from `ProfilePage.css` into a modular `FeedItem.css`.
   - Standardized button and form styles across `FeedItem` and `InteractionBar` using global design tokens.
 - **Files modified:** `ThreadPage.tsx`, `ProfilePage.css`, `FeedItem.css`, `FeedItem.tsx`, `InteractionBar.tsx`
 
 #### **NIP-45 Stats & Homepage Stability**
+
 - Refactored event interaction counts (Likes, Comments, Reposts, Zaps) to use reliable **NIP-45 COUNT** queries.
 - **Improved Stability**: Implemented a global concurrency limiter (`MAX_CONCURRENT_STATS = 3`) to prevent "subscription storms" that were freezing the homepage.
-- **Optimized Performance**: 
+- **Optimized Performance**:
   - Added a 500ms batch collection window for stats requests.
   - Limits batch processing to 10 events at a time.
   - Direct `relay.count` support for relays that natively support NIP-45.
@@ -28,11 +30,13 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 ### 🎨 UI/UX Enhancements
 
 #### **Quote Box & Button Styling**
+
 - Standardized the look of the quote box and action buttons in the feed.
 - Quote box now takes full width for better usability.
 - Buttons now use consistent MySpace-themed styling (blue/white) instead of browser defaults or inline styles.
 
 #### **Dynamic Block List & Notification Reliability**
+
 - **Kind 10000 (Mute List) Support**: Integrated support for fetching and updating user mute lists from Nostr.
 - **Improved Blocking**: Added `useBlockList` hook to centralize blocking logic, ensuring blocked users are filtered from:
   - Global follower counts and statistics.
@@ -43,11 +47,30 @@ All notable changes to the MyNostrSpace project will be documented in this file.
   - Uses reliable history fetching via Antiprimal relays to verify follow state changes.
 - **Functional "Block User" Action**: Completed the "Block User" UI in `ContactBox`, allowing users to dynamically mute accounts via Nostr.
 - **Files modified**: `HomePage.tsx`, `useFriends.ts`, `ContactBox.tsx`, `useBlockList.ts`, `blockedUsers.ts`
+
+### 🚀 New Features
+
+#### **Bitari 2100 Arcade Integration**
+
+- Added **Bitari 2100 Arcade** to the Games section, consolidating multiple Bitari games (Hash-out, Pow-man, Dip Hopper) into a single retro-themed hub.
+- Games are embedded via iframes for a seamless in-app experience.
+- Updated `GAMES_LIST` to include the new consolidated Bitari entry.
+
+### 🛠 Technical Improvements
+
+#### **Game Data Refactoring**
+
+- Extracted `Game` interface and `GAMES_LIST` constant from `GamesPage.tsx` into a dedicated `gamesData.ts` file.
+- **Fixed Lint Error:** Resolved a "Fast Refresh" error in `GamesPage.tsx` caused by exporting constants alongside components.
+- Standardized game data structure across the application.
+- **Files modified:** `GamesPage.tsx`, `GamePlayerPage.tsx`, `gamesData.ts`
+
 ## [Unreleased] - 2026-02-10
 
 ### 🚀 New Features
 
 #### **Browse Page Update**
+
 - **Categories Update**:
   - Renamed "**Audio Rooms**" to "**Rooms**" to better reflect content diversity.
   - Added "**Games**" category pointing to `/games`.
@@ -57,6 +80,7 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 ### 🐛 Bug Fixes
 
 #### **Message Caching & Read Status**
+
 - Fixed issue where unread messages weren't being properly tracked after reading them
 - **Root Cause:** Incoming DM events from network subscriptions were resetting read status to false, overwriting database state
 - **Solution:** Modified `useMessages.ts` to preserve read status from database when processing duplicate events
@@ -64,6 +88,7 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 - **Files modified:** `useMessages.ts`
 
 #### **Message Subscription on Homepage**
+
 - Fixed "You've Got Mail!" notification not updating until user clicks Messages in navbar
 - **Root Cause:** `useMessages` hook was only called in MessagesPage/ConversationPage, not HomePage
 - **Solution:** Added `useMessages` call to HomePage to load messages in background automatically
@@ -71,12 +96,14 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 - **Files modified:** `HomePage.tsx`
 
 #### **Message Sending Error**
+
 - Fixed "undefined is not a constructor" error when sending messages
 - **Root Cause:** Code was trying to access NDKEvent through `ndk.constructor.NDKEvent` which is unreliable
 - **Solution:** Properly import NDKEvent from @nostr-dev-kit/ndk and use direct constructor
 - **Files modified:** `ConversationPage.tsx`
 
 #### **"You've Got Mail!" Styling**
+
 - Simplified notification box styling to match My Apps/Alerts design
 - Removed unnecessary gradients, shadows, and animations
 - Now uses clean rose/mauve header (#d97979) matching Alerts box
@@ -86,9 +113,11 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 ### 🚀 New Features
 
 #### **NIP-04 Direct Messaging System**
+
 Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encryption with Dexie local caching:
 
 **Core Features:**
+
 - ✅ Full two-way messaging: send and receive encrypted DMs
 - ✅ Real-time message subscriptions (kind 4 events)
 - ✅ Message encryption/decryption with NDK signer (supports all extensions: Alby, nos2x, Nos, NIP-46 signers)
@@ -99,6 +128,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - ✅ NIP-04 privacy notice explaining encryption limitations
 
 **Pages & Components:**
+
 - `MessagesPage.tsx` - Main inbox showing all conversations with unread counts
 - `ConversationPage.tsx` - Individual message thread with single user
 - `MessageItem.tsx` - Single message bubble (sent/received styling)
@@ -107,22 +137,26 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - Complete CSS styling for all components using design tokens
 
 **Services & Hooks:**
+
 - `messageCache.ts` - Dexie database service for message persistence (add, query, mark read, bulk operations)
 - `useMessages.ts` - Hook to subscribe to kind 4 events and cache locally
 - `useConversations.ts` - Hook to group messages by conversation partner
 - `useDMRelays.ts` - Hook to fetch user's DM relay preferences (kind 10050)
 
 **Architecture Decisions:**
+
 - Chose NIP-04 over NIP-17 for immediate compatibility with current Nostr ecosystem
 - NIP-17 infrastructure preserved for future upgrade when signers support NIP-44 encryption
 - Message batching (300ms) to prevent excessive re-renders during sync
 - Subscription-based loading with NDK cache-first strategy
 
 **Routes:**
+
 - `/messages` - Inbox with conversation list
 - `/messages/:pubkey` - Individual conversation thread
 
 #### **"You've Got Mail!" Homepage Section**
+
 - Added oldschool MySpace-themed mailbox notification above "My Apps"
 - Displays unread message count with eye-catching retro styling (orange gradient, yellow/cream background)
 - Shows mailbox emoji (📬) with bold count display
@@ -133,6 +167,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - **Files modified:** `HomePage.tsx`, `HomePage.css`
 
 **"Mark All as Read" Button:**
+
 - Added to Messages page header to clear all unread counts at once
 - Only displays when totalUnread > 0
 - Updates both message read status and conversation metadata
@@ -141,6 +176,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 ### ⚡ Performance Optimizations
 
 #### **Media Lazy Loading with IntersectionObserver**
+
 - Created `LazyImage` component in `RichTextRenderer.tsx` with IntersectionObserver (50px rootMargin)
   - Only loads images when they enter viewport
   - Prevents off-screen image loading, reducing initial network requests
@@ -154,20 +190,24 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - Added `loading="lazy"` to all iframes (YouTube, Vimeo, Streamable)
 
 #### **Cross-Page Component Memoization**
+
 - `VideosPage.tsx`: Wrapped VideoCard component with `React.memo` to prevent re-renders
 - `PhotosPage.tsx`: Wrapped PhotoCard component with `React.memo` for smoother gallery scrolling
 - `ThreadPage.tsx`: Wrapped ThreadItemRow component with `React.memo` for thread interactions
 - Memoized `InternalMention` component in `RichTextRenderer.tsx` to prevent unnecessary profile fetches
 
 #### **Deferred Profile Fetching**
+
 - Implemented `requestIdleCallback` with `setTimeout` fallback for non-blocking profile loads
 - VideosPage, PhotosPage, and ThreadPage now fetch author profiles during browser idle time
 - Prevents blocking of main thread and user interactions
 
 #### **Build Error Fix**
+
 - Removed unused `memo` import from `ProfilePage.tsx` that was causing TypeScript compilation failure
 
 ### 📊 Expected Performance Impact
+
 - ✅ Reduced initial network requests by ~50% (off-screen images/videos not loaded)
 - ✅ Smoother scrolling in media-heavy pages (gallery pages, feed with videos)
 - ✅ Faster page interactivity (deferred non-critical profile fetching)
@@ -181,12 +221,14 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 ### 🚀 New Features
 
 #### **Site-wide Blocked Users & Keywords**
+
 - Centralized `isBlockedUser` and `hasBlockedKeyword` utilities integrated into **Browse**, **Videos**, **Photos**, **Thread View**, and **Profile** pages.
 - Added site-wide filtering for `BLOCKED_KEYWORDS`.
 - Content from blocked pubkeys or containing blocked keywords is automatically hidden from feeds, grids, and replies.
 - Blocked profiles display a "Profile Blocked" notification.
 
 #### **Badge Awarding (NIP-58)**
+
 - Added **AwardBadgeModal** for badge creators to award their badges to others.
 - Integrated "Give Badge" option into user profiles for badge creators.
 - Added direct "Award" button to owned badges on the **Badges** page.
@@ -194,12 +236,14 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 ### 🎨 UI/UX Enhancements
 
 #### **Mobile Comment Header Layout**
+
 - Comment headers now stack name and date vertically on mobile to prevent cramped text.
 - Added `.comment-header`, `.comment-author-name`, and `.comment-date` CSS classes for threaded comments.
 - Date/time displays on its own line below the author name on screens under 768px.
 - Feed header line also stacks vertically on mobile for consistency.
 
 #### **Notifications Tab & Entity Loading Fixes**
+
 - Fixed an issue where manual text truncation in notification items broke the parsing of `nostr:nevent` and `nostr:npub` links.
 - Switched to CSS-based `line-clamp` for visual truncation in the notifications tab to ensure raw content remains intact for the renderer.
 - Resolved "Invalid filter(s) detected" error by adding validation for `"undefined"` IDs in event fetch calls across `HomePage.tsx`, `EmbeddedNote.tsx`, and `RichTextRenderer.tsx`.
@@ -207,6 +251,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - Added extra validation in `RichTextRenderer` to ensure pubkeys and IDs are valid before rendering.
 
 #### **Marketplace Mobile Optimization**
+
 - Improved marketplace popup placement on mobile devices to prevent scrolling.
 - Ensured all popup content (images, descriptions, links) fits within the mobile viewport.
 
@@ -217,6 +262,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 ### 🚀 New Features
 
 #### **Browse Page Redesign**
+
 - Complete refactor to use shared LandingPage.css styling for consistency
 - Added **Categories Grid** with 12 content categories (Videos, Audio Rooms, Music, Marketplace, Livestreams, Blogs, Recipes, Photos, Badges, Search, Calendar, Film)
 - Reorganized layout: sidebar with categories + popular sites, main content with people grid + global feed
@@ -224,6 +270,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - Simplified CSS (170+ lines → ~5 lines, inheriting from LandingPage.css)
 
 #### **Profile Badges Display**
+
 - Added **ProfileBadges** component to display user's Nostr badges (NIP-58)
 - Fetches Kind 30008 (profile_badges) and Kind 30009 (badge definitions)
 - Displays badges as 40x40px icons with hover tooltips showing name and description
@@ -231,6 +278,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - Only renders when user has badges to show
 
 #### **Wall Post Recipient Display**
+
 - Added visual indicator for wall posts showing "Author → Recipient"
 - Implemented in both feed items and comment walls
 - Uses new `WallRecipient` component with arrow styling
@@ -240,6 +288,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 ### 🎨 UI/UX Enhancements
 
 #### **Livestream Page Improvements**
+
 - Complete layout restructure using home-page-container wrapper for consistency
 - Increased chat window height (300px → 400px) for better readability
 - Changed chat background to white for cleaner appearance
@@ -247,6 +296,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - Better container structure with proper border handling
 
 #### **Cross-Platform Livestream Chat**
+
 - Enhanced chat functionality to work across different Nostr streaming platforms
 - Explicitly connects to streaming relays before subscribing and publishing
 - Uses stream author's pubkey and d-tag for proper cross-platform tagging
@@ -255,53 +305,63 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - Increased chat limit from 50 → 100 messages for better history
 
 #### **Film Page Relay Management**
+
 - Switched from isolated NDK instance to global NDK pool
 - Explicitly adds film relays (nostr.mom, nos.lol, relay.damus.io) to connection pool
 - Added debug logging for relay connectivity troubleshooting
 - Better loading state handling with flush buffer logic
 
 #### **Audio Room Filtering**
+
 - Livestreams page now filters out audio rooms (Corny Chat, Nostr Nests)
 - Prevents duplicate listings across different sections
 
 ### 🛠 Technical Improvements
 
 #### **Layout Consistency**
+
 - Livestreams page now uses home-page-container wrapper
 - Consistent structure across Live, Livestream, and Profile pages
 - Better responsive design with unified CSS approach
 
 #### **CSS Cleanup**
+
 - Browse page CSS reduced from 175 lines to 5 lines
 - Reuses LandingPage.css for consistent styling
 - Removed duplicate styles across components
 
 #### **Navbar Updates**
+
 - Added links for Badges (`/badges`)
 - Added links for Audio Rooms (`/rooms`)
 - Added links for Video Rooms (`/videorooms`)
 
 #### **Mobile Responsive**
+
 - Added responsive styles for profile tabs on mobile
 - Smaller padding and font sizes for better mobile experience
 - Flex-wrap support for tab overflow
 
 #### **Zap Parsing Fixes**
+
 - Fixed issue where zaps appeared as 0 sats locally.
 - Implemented dual-parsing for zap receipts and zap requests to ensure accurate amounts.
 - Ensured zap requests are published to relays for synchronization with external platforms like Zap.stream.
 
 #### **Wall Comment UI**
+
 - Enhanced comment wall headers to show "Commenter → Wall Owner".
 - Improved visual clarity of wall post relationships across the site.
 
 #### **Profile Video Detection**
+
 - Added `imeta` tag parsing and Kind 1 mp4 detection to profile Video tab.
 - Unified video parsing logic between HomePage and ProfileVideos for consistency.
 
 ### ⚡ Performance
 
 #### **Homepage Feed Optimization**
+
 - Added shared profile cache with request deduplication (`profileCache.ts`)
   - Previously: 40+ parallel profile fetches per page load
   - Now: Deduplicated requests, cached results shared across components
@@ -323,18 +383,21 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 ### 🚀 New Features
 
 #### **Recipes Page**
+
 - New `/recipes` page displaying community recipes from Nostr
 - Fetches Kind 30040 (specialized recipes), Kind 30023 (Zap.cooking long-form), and Kind 35000 (gated content)
 - Supports markdown template parsing for Zap.cooking recipe format
 - Grid layout with recipe cards showing title, author, and preview
 
 #### **Profile Page Tabs**
+
 - Added dynamic content tabs to profile pages: Photos, Videos, Recipes, Livestreams, Blog
 - Tabs only appear when user has content of that type
 - Lazy loading for each tab to improve performance
 - Recipes tab fetches user's Zap.cooking entries
 
 #### **All Friends Page Redesign**
+
 - Reduced page size from 100 → 24 profiles per page for 4x faster loading
 - Added skeleton loading placeholders with shimmer animation
 - Implemented CSS Grid layout for consistent, responsive card sizing
@@ -344,6 +407,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 - Consistent MySpace-themed styling
 
 #### **Profile Videos Tab Fix**
+
 - Added `imeta` tag parsing for video detection (used by Primal, Damus, etc.)
 - Fixed video URL regex to match URLs with query parameters (e.g., `video.mp4?token=xxx`)
 - Videos from Kind 1 posts now properly detected via both imeta tags and content regex
@@ -361,6 +425,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 ### 🚀 Major Features
 
 #### **Blossom Integration for Comments**
+
 - **Authenticated Image Uploads**:
   - Integrated **Blossom** media protocol into both `CommentWall` and `FeedItem` components.
   - Added "Add Photo" text links (replacing icons) for a cleaner, retro-inspired UI.
@@ -370,6 +435,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
   - Removed intrusive "Comment posted" alert notifications for a more seamless experience.
 
 #### **Nested Threaded Conversations**
+
 - **In-Feed Threading**:
   - Extended the recursively threaded reply structure from the thread page into individual homepage feed items.
   - Implemented visual hierarchy with progressive indentation (20px per level) and blue left-border connectors for deep conversations.
@@ -379,17 +445,20 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 ### ⚡ Performance Improvements
 
 #### **Wait-to-Render Threading**
+
 - Refactored `FeedItem` to use a dedicated sub-component for threaded comments.
 - **Lazy Tree Calculation**: Thread trees are now only calculated using `useMemo` when a user specifically clicks "Show thread," eliminating homepage mount lag.
 
 #### **Network & UI Optimization**
+
 - **Notification Efficiency**: Removed aggressive profile pre-fetching in the notification subscription loop; profiles now lazy-load via the `useProfile` hook only when viewed.
 - **Scroll Smoothness**: Added 150ms debounce to the Intersection Observer logic in `HomePage.tsx` to prevent scroll-blocking state updates.
-- **Media Processing Fast-Path**: 
+- **Media Processing Fast-Path**:
   - Optimized `processMediaEvent` regex logic with early returns for short content.
   - Added direct tag parsing for Kind 1063 events to bypass expensive regex matches.
 
 #### **Virtual Scrolling Implementation**
+
 - **Homepage Feed Tab**:
   - Implemented virtual scrolling to fix severe performance issues caused by rendering all feed items at once.
   - Only renders 20 posts initially instead of 100+.
@@ -406,6 +475,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
   - Displays count indicator: "Showing X of Y streams".
 
 #### **Optimized Event Handling**
+
 - Batched feed updates every 300ms to prevent excessive re-renders.
 - Implemented event buffering with flush timeouts for smoother UI updates.
 - Increased initial subscription limit from 15 to 25 to match display count.
@@ -413,10 +483,12 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
 ### 🎨 UI/UX Enhancements
 
 #### **Repost Identity**
+
 - Replaced the generic 🔄 (Kind 6) icon with a tiny (16px) **Avatar of the reposter**.
 - Makes it immediately clear "who" is sharing content at a glance without cluttering the feed.
 
 #### **Modern Tab Design** (`HomePage.css`)
+
 - Completely redesigned view mode tabs (Feed, Media, Blog, Music, Live) with modern aesthetics:
   - Added rounded top corners (8px border-radius).
   - Implemented gradient backgrounds for inactive tabs (`linear-gradient`).
@@ -427,6 +499,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
   - Added smooth transitions (0.2s ease) for all interactive states.
 
 #### **Stream Listings Redesign**
+
 - Created new card-style design for stream items with orange accent borders and refined typography.
 - Created new `.stream-item` CSS class with card-style design:
   - Added border with orange left accent (3px solid).
@@ -437,6 +510,7 @@ Complete implementation of Nostr direct messaging (DMs) using NIP-04 legacy encr
   - Consistent with MySpace aesthetic while feeling modern.
 
 #### **Thread View Improvements** (`ThreadPage.tsx`)
+
 - Completely redesigned thread view with proper nested conversation structure:
   - Implemented tree-based reply hierarchy where replies are indented under their parent comments.
   - Replies to a specific comment now appear directly beneath that comment with visual indentation.

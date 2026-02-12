@@ -10,111 +10,111 @@
  */
 
 :root {
-    /* ========================================
+  /* ========================================
      PRIMARY BRAND COLORS
      ======================================== */
 
-    /* MySpace Blue - Primary brand color, used for frames and identity */
-    --myspace-blue: #6699cc;
-    --myspace-blue-hover: #5588bb;
-    --myspace-blue-dark: #003399;
+  /* MySpace Blue - Primary brand color, used for frames and identity */
+  --myspace-blue: #6699cc;
+  --myspace-blue-hover: #5588bb;
+  --myspace-blue-dark: #003399;
 
-    /* MySpace Orange - Action color, section headers */
-    --myspace-orange: #ff9933;
-    --myspace-orange-hover: #e68a00;
-    --myspace-orange-light: #ffcc99;
+  /* MySpace Orange - Action color, section headers */
+  --myspace-orange: #ff9933;
+  --myspace-orange-hover: #e68a00;
+  --myspace-orange-light: #ffcc99;
 
-    /* ========================================
+  /* ========================================
      SEMANTIC COLORS
      ======================================== */
 
-    /* Backgrounds */
-    --myspace-bg: #e5e5e5;
-    --myspace-bg-content: #ffffff;
-    --myspace-bg-alt: #f0f5ff;
-    /* Alternating rows */
+  /* Backgrounds */
+  --myspace-bg: #e5e5e5;
+  --myspace-bg-content: #ffffff;
+  --myspace-bg-alt: #f0f5ff;
+  /* Alternating rows */
 
-    /* Text */
-    --myspace-text: #000000;
-    --myspace-text-muted: #666666;
-    --myspace-text-light: #999999;
+  /* Text */
+  --myspace-text: #000000;
+  --myspace-text-muted: #666666;
+  --myspace-text-light: #999999;
 
-    /* Links */
-    --myspace-link: #003399;
-    --myspace-link-hover: #0044cc;
+  /* Links */
+  --myspace-link: #003399;
+  --myspace-link-hover: #0044cc;
 
-    /* Light Blues - Highlights and accents */
-    --myspace-light-blue: #b1d0f0;
-    --myspace-light-blue-pale: #d5e5f5;
+  /* Light Blues - Highlights and accents */
+  --myspace-light-blue: #b1d0f0;
+  --myspace-light-blue-pale: #d5e5f5;
 
-    /* ========================================
+  /* ========================================
      GRAY SCALE
      ======================================== */
-    --myspace-gray-100: #f5f5f5;
-    --myspace-gray-200: #eeeeee;
-    --myspace-gray-300: #dddddd;
-    --myspace-gray-400: #cccccc;
-    --myspace-gray-500: #999999;
-    --myspace-gray-600: #666666;
-    --myspace-gray-700: #333333;
+  --myspace-gray-100: #f5f5f5;
+  --myspace-gray-200: #eeeeee;
+  --myspace-gray-300: #dddddd;
+  --myspace-gray-400: #cccccc;
+  --myspace-gray-500: #999999;
+  --myspace-gray-600: #666666;
+  --myspace-gray-700: #333333;
 
-    /* ========================================
+  /* ========================================
      BORDERS
      ======================================== */
-    --myspace-border: #cccccc;
-    --myspace-border-blue: #6699cc;
-    --myspace-border-dark: #003399;
+  --myspace-border: #cccccc;
+  --myspace-border-blue: #6699cc;
+  --myspace-border-dark: #003399;
 
-    /* ========================================
+  /* ========================================
      STATUS COLORS
      ======================================== */
-    --myspace-success: #00aa00;
-    --myspace-warning: #ffaa00;
-    --myspace-error: #cc0000;
-    --myspace-info: #6699cc;
+  --myspace-success: #00aa00;
+  --myspace-warning: #ffaa00;
+  --myspace-error: #cc0000;
+  --myspace-info: #6699cc;
 
-    /* Online/Offline Status */
-    --myspace-online: #00aa00;
-    --myspace-away: #ffaa00;
-    --myspace-offline: #999999;
+  /* Online/Offline Status */
+  --myspace-online: #00aa00;
+  --myspace-away: #ffaa00;
+  --myspace-offline: #999999;
 
-    /* ========================================
+  /* ========================================
      SHADOWS
      ======================================== */
-    --myspace-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-    --myspace-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
-    --myspace-shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
+  --myspace-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --myspace-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
+  --myspace-shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
 
-    /* ========================================
+  /* ========================================
      TYPOGRAPHY
      ======================================== */
-    --myspace-font-family: verdana, arial, sans-serif, helvetica;
-    --myspace-font-size-xs: 7pt;
-    --myspace-font-size-sm: 8pt;
-    --myspace-font-size-base: 9pt;
-    --myspace-font-size-md: 10pt;
-    --myspace-font-size-lg: 11pt;
-    --myspace-font-size-xl: 14pt;
-    --myspace-font-size-2xl: 16pt;
+  --myspace-font-family: verdana, arial, sans-serif, helvetica;
+  --myspace-font-size-xs: 7pt;
+  --myspace-font-size-sm: 8pt;
+  --myspace-font-size-base: 9pt;
+  --myspace-font-size-md: 10pt;
+  --myspace-font-size-lg: 11pt;
+  --myspace-font-size-xl: 14pt;
+  --myspace-font-size-2xl: 16pt;
 
-    /* ========================================
+  /* ========================================
      SPACING
      ======================================== */
-    --myspace-spacing-xs: 3px;
-    --myspace-spacing-sm: 5px;
-    --myspace-spacing-md: 10px;
-    --myspace-spacing-lg: 15px;
-    --myspace-spacing-xl: 20px;
+  --myspace-spacing-xs: 3px;
+  --myspace-spacing-sm: 5px;
+  --myspace-spacing-md: 10px;
+  --myspace-spacing-lg: 15px;
+  --myspace-spacing-xl: 20px;
 
-    /* ========================================
+  /* ========================================
      LAYOUT
      ======================================== */
-    --myspace-container-width: 992px;
-    --myspace-sidebar-width: 300px;
-    --myspace-border-radius: 0;
-    /* Authentic MySpace = no rounding */
-    --myspace-border-radius-sm: 2px;
-    /* Minimal rounding when needed */
+  --myspace-container-width: 992px;
+  --myspace-sidebar-width: 300px;
+  --myspace-border-radius: 0;
+  /* Authentic MySpace = no rounding */
+  --myspace-border-radius-sm: 2px;
+  /* Minimal rounding when needed */
 }
 
 /* ========================================
@@ -122,17 +122,17 @@
    ======================================== */
 
 .myspace-font {
-    font-family: var(--myspace-font-family);
+  font-family: var(--myspace-font-family);
 }
 
 .myspace-link {
-    color: var(--myspace-link);
-    text-decoration: underline;
-    cursor: pointer;
+  color: var(--myspace-link);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .myspace-link:hover {
-    color: var(--myspace-link-hover);
+  color: var(--myspace-link-hover);
 }
 
 /* ========================================
@@ -144,82 +144,84 @@
 .btn-primary,
 .btn-secondary,
 .btn-tertiary {
-    display: inline-block;
-    padding: 5px 15px;
-    font-family: var(--myspace-font-family);
-    font-size: var(--myspace-font-size-base);
-    font-weight: bold;
-    text-align: center;
-    text-decoration: none;
-    border-radius: var(--myspace-border-radius);
-    cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-    -webkit-appearance: none;
-    appearance: none;
+  display: inline-block;
+  padding: 5px 15px;
+  font-family: var(--myspace-font-family);
+  font-size: var(--myspace-font-size-base);
+  font-weight: bold;
+  text-align: center;
+  text-decoration: none;
+  border-radius: var(--myspace-border-radius);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 /* Primary Button - Orange (Main CTAs) */
 .btn-primary {
-    background-color: var(--myspace-orange);
-    color: white;
-    border: 1px solid var(--myspace-orange-hover);
+  background-color: var(--myspace-orange);
+  color: white;
+  border: 1px solid var(--myspace-orange-hover);
 }
 
 .btn-primary:hover {
-    background-color: var(--myspace-orange-hover);
-    border-color: #cc7a00;
+  background-color: var(--myspace-orange-hover);
+  border-color: #cc7a00;
 }
 
 .btn-primary:active {
-    background-color: #cc7a00;
+  background-color: #cc7a00;
 }
 
 /* Secondary Button - Blue (Secondary actions) */
 .btn-secondary {
-    background-color: var(--myspace-blue);
-    color: white;
-    border: 1px solid var(--myspace-blue-hover);
+  background-color: var(--myspace-blue);
+  color: white;
+  border: 1px solid var(--myspace-blue-hover);
 }
 
 .btn-secondary:hover {
-    background-color: var(--myspace-blue-hover);
-    border-color: #4477aa;
+  background-color: var(--myspace-blue-hover);
+  border-color: #4477aa;
 }
 
 .btn-secondary:active {
-    background-color: #4477aa;
+  background-color: #4477aa;
 }
 
 /* Tertiary Button - Gray (Cancel, dismiss, low priority) */
 .btn-tertiary {
-    background-color: var(--myspace-gray-200);
-    color: var(--myspace-gray-700);
-    border: 1px solid var(--myspace-gray-400);
+  background-color: var(--myspace-gray-200);
+  color: var(--myspace-gray-700);
+  border: 1px solid var(--myspace-gray-400);
 }
 
 .btn-tertiary:hover {
-    background-color: var(--myspace-gray-300);
-    border-color: var(--myspace-gray-500);
+  background-color: var(--myspace-gray-300);
+  border-color: var(--myspace-gray-500);
 }
 
 .btn-tertiary:active {
-    background-color: var(--myspace-gray-400);
+  background-color: var(--myspace-gray-400);
 }
 
 /* Link-style button */
 .btn-link {
-    background: none;
-    color: var(--myspace-link);
-    border: none;
-    padding: 0;
-    font-weight: bold;
-    text-decoration: none;
-    cursor: pointer;
+  background: none;
+  color: var(--myspace-link);
+  border: none;
+  padding: 0;
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .btn-link:hover {
-    text-decoration: underline;
-    color: var(--myspace-link-hover);
+  text-decoration: underline;
+  color: var(--myspace-link-hover);
 }
 
 /* Disabled state for all buttons */
@@ -227,21 +229,21 @@
 .btn-primary:disabled,
 .btn-secondary:disabled,
 .btn-tertiary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    pointer-events: none;
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Small button variant */
 .btn-sm {
-    padding: 3px 10px;
-    font-size: var(--myspace-font-size-sm);
+  padding: 3px 10px;
+  font-size: var(--myspace-font-size-sm);
 }
 
 /* Large button variant */
 .btn-lg {
-    padding: 8px 20px;
-    font-size: var(--myspace-font-size-md);
+  padding: 8px 20px;
+  font-size: var(--myspace-font-size-md);
 }
 
 /* ========================================
@@ -250,25 +252,25 @@
 
 .section-header,
 .myspace-section-header {
-    background-color: var(--myspace-orange);
-    color: black;
-    padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
-    margin-bottom: var(--myspace-spacing-sm);
-    margin-top: 0;
-    font-size: var(--myspace-font-size-md);
-    font-weight: bold;
-    text-align: left;
-    font-family: var(--myspace-font-family);
+  background-color: var(--myspace-orange);
+  color: black;
+  padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
+  margin-bottom: var(--myspace-spacing-sm);
+  margin-top: 0;
+  font-size: var(--myspace-font-size-md);
+  font-weight: bold;
+  text-align: left;
+  font-family: var(--myspace-font-family);
 }
 
 /* Blue header variant (for special cases like loading screens) */
 .section-header-blue {
-    background-color: var(--myspace-blue);
-    color: white;
-    padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
-    font-size: var(--myspace-font-size-md);
-    font-weight: bold;
-    font-family: var(--myspace-font-family);
+  background-color: var(--myspace-blue);
+  color: white;
+  padding: var(--myspace-spacing-xs) var(--myspace-spacing-sm);
+  font-size: var(--myspace-font-size-md);
+  font-weight: bold;
+  font-family: var(--myspace-font-family);
 }
 
 /* ========================================
@@ -276,22 +278,22 @@
    ======================================== */
 
 .myspace-box {
-    border: 1px solid var(--myspace-border-blue);
-    background: var(--myspace-bg-content);
-    margin-bottom: var(--myspace-spacing-md);
+  border: 1px solid var(--myspace-border-blue);
+  background: var(--myspace-bg-content);
+  margin-bottom: var(--myspace-spacing-md);
 }
 
 .myspace-box-header {
-    background-color: var(--myspace-orange);
-    color: white;
-    padding: 4px 8px;
-    font-size: var(--myspace-font-size-md);
-    font-weight: bold;
+  background-color: var(--myspace-orange);
+  color: white;
+  padding: 4px 8px;
+  font-size: var(--myspace-font-size-md);
+  font-weight: bold;
 }
 
 .myspace-box-body {
-    padding: var(--myspace-spacing-sm);
-    font-size: var(--myspace-font-size-base);
+  padding: var(--myspace-spacing-sm);
+  font-size: var(--myspace-font-size-base);
 }
 
 /* ========================================
@@ -299,38 +301,38 @@
    ======================================== */
 
 .status-dot {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    margin-right: 5px;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
 }
 
 .status-dot.online {
-    background-color: var(--myspace-online);
+  background-color: var(--myspace-online);
 }
 
 .status-dot.away {
-    background-color: var(--myspace-away);
+  background-color: var(--myspace-away);
 }
 
 .status-dot.offline {
-    background-color: var(--myspace-offline);
+  background-color: var(--myspace-offline);
 }
 
 .last-seen {
-    font-size: var(--myspace-font-size-sm);
-    color: var(--myspace-text-muted);
-    font-style: italic;
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-text-muted);
+  font-style: italic;
 }
 
 .mood-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 6px;
-    background: var(--myspace-light-blue);
-    border: 1px solid var(--myspace-blue);
-    font-size: var(--myspace-font-size-sm);
-    border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: var(--myspace-light-blue);
+  border: 1px solid var(--myspace-blue);
+  font-size: var(--myspace-font-size-sm);
+  border-radius: 3px;
 }

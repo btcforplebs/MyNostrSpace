@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { GAMES_LIST } from './GamesPage';
+import { GAMES_LIST } from './gamesData';
 import { useNostr } from '../../context/NostrContext';
 import { Navbar } from '../Shared/Navbar';
 import { useEffect, useRef } from 'react';

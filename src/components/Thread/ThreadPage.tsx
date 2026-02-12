@@ -98,7 +98,7 @@ export const ThreadPage = () => {
 
     rootSub.on('event', async (event: NDKEvent) => {
       // Fetch author profile in background
-      event.author.fetchProfile().catch(() => { });
+      event.author.fetchProfile().catch(() => {});
 
       if (isBlockedUser(event.pubkey)) {
         setLoading(false);
@@ -123,7 +123,7 @@ export const ThreadPage = () => {
       replySub.on('event', (reply: NDKEvent) => {
         if (!repliesRef.current.has(reply.id) && !isBlockedUser(reply.pubkey)) {
           repliesRef.current.set(reply.id, reply);
-          reply.author.fetchProfile().catch(() => { });
+          reply.author.fetchProfile().catch(() => {});
           setReplies(Array.from(repliesRef.current.values()));
         }
       });

@@ -17,19 +17,37 @@ const ThreadItemRow = memo(
   ({
     node,
     depth,
+    highlightedEventId,
     onRenderThread,
   }: {
     node: ThreadNode;
     depth: number;
+    highlightedEventId: string | null;
     onRenderThread: (nodes: ThreadNode[], depth: number) => React.ReactNode;
-  }) => (
-    <div className={depth > 0 ? 'nested-reply' : ''}>
-      <FeedItem event={node.event} hideThreadButton={true} />
-      {node.children.length > 0 && (
-        <div className="reply-children">{onRenderThread(node.children, depth + 1)}</div>
-      )}
-    </div>
-  )
+  }) => {
+    const isHighlighted = node.event.id === highlightedEventId;
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      if (isHighlighted && ref.current) {
+        setTimeout(() => {
+          ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      }
+    }, [isHighlighted]);
+
+    return (
+      <div
+        ref={isHighlighted ? ref : undefined}
+        className={`${depth > 0 ? 'nested-reply' : ''} ${isHighlighted ? 'highlighted-reply' : ''}`}
+      >
+        <FeedItem event={node.event} hideThreadButton={true} />
+        {node.children.length > 0 && (
+          <div className="reply-children">{onRenderThread(node.children, depth + 1)}</div>
+        )}
+      </div>
+    );
+  }
 );
 
 export const ThreadPage = () => {
@@ -39,6 +57,7 @@ export const ThreadPage = () => {
   const [replies, setReplies] = useState<NDKEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingReplies, setLoadingReplies] = useState(false);
+  const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [prevEventId, setPrevEventId] = useState(eventId);
   const repliesRef = useRef<Map<string, NDKEvent>>(new Map());
 
@@ -48,6 +67,7 @@ export const ThreadPage = () => {
     setLoading(true);
     setRootEvent(null);
     setReplies([]);
+    setHighlightedEventId(null);
   }
 
   // Clear ref in layout effect to avoid "refs during render" error
@@ -90,40 +110,47 @@ export const ThreadPage = () => {
   useEffect(() => {
     if (!ndk || !eventId) return;
 
-    // Fetch root event
-    const rootSub = ndk.subscribe(
-      { ids: [eventId] },
-      { closeOnEose: true, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
-    );
+    let cancelled = false;
+    let replySubRef: ReturnType<typeof ndk.subscribe> | null = null;
 
-    rootSub.on('event', async (event: NDKEvent) => {
-      // Fetch author profile in background
-      event.author.fetchProfile().catch(() => {});
+    const fetchEventById = (id: string): Promise<NDKEvent | null> => {
+      return new Promise((resolve) => {
+        const sub = ndk.subscribe(
+          { ids: [id] },
+          { closeOnEose: true, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
+        );
+        let found: NDKEvent | null = null;
+        sub.on('event', (ev: NDKEvent) => {
+          found = ev;
+        });
+        sub.on('eose', () => {
+          sub.stop();
+          resolve(found);
+        });
+        setTimeout(() => {
+          sub.stop();
+          resolve(found);
+        }, 5000);
+      });
+    };
 
-      if (isBlockedUser(event.pubkey)) {
-        setLoading(false);
-        return;
-      }
-
-      setRootEvent(event);
-      setLoading(false);
-
-      // Now fetch replies
+    const loadReplies = (rootId: string) => {
       setLoadingReplies(true);
       const replyFilter: NDKFilter = {
         kinds: [1],
-        '#e': [event.id],
+        '#e': [rootId],
       };
 
       const replySub = ndk.subscribe(replyFilter, {
         closeOnEose: false,
         cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
       });
+      replySubRef = replySub;
 
       replySub.on('event', (reply: NDKEvent) => {
         if (!repliesRef.current.has(reply.id) && !isBlockedUser(reply.pubkey)) {
           repliesRef.current.set(reply.id, reply);
-          reply.author.fetchProfile().catch(() => {});
+          reply.author.fetchProfile().catch(() => { });
           setReplies(Array.from(repliesRef.current.values()));
         }
       });
@@ -137,33 +164,85 @@ export const ThreadPage = () => {
         replySub.stop();
         setLoadingReplies(false);
       }, 30000);
-    });
+    };
 
-    rootSub.on('eose', () => {
-      // If no event found after EOSE, stop loading
-      setTimeout(() => {
+    const loadThread = async () => {
+      // Phase 1: Fetch the clicked event
+      const clickedEvent = await fetchEventById(eventId);
+
+      if (cancelled) return;
+
+      if (!clickedEvent || isBlockedUser(clickedEvent.pubkey)) {
         setLoading(false);
-      }, 1000);
-    });
+        return;
+      }
+
+      // Phase 2: Check if the clicked event is a reply
+      const eTags = clickedEvent.tags.filter((t) => t[0] === 'e');
+      const rootMarkerTag = eTags.find((t) => t[3] === 'root');
+      const trueRootId = rootMarkerTag
+        ? rootMarkerTag[1]
+        : eTags.length > 0
+          ? eTags[0][1]
+          : null;
+
+      // If the clicked event is the root (no e-tags or root points to itself)
+      if (!trueRootId || trueRootId === eventId) {
+        clickedEvent.author.fetchProfile().catch(() => { });
+        setRootEvent(clickedEvent);
+        setHighlightedEventId(null);
+        setLoading(false);
+        loadReplies(clickedEvent.id);
+        return;
+      }
+
+      // The clicked event is a reply — fetch the true root
+      setHighlightedEventId(eventId);
+
+      const actualRoot = await fetchEventById(trueRootId);
+
+      if (cancelled) return;
+
+      if (actualRoot && !isBlockedUser(actualRoot.pubkey)) {
+        actualRoot.author.fetchProfile().catch(() => { });
+        setRootEvent(actualRoot);
+        setLoading(false);
+        loadReplies(actualRoot.id);
+      } else {
+        // Fallback: if root can't be found, show clicked event as root
+        clickedEvent.author.fetchProfile().catch(() => { });
+        setRootEvent(clickedEvent);
+        setHighlightedEventId(null);
+        setLoading(false);
+        loadReplies(clickedEvent.id);
+      }
+    };
+
+    loadThread();
 
     return () => {
-      rootSub.stop();
+      cancelled = true;
+      replySubRef?.stop();
     };
   }, [ndk, eventId]);
 
-  const renderThread = useCallback((nodes: ThreadNode[], depth: number = 0) => {
-    const renderNodes = (currentNodes: ThreadNode[], currentDepth: number): React.ReactNode => {
-      return currentNodes.map((node) => (
-        <ThreadItemRow
-          key={node.event.id}
-          node={node}
-          depth={currentDepth}
-          onRenderThread={renderNodes}
-        />
-      ));
-    };
-    return renderNodes(nodes, depth);
-  }, []);
+  const renderThread = useCallback(
+    (nodes: ThreadNode[], depth: number = 0) => {
+      const renderNodes = (currentNodes: ThreadNode[], currentDepth: number): React.ReactNode => {
+        return currentNodes.map((node) => (
+          <ThreadItemRow
+            key={node.event.id}
+            node={node}
+            depth={currentDepth}
+            highlightedEventId={highlightedEventId}
+            onRenderThread={renderNodes}
+          />
+        ));
+      };
+      return renderNodes(nodes, depth);
+    },
+    [highlightedEventId]
+  );
 
   return (
     <div className="thread-page-container">
@@ -262,8 +341,21 @@ export const ThreadPage = () => {
           padding-left: 10px;
           border-left: 2px solid #ddd;
         }
+
+        @media (max-width: 768px) {
+          .reply-children {
+            margin-left: 8px;
+            padding-left: 5px;
+            border-left: 1px solid #ddd;
+          }
+        }
         .nested-reply {
           margin-top: 10px;
+        }
+        .highlighted-reply {
+          background-color: #fffde7;
+          border-left: 3px solid #ff9933;
+          padding-left: 8px;
         }
       `}</style>
 

@@ -24,34 +24,46 @@ export const MusicPage = () => {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchMusic = async () => {
       try {
-        const res = await fetch('https://wavlake.com/api/v1/content/rankings?sort=sats&days=7');
+        const res = await fetch('https://wavlake.com/api/v1/content/rankings?sort=sats&days=7', {
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          console.error('Wavlake API returned', res.status, res.statusText);
+          return;
+        }
+
         const data = await res.json();
 
-        if (Array.isArray(data)) {
+        if (!controller.signal.aborted && Array.isArray(data)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const formatted = data.map((item: any) => ({
             id: item.id,
             title: item.title,
             artist: item.artist,
             albumArtUrl: item.albumArtUrl,
-            // Construct Embed URL so WavlakePlayer can do its magic upgrade to MP3
-            // Original URL: https://wavlake.com/track/UUID
-            // Embed URL: https://embed.wavlake.com/track/UUID
             url: `https://embed.wavlake.com/track/${item.id}`,
-            link: item.url, // Keep original link for "View on Wavlake"
+            link: item.url,
           }));
           setTracks(formatted);
         }
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         console.error('Failed to fetch Wavlake music', err);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchMusic();
+
+    return () => controller.abort();
   }, []);
 
   return (

@@ -4,6 +4,8 @@ import { nip19 } from 'nostr-tools';
 import { useNostr } from '../../context/NostrContext';
 import { subscribeToStats, updateStats, getStats, type EventStats } from '../../hooks/statsCache';
 import { uploadToBlossom } from '../../services/blossom';
+import { MentionInput } from './MentionInput';
+import { extractMentions } from '../../utils/mentions';
 import './FeedItem.css';
 
 interface InteractionBarProps {
@@ -156,9 +158,15 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
         const quote = new NDKEvent(ndk);
         quote.kind = 1;
         quote.content = `${quoteText}\n\nnostr:${nevent}`;
+
+        // Extract mentions from the quote text itself
+        const mentionedPubkeys = extractMentions(quoteText);
+        const mentionTags = mentionedPubkeys.map(pk => ['p', pk]);
+
         quote.tags = [
           ['e', event.id, '', 'mention'],
           ['p', event.pubkey],
+          ...mentionTags,
           ['q', event.id],
           ['client', 'MyNostrSpace'],
         ];
@@ -343,10 +351,10 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
       </a>
       {showQuoteForm && (
         <div className="myspace-form-container" style={{ flexBasis: '100%' }}>
-          <textarea
+          <MentionInput
             className="nostr-input"
             value={quoteText}
-            onChange={(e) => setQuoteText(e.target.value)}
+            setValue={setQuoteText}
             placeholder="Add your thoughts..."
             style={{ minHeight: '80px' }}
           />

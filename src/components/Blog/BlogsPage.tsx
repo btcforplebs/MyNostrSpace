@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { type NDKFilter, NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
@@ -28,11 +28,47 @@ export const BlogsPage = () => {
   const [articles, setArticles] = useState<BlogArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [isBlogEditorOpen, setIsBlogEditorOpen] = useState(false);
+  const fetchedProfilesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!ndk) return;
 
     let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
+    fetchedProfilesRef.current.clear();
+
+    const fetchAuthorProfile = (pubkey: string) => {
+      if (fetchedProfilesRef.current.has(pubkey)) return;
+      fetchedProfilesRef.current.add(pubkey);
+
+      const user = ndk.getUser({ pubkey });
+      user
+        .fetchProfile({ cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST })
+        .then((profile) => {
+          if (profile) {
+            setArticles((prev) =>
+              prev.map((a) =>
+                a.pubkey === pubkey
+                  ? {
+                      ...a,
+                      authorProfile: {
+                        name: String(
+                          profile.name ||
+                            profile.displayName ||
+                            profile.display_name ||
+                            pubkey.slice(0, 8)
+                        ),
+                        picture: profile.image || profile.picture,
+                      },
+                    }
+                  : a
+              )
+            );
+          }
+        })
+        .catch((err) => {
+          console.warn('Failed to fetch blog author profile for', pubkey.slice(0, 8), err);
+        });
+    };
 
     const fetchArticles = async () => {
       setLoading(true);
@@ -67,32 +103,7 @@ export const BlogsPage = () => {
             return next.sort((a, b) => b.publishedAt - a.publishedAt);
           });
 
-          // Proactively fetch profile
-          event.author
-            .fetchProfile()
-            .then((profile) => {
-              if (profile) {
-                setArticles((prev) =>
-                  prev.map((a) =>
-                    a.pubkey === event.pubkey
-                      ? {
-                          ...a,
-                          authorProfile: {
-                            name: String(
-                              profile.name ||
-                                profile.displayName ||
-                                profile.display_name ||
-                                a.pubkey.slice(0, 8)
-                            ),
-                            picture: profile.image || profile.picture,
-                          },
-                        }
-                      : a
-                  )
-                );
-              }
-            })
-            .catch(() => {});
+          fetchAuthorProfile(event.pubkey);
         };
 
         sub = ndk.subscribe(filter, {
@@ -106,7 +117,6 @@ export const BlogsPage = () => {
 
         sub.on('eose', () => {
           setLoading(false);
-          console.log('Blogs Page: Initial fetch complete');
         });
       } catch (err) {
         console.error('Failed to fetch blog articles', err);

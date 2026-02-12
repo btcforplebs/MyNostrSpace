@@ -2,6 +2,59 @@
 
 All notable changes to the MyNostrSpace project will be documented in this file.
 
+## [Unreleased] - 2026-02-12
+
+### 🚀 New Features
+
+#### **Replies Feed**
+
+- Added a new **Replies** tab to the homepage.
+- **Visual Threading:** Redesigned the Replies tab UI with vertical connectors and structured indentation (similar to the main thread view) to clarify conversational relationships.
+- **Infinite Scrolling:** Implemented `loadMoreReplies` for seamless back-filling of historical replies.
+- **Contextual Rendering:** Replies now display their parent note (Kind 1) using an embedded preview for better conversational context.
+- **Recursive Improvements:** Removed redundant "↳ Replied:" text in favor of stronger CSS-based visual markers.
+- **Files modified:** `HomePage.tsx`, `HomePage.css`, `EmbeddedNote.tsx`
+
+### ⚡ Performance Optimizations
+
+#### **Blog Feed Performance**
+
+- Optimized the rendering of long-form articles (Kind 30023) within the main feed.
+- **Problem:** Full markdown rendering of massive blog posts was causing significant UI lag and "jank" in the main feed.
+- **Solution:** Implemented specialized rendering for blog posts in `FeedItem.tsx` that shows a title, a short content summary, and a "Read Full Article" button.
+- **Files modified:** `FeedItem.tsx`
+
+### 🚀 New Features
+
+#### **User Tagging / Mention Feature**
+
+- Implemented `@` mentions in comments, replies, **status updates**, and **quote posts**.
+- **Usage:** Type `@` to see a list of friends/follows.
+- **Integration:** Now available in:
+  - Feed Comments & Replies
+  - Home Page Status Update
+  - Quote Reply Box
+- **Global Search:** Type a name (e.g., `@zap`) to search the entire Nostr network (NIP-50) if the user is not in your friend list.
+- **Optimization:** Uses incremental profile loading to ensure suggestions appear quickly without freezing the UI.
+- **Notifications:** Automatically tags mentioned users so they receive notifications.
+- **Files modified:** `MentionInput.tsx`, `FeedItem.tsx`, `MentionInput.css`, `mentions.ts`
+
+### 🎨 UI/UX Enhancements
+
+#### **Mobile Thread View Improvements**
+
+- Optimized threaded reply indentation for mobile devices.
+- **Problem:** Deeply nested threads were accumulating too much left margin on small screens, causing text to be "crammed" to the edge.
+- **Solution:** Added a media query for screens under 768px to reduce indentation from 20px to 8px and padding from 10px to 5px.
+- **Files modified:** `ThreadPage.tsx`
+
+#### **Notification Cleanup**
+
+- Removed "Followed You" notifications from the Notification tab.
+- **Problem:** Follower notifications were not working reliably and added unnecessary clutter/complexity.
+- **Solution:** Completely removed the logic for fetching Kind 3 (Contact) events and rendering "followed you" alerts. Will revisit at a later time.
+- **Files modified:** `HomePage.tsx`
+
 ## [Unreleased] - 2026-02-11
 
 ### 🐛 Bug Fixes
@@ -74,6 +127,29 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 - **Categories Update**:
   - Renamed "**Audio Rooms**" to "**Rooms**" to better reflect content diversity.
   - Added "**Games**" category pointing to `/games`.
+
+### ⚡ Performance Optimizations
+
+### ⚡ Performance Optimizations
+
+#### **Homepage Stats Batching (NIP-01)**
+- Refactored `statsCache.ts` to implement batched event fetching for likes and comments.
+- **Problem**: Homepage was making 80+ separate subscription requests to fetch interaction stats for every visible post.
+- **Solution**: Implemented a batching mechanism that groups visible events and fetches all their stats in a single NIP-01 subscription request.
+- **Result**: Network request overhead reduced by ~95%, significantly improving homepage load performance and reducing relay load.
+- **Files modified**: `statsCache.ts`
+
+### 🐛 Bug Fixes
+- **Feed Update Logic**: Incoming posts are now queued and displayed via a "click to show" banner instead of automatically shifting the feed, preventing scroll jumps.
+- **NIP-10 Compliance**: Refined reply tag generation in `FeedItem.tsx` to strictly adhere to standards, removing redundant `root` and `reply` tags for direct replies.
+
+### 🎨 UI/UX Enhancements
+- **Expandable Status Input**: The home status update box now auto-resizes as you type to handle longer messages comfortably.
+- **Tab Styling**: Refined homepage tabs with neutral gray backgrounds for inactive states, making the active tab clearly stand out.
+- **New Posts Banner**: Updated coloring to be distinct from tab states to avoid visual confusion.
+
+### 🗑️ Removed
+- **Music Tab**: Removed the "Music" tab and Wavlake player from the homepage and sidebar for a cleaner, faster interface.
 
 ## [Unreleased] - 2026-02-08
 

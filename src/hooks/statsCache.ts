@@ -1,6 +1,6 @@
 import type NDK from '@nostr-dev-kit/ndk';
 import type { NDKFilter } from '@nostr-dev-kit/ndk';
-import { NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
+import { NDKRelaySet } from '@nostr-dev-kit/ndk';
 
 export interface EventStats {
   likes: number;
@@ -77,8 +77,6 @@ export function subscribeToStats(
 }
 
 const BATCH_INTERVAL = 500; // Collect for 500ms
-const MAX_BATCH_SIZE = 10; // Process 10 events at a time
-const MAX_CONCURRENT_STATS = 3; // Only fetch stats for 3 events in parallel
 
 function scheduleBatchFetch(): void {
   if (batchTimeout) return;
@@ -89,26 +87,86 @@ function scheduleBatchFetch(): void {
   }, BATCH_INTERVAL);
 }
 
-// Simple semaphore for concurrency control
-let activeFetches = 0;
-const fetchQueue: (() => void)[] = [];
+// Helper to process a batch of events
+async function processBatch(
+  eventIds: string[],
+  ndk: NDK,
+  currentUserPubkeyRef: string | null
+): Promise<void> {
+  const statsRelaySet = NDKRelaySet.fromRelayUrls(
+    ['wss://relay.damus.io', 'wss://nos.lol', 'wss://antiprimal.net'],
+    ndk
+  );
 
-const runThrottled = (fn: () => Promise<void>) => {
-  if (activeFetches < MAX_CONCURRENT_STATS) {
-    activeFetches++;
-    fn().finally(() => {
-      activeFetches--;
-      if (fetchQueue.length > 0) {
-        const next = fetchQueue.shift();
-        if (next) runThrottled(next as any); // Type cast for simplicity in this helper
+  // 1. Initialize stats for all IDs to ensure we don't leave them null
+  eventIds.forEach((id) => {
+    updateStats(id, (prev) => prev); // Triggers initial emission if needed or just ensures existence
+  });
+
+  // 2. Fetch all interactions in one go
+  // We want: Likes (7), Reposts (6), Zaps (9735), Replies (1), Generic Reposts (16)
+  const filter: NDKFilter = {
+    kinds: [1, 6, 7, 16, 9735],
+    '#e': eventIds,
+  };
+
+  const sub = ndk.subscribe(filter, {
+    closeOnEose: true, // We only need current counts, not live updates for now (can change if needed)
+    groupable: false,
+    relaySet: statsRelaySet,
+  });
+
+  // Temporary map to hold counts before updating state to avoid too many re-renders
+  const tempCounts = new Map<string, EventStats>();
+
+  // Initialize temp counts
+  eventIds.forEach((id) => {
+    const current = cache.get(id)?.stats || { ...defaultStats };
+    tempCounts.set(id, { ...current });
+  });
+
+  sub.on('event', (e) => {
+    // Find which event this interaction is for
+    // Check 'e' tags. The standard is the last 'e' tag is the "root" or "reply" target usually,
+    // but for simple reactions, any 'e' tag match counts.
+    // However, to be precise, we should check all 'e' tags to see which ones match our batch.
+    const targetIds = e.tags.filter((t) => t[0] === 'e' && eventIds.includes(t[1])).map((t) => t[1]);
+
+    targetIds.forEach((targetId) => {
+      const stats = tempCounts.get(targetId);
+      if (!stats) return;
+
+      if (e.kind === 7) {
+        stats.likes++;
+        if (currentUserPubkeyRef && e.pubkey === currentUserPubkeyRef && e.content !== '-') {
+          stats.likedByMe = true;
+        }
+      } else if (e.kind === 6 || e.kind === 16) {
+        stats.reposts++;
+        if (currentUserPubkeyRef && e.pubkey === currentUserPubkeyRef) {
+          stats.repostedByMe = true;
+        }
+      } else if (e.kind === 1) {
+        stats.comments++;
+      } else if (e.kind === 9735) {
+        stats.zaps++;
       }
     });
-  } else {
-    fetchQueue.push(fn as any);
-  }
-};
+  });
 
-import { ANTIPRIMAL_RELAY } from '../utils/antiprimal';
+  sub.on('eose', () => {
+    // Commit all updates
+    tempCounts.forEach((stats, id) => {
+      updateStats(id, () => stats);
+    });
+    sub.stop();
+  });
+
+  // Safety timeout
+  setTimeout(() => {
+    sub.stop();
+  }, 4000);
+}
 
 async function executeBatchFetch(): Promise<void> {
   if (pendingEventIds.size === 0 || !currentNdk) return;
@@ -129,123 +187,12 @@ async function executeBatchFetch(): Promise<void> {
     }
   });
 
-  // Split into chunks to avoid massive parallel spikes
-  for (let i = 0; i < allEventIds.length; i += MAX_BATCH_SIZE) {
-    const chunk = allEventIds.slice(i, i + MAX_BATCH_SIZE);
-
-    // Process chunk's "By Me" interactions (can be batched easily)
-    if (currentUserPubkeyRef) {
-      fetchUserInteractions(chunk, currentNdkRef, currentUserPubkeyRef);
-    }
-
-    // Process chunk's global counts (must be throttled)
-    chunk.forEach((id) => {
-      runThrottled(() => fetchEventCounts(id, currentNdkRef));
-    });
+  // Split into chunks to avoid too big filters
+  const CHUNK_SIZE = 50; // Requests with 50 IDs in #e filter is generally safe for relays
+  for (let i = 0; i < allEventIds.length; i += CHUNK_SIZE) {
+    const chunk = allEventIds.slice(i, i + CHUNK_SIZE);
+    processBatch(chunk, currentNdkRef, currentUserPubkeyRef);
   }
-}
-
-async function fetchUserInteractions(eventIds: string[], ndk: NDK, pubkey: string) {
-  try {
-    const myEvents = await ndk.fetchEvents(
-      {
-        kinds: [7, 6],
-        '#e': eventIds,
-        authors: [pubkey],
-      },
-      { cacheUsage: NDKSubscriptionCacheUsage.PARALLEL }
-    );
-
-    myEvents.forEach((e) => {
-      const targetId = e.tags.find((t) => t[0] === 'e')?.[1];
-      if (!targetId) return;
-
-      updateStats(targetId, (prev) => ({
-        ...prev,
-        likedByMe: prev.likedByMe || (e.kind === 7 && e.content !== '-'),
-        repostedByMe: prev.repostedByMe || e.kind === 6,
-      }));
-    });
-  } catch (err) {
-    console.error('Error fetching user interactions:', err);
-  }
-}
-
-async function fetchEventCounts(id: string, ndk: NDK) {
-  try {
-    const antiprimalRelaySet = NDKRelaySet.fromRelayUrls(
-      [ANTIPRIMAL_RELAY, 'wss://relay.nostr.band'],
-      ndk
-    );
-
-    // Try to find a relay that supports COUNT (NIP-45)
-    // We'll use a standard subscription but keep it extremely short-lived
-    // and only for THIS specific event.
-    const [likes, comments, reposts, zaps] = await Promise.all([
-      countEvents(ndk, { kinds: [7], '#e': [id] }, antiprimalRelaySet),
-      countEvents(ndk, { kinds: [1], '#e': [id] }, antiprimalRelaySet),
-      countEvents(ndk, { kinds: [6, 16], '#e': [id] }, antiprimalRelaySet),
-      countEvents(ndk, { kinds: [9735], '#e': [id] }, antiprimalRelaySet),
-    ]);
-
-    updateStats(id, (prev) => ({
-      ...prev,
-      likes,
-      comments,
-      reposts,
-      zaps,
-    }));
-  } catch (err) {
-    console.error(`Error fetching counts for ${id}:`, err);
-  }
-}
-
-async function countEvents(ndk: NDK, filter: NDKFilter, relaySet: NDKRelaySet): Promise<number> {
-  return new Promise((resolve) => {
-    // 1. Try NIP-45 COUNT if possible via direct relay access
-    // This is much faster and lighter if supported
-    const relays = Array.from(relaySet.relays);
-    const relayWithCount = relays.find((r) => (r as any).count !== undefined);
-
-    if (relayWithCount) {
-      (relayWithCount as any)
-        .count([filter], { id: Math.random().toString(36).substring(7) })
-        .then((res: any) => resolve(typeof res === 'number' ? res : res.count || 0))
-        .catch(() => {
-          // Fallback to manual count if COUNT fails
-          manualCount(ndk, filter, relaySet, resolve);
-        });
-    } else {
-      manualCount(ndk, filter, relaySet, resolve);
-    }
-  });
-}
-
-function manualCount(
-  ndk: NDK,
-  filter: NDKFilter,
-  relaySet: NDKRelaySet,
-  resolve: (n: number) => void
-) {
-  const sub = ndk.subscribe(filter, {
-    closeOnEose: true,
-    groupable: false,
-    relaySet,
-  });
-
-  let count = 0;
-  sub.on('event', () => {
-    count++;
-  });
-  sub.on('eose', () => {
-    sub.stop();
-    resolve(count);
-  });
-
-  setTimeout(() => {
-    sub.stop();
-    resolve(count);
-  }, 2000); // 2s timeout for manual count
 }
 
 // Update stats after user interaction (like, repost, etc.)

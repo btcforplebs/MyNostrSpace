@@ -120,6 +120,107 @@ body {
 .home-box { border: 1px solid #00ffff !important; background: #111 !important; margin: 10px; }
 a { color: #00ffff !important; text-transform: lowercase; font-style: italic; }
 `,
+  myspace2030: `/* MySpace 2030 (Futuristic Glass) */
+body {
+    background: #050510 url('https://www.transparenttextures.com/patterns/stardust.png') !important;
+    color: #e0e0e0 !important;
+    font-family: 'Inter', 'Segoe UI', sans-serif !important;
+}
+.profile-container, .home-content {
+    background: rgba(20, 20, 35, 0.7) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(100, 200, 255, 0.2) !important;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    color: #e0e0e0 !important;
+}
+.home-box, .status-mood-box {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px;
+    backdrop-filter: blur(5px);
+}
+.home-box-header, .status-mood-header, .section-header {
+    background: linear-gradient(90deg, rgba(0,200,255,0.8), rgba(150,0,255,0.8)) !important;
+    color: #fff !important;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 800;
+    text-shadow: 0 0 10px rgba(0,0,0,0.5);
+    border: none !important;
+}
+a { color: #00ddff !important; text-decoration: none !important; transition: all 0.2s; }
+a:hover { color: #fff !important; text-shadow: 0 0 8px #00ddff; }
+.btn-primary, .post-status-btn {
+    background: linear-gradient(45deg, #00c6ff, #0072ff) !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(0, 114, 255, 0.4);
+    border-radius: 20px !important;
+}
+input, textarea, select {
+    background: rgba(0,0,0,0.3) !important;
+    border: 1px solid rgba(100,200,255,0.3) !important;
+    color: #fff !important;
+    border-radius: 8px !important;
+}
+`,
+  retrogold: `/* Retro Gold (Luxury) */
+body {
+    background: #1a1a1a !important;
+    color: #d4af37 !important;
+    font-family: 'Times New Roman', serif !important;
+}
+.profile-container, .home-content {
+    background-color: #000 !important;
+    border: 2px solid #d4af37 !important;
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+}
+.home-box, .status-mood-box {
+    background: #0a0a0a !important;
+    border: 1px solid #7a6620 !important;
+}
+.home-box-header, .status-mood-header, .section-header {
+    background: linear-gradient(180deg, #d4af37 0%, #aa8c2c 100%) !important;
+    color: #000 !important;
+    font-family: serif;
+    font-style: italic;
+    border-bottom: 2px solid #fff !important;
+}
+a { color: #f5e080 !important; }
+a:hover { color: #fff !important; text-decoration: underline !important; }
+.btn-primary {
+    background: #d4af37 !important;
+    color: #000 !important;
+    border: 1px solid #fff !important;
+}
+`,
+  vaporwave: `/* Vaporwave Aesthetics */
+body {
+    background: #ff71ce !important; /* Pink base */
+    background-image: linear-gradient(to bottom, #ff71ce, #01cdfe) !important;
+    min-height: 100vh; 
+}
+.profile-container, .home-content {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border: 3px solid #01cdfe !important;
+    box-shadow: 10px 10px 0px #b967ff;
+}
+.home-box-header, .status-mood-header, .section-header {
+    background: linear-gradient(90deg, #01cdfe, #b967ff) !important;
+    color: #fff !important;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+.home-box {
+    border: 1px dashed #ff71ce !important;
+    background: #fff !important;
+}
+a { color: #b967ff !important; font-weight: bold; }
+a:hover { color: #01cdfe !important; background: #000; }
+`
 };
 
 export const LayoutEditor = () => {
@@ -234,6 +335,9 @@ export const LayoutEditor = () => {
             >
               <option value="">-- Select a Full Page Theme --</option>
               <option value="classic">Classic MySpace</option>
+              <option value="myspace2030">✨ MySpace 2030 (Futuristic) ✨</option>
+              <option value="retrogold">🏆 Retro Gold (Luxury)</option>
+              <option value="vaporwave">🌊 Vaporwave Aesthetics</option>
               <option value="matrix">Matrix Code</option>
               <option value="y2k">Y2K Glitter</option>
               <option value="emo">Emo/Scene Night</option>

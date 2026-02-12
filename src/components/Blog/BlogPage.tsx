@@ -100,9 +100,9 @@ export const BlogPage: React.FC = () => {
           <aside className="blog-sidebar">
             <div className="author-box">
               <div className="author-pic">
-                <Link to={`/ p / ${pubkey} `}>
+                <Link to={`/p/${pubkey}`}>
                   <img
-                    src={author?.picture || `https://robohash.org/${pubkey}?set=set4`}
+                    src={author?.image || author?.picture || `https://robohash.org/${pubkey}?set=set4`}
                     alt={author?.name}
                   />
                 </Link>

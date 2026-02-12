@@ -10,6 +10,8 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useProfile } from '../../hooks/useProfile';
 import { Avatar } from './Avatar';
 import { isBlockedUser, hasBlockedKeyword } from '../../utils/blockedUsers';
+import { MentionInput } from './MentionInput';
+import { extractMentions } from '../../utils/mentions';
 
 interface ThreadNode {
   event: NDKEvent;
@@ -124,10 +126,10 @@ const ThreadedComments: React.FC<ThreadedCommentsProps> = ({
 
               {activeReplyId === node.event.id && (
                 <div className="reply-form myspace-form-container">
-                  <textarea
+                  <MentionInput
                     className="nostr-input"
                     value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
+                    setValue={setReplyText}
                     onKeyDown={(e) => {
                       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                         handlePostComment(node.event, replyText, false);
@@ -273,7 +275,7 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
         if (!commentsRef.has(reply.id)) {
           commentsRef.set(reply.id, reply);
           // Fetch profile in background
-          reply.author.fetchProfile().catch(() => {});
+          reply.author.fetchProfile().catch(() => { });
         }
       });
 
@@ -362,10 +364,25 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
         ? parentEvent.id
         : parentEvent.tags.find((t) => t[0] === 'e' && t[3] === 'root')?.[1] || parentEvent.id;
 
+
+      const replyTags: string[][] = [];
+
+      // NIP-10: Root tag
+      replyTags.push(['e', rootId, '', 'root']);
+
+      // NIP-10: Reply tag (only if parent is NOT the root)
+      if (parentEvent.id !== rootId) {
+        replyTags.push(['e', parentEvent.id, '', 'reply']);
+      }
+
+      // Extract mentions
+      const mentionedPubkeys = extractMentions(text);
+      const mentionTags = mentionedPubkeys.map((pubkey) => ['p', pubkey]);
+
       reply.tags = [
-        ['e', rootId, '', 'root'],
-        ['e', parentEvent.id, '', 'reply'],
+        ...replyTags,
         ['p', parentEvent.pubkey],
+        ...mentionTags,
         ['client', 'MyNostrSpace'],
       ];
 
@@ -477,7 +494,36 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
           )}
         </div>
         <div className="feed-text">
-          <RichTextRenderer content={displayContent} />
+          {event.kind === 30023 ? (
+            <div className="blog-post-card" style={{
+              padding: '12px',
+              border: '1px solid #6699cc',
+              borderRadius: '4px',
+              background: '#f0f5ff',
+              marginTop: '5px'
+            }}>
+              <div style={{ fontWeight: 'bold', fontSize: '11pt', marginBottom: '8px', color: '#003399' }}>
+                ✍️ {event.tags.find(t => t[0] === 'title')?.[1] || 'Untitled Blog Post'}
+              </div>
+              <div style={{ fontSize: '9pt', color: '#444', lineHeight: '1.4', marginBottom: '10px' }}>
+                {event.content.slice(0, 180)}...
+              </div>
+              <Link
+                to={`/blog/${event.pubkey}/${event.tags.find(t => t[0] === 'd')?.[1]}`}
+                className="myspace-button"
+                style={{
+                  display: 'inline-block',
+                  padding: '4px 12px',
+                  fontSize: '8pt',
+                  textDecoration: 'none'
+                }}
+              >
+                Read Full Article
+              </Link>
+            </div>
+          ) : (
+            <RichTextRenderer content={displayContent} />
+          )}
         </div>
         <div className="feed-meta">
           Posted {new Date(event.created_at! * 1000).toLocaleDateString()}{' '}
@@ -530,10 +576,10 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
 
         {showCommentForm && (
           <div className="feed-comment-form myspace-form-container">
-            <textarea
+            <MentionInput
               className="nostr-input"
               value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
+              setValue={setCommentText}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                   handlePostComment(event, commentText, true);

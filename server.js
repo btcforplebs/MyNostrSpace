@@ -77,8 +77,9 @@ async function fetchNostrData(type, id) {
 
         if (type === 'profile') {
             const metadata = JSON.parse(event.content || '{}');
+            const author = metadata.display_name || metadata.name || 'User';
             return {
-                title: metadata.display_name || metadata.name || 'User',
+                title: `MyNostrSpace - ${author}`,
                 description: (metadata.about || 'Nostr Profile').slice(0, 160),
                 image: metadata.picture || '/mynostrspace_logo.png'
             };
@@ -88,9 +89,12 @@ async function fetchNostrData(type, id) {
             const profileEvent = await fetchWithTimeout(pool.get(RELAYS, { kinds: [0], authors: [authorHex], limit: 1 }), 1500).catch(() => null);
             const profile = profileEvent ? JSON.parse(profileEvent.content || '{}') : {};
 
+            const author = profile.display_name || profile.name || 'someone';
+            const snippet = (event.content?.slice(0, 80) || 'Nostr Thread').replace(/\n/g, ' ') + '...';
+
             return {
-                title: (event.content?.slice(0, 80) || 'Nostr Thread').replace(/\n/g, ' ') + '...',
-                description: `Post by ${profile.display_name || profile.name || 'someone'} on MyNostrSpace`,
+                title: `MyNostrSpace - ${author} - ${snippet}`,
+                description: `Post by ${author} on MyNostrSpace`,
                 image: profile.picture || '/mynostrspace_logo.png'
             };
         }
@@ -124,7 +128,7 @@ app.use(async (req, res) => {
         const meta = await fetchNostrData(type, id);
         if (meta) {
             let html = cachedIndexHtml;
-            html = html.replace(/<title>.*?<\/title>/, `<title>${meta.title} | MyNostrSpace</title>`);
+            html = html.replace(/<title>.*?<\/title>/, `<title>${meta.title}</title>`);
 
             const tags = [
                 { name: 'description', content: meta.description },

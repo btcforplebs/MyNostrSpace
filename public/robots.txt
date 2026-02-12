@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /p/
+Allow: /thread/
+
+# Allow access to assets for rich icons/images
+Allow: /assets/
+Allow: /favicon.png
+Allow: /mynostrspace_logo.png
+
+Sitemap: https://mynostrspace.com/sitemap.xml

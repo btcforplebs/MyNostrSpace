@@ -6,6 +6,7 @@ import { Navbar } from '../Shared/Navbar';
 import { FeedItem } from '../Shared/FeedItem';
 import { isBlockedUser } from '../../utils/blockedUsers';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
+import { SEO } from '../Shared/SEO';
 
 interface ThreadNode {
   event: NDKEvent;
@@ -248,6 +249,14 @@ export const ThreadPage = () => {
     <div className="thread-page-container">
       <div className="thread-page-wrapper">
         <Navbar />
+        {rootEvent && (
+          <SEO
+            title={`${rootEvent.content.slice(0, 50)}${rootEvent.content.length > 50 ? '...' : ''}`}
+            description={`Discussion on MyNostrSpace by ${rootEvent.author.profile?.displayName || rootEvent.author.profile?.name || 'an anonymous user'}.`}
+            image={rootEvent.author.profile?.image}
+            type="article"
+          />
+        )}
         <div className="thread-content">
           <div style={{ marginBottom: '10px' }}>
             <Link

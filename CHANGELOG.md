@@ -6,6 +6,22 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 ### 🚀 New Features
 
+#### **Meta-Injection Server (Production Hardened)**
+
+- Replaced Nginx with a custom **Node.js Express** server to handle dynamic meta-tag injection.
+- **Bot Detection:** Implemented automated identification of search engine and social media crawlers (X/Twitter, Discord, Google, etc.).
+- **Dynamic Meta Tags:** Bots are now served a modified `index.html` with injected `og:title`, `og:image`, and `twitter:card` tags for rich social previews.
+- **Relay-Pool Fetching:** Switched from unreliable HTTP APIs to a WebSocket-based **SimplePool** that "races" multiple relays (`nos.lol`, `relay.primal.net`, `relay.damus.io`, etc.) for real-time metadata recovery.
+- **Production Hardening:**
+  - **In-Memory Caching:** `index.html` is cached in RAM for ultra-fast responses.
+  - **Execution Timeouts:** Added 3s/1.5s hard timeouts to prevent bot requests from hanging the server.
+  - **DNS Fix:** Updated `docker-compose.yml` with explicit Cloudflare/Google DNS resolvers to fix container-level networking issues.
+  - **SEO:** Added `robots.txt` to explicitly allow crawling of profile and thread routes.
+- **Files modified:** `server.js`, `Dockerfile`, `docker-compose.yml`, `package.json`, `robots.txt`
+
+
+### 🚀 New Features
+
 #### **Replies Feed**
 
 - Added a new **Replies** tab to the homepage.

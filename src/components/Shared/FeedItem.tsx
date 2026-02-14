@@ -230,7 +230,13 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
       const trimmed = event.content.trim();
       if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
         try {
-          return new NDKEvent(ndk, JSON.parse(trimmed));
+          // Sanitize the JSON string to remove invalid control characters
+          const sanitized = trimmed.replace(/[\x00-\x1F\x7F]/g, (char) => {
+            // Keep newlines and tabs but remove other control characters
+            if (char === '\n' || char === '\t') return char;
+            return '';
+          });
+          return new NDKEvent(ndk, JSON.parse(sanitized));
         } catch {
           /* ignore parse error */
         }

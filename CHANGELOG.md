@@ -2,6 +2,62 @@
 
 All notable changes to the MyNostrSpace project will be documented in this file.
 
+## [Unreleased] - 2026-02-14
+
+### 🐛 Bug Fixes
+
+#### **JSON Sanitization for Event Parsing**
+
+- Fixed "JSON Parse Error" issues when parsing embedded NDKEvent objects in `FeedItem.tsx` and `ChatMessage.tsx`.
+- **Root Cause:** Some events contained invalid control characters (non-printable ASCII) that caused `JSON.parse()` to fail.
+- **Solution:** Added sanitization step that removes invalid control characters while preserving newlines and tabs.
+- **Files modified:** `FeedItem.tsx`, `ChatMessage.tsx`
+
+#### **NIP-46 Login Relay Handling**
+
+- Fixed issue where extension-provided relays were not being properly added to NDK during NIP-46 login.
+- **Solution:** Added explicit relay URL extraction and addition from extension's `getRelays()` response.
+- **Files modified:** `NostrContext.tsx`
+
+### ⚡ Performance Optimizations
+
+#### **Thread Reply Buffering**
+
+- Refactored thread reply loading to use buffered batch updates.
+- **Problem:** Large threads with many replies were causing UI freezing due to excessive re-renders on each incoming event.
+- **Solution:** Implemented a 400ms batching interval that collects incoming replies and updates the UI in batches, with a 50ms initial render delay.
+- **Files modified:** `ThreadPage.tsx`
+
+### 🎨 UI/UX Enhancements
+
+#### **Avatar Component Improvements**
+
+- Enhanced `Avatar` component with memoized color generation for deterministic fallback colors.
+- Added native browser `loading="lazy"` attribute for profile images.
+- Created SVG-based identicon fallback with initials (first 2 hex characters of pubkey) when no image is available.
+- **Files modified:** `Avatar.tsx`
+
+#### **RichTextRenderer Enhancements**
+
+- Added `BLOCKED_KEYWORDS` filtering to automatically hide content containing inappropriate keywords.
+- Improved lazy loading for embedded media with IntersectionObserver and Safari-compatible fallbacks.
+- Enhanced YouTube embed handling with timeout fallback for reliable loading.
+- Added `decoding="async"` for non-blocking image decoding.
+- **Files modified:** `RichTextRenderer.tsx`
+
+#### **Loading Screen Styling**
+
+- Added retro MySpace-themed loading screen styles using design tokens.
+- Implemented CSS-only loading spinner animation.
+- **Files modified:** `index.css`
+
+### 🛠 Technical Improvements
+
+#### **App Routing Cleanup**
+
+- Simplified and cleaned up route definitions in `App.tsx` for better maintainability.
+- **Files modified:** `App.tsx`
+
 ## [Unreleased] - 2026-02-12
 
 ### 🚀 New Features

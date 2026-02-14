@@ -24,24 +24,27 @@ const InternalMention: React.FC<{ pubkey: string; originalText: string }> = Reac
   }
 );
 
-// Lazy-loaded image component with intersection observer
+// Lazy-loaded image component with loading="lazy" (native browser support)
+// This is more reliable across browsers including Safari
 const LazyImage: React.FC<{ src: string; alt: string; onClick: () => void }> = React.memo(
   ({ src, alt, onClick }) => {
-    const [isLoaded, setIsLoaded] = React.useState(false);
+    const [isInView, setIsInView] = React.useState(false);
     const imgRef = useRef<HTMLImageElement>(null);
 
     React.useEffect(() => {
       const img = imgRef.current;
       if (!img) return;
 
+      // Use native loading="lazy" as primary mechanism
+      // IntersectionObserver is just to track when image enters viewport
       const observer = new IntersectionObserver(
         (entries) => {
           if (entries[0].isIntersecting) {
-            setIsLoaded(true);
+            setIsInView(true);
             observer.disconnect();
           }
         },
-        { rootMargin: '50px' }
+        { rootMargin: '50px', threshold: 0 }
       );
 
       observer.observe(img);
@@ -51,15 +54,16 @@ const LazyImage: React.FC<{ src: string; alt: string; onClick: () => void }> = R
     return (
       <img
         ref={imgRef}
-        src={isLoaded ? src : undefined}
+        src={isInView ? src : undefined}
         alt={alt}
         style={{
           maxWidth: '100%',
           maxHeight: '400px',
           borderRadius: '4px',
           cursor: 'pointer',
-          backgroundColor: isLoaded ? undefined : '#f0f0f0',
-          minHeight: isLoaded ? undefined : '200px',
+          backgroundColor: isInView ? undefined : '#f0f0f0',
+          minHeight: '200px',
+          display: 'block',
         }}
         onClick={onClick}
         loading="lazy"
@@ -70,6 +74,7 @@ const LazyImage: React.FC<{ src: string; alt: string; onClick: () => void }> = R
 );
 
 // Lazy-loaded video component with intersection observer
+// With Safari fallback timeout
 const LazyVideo: React.FC<{ src: string }> = React.memo(({ src }) => {
   const [isLoaded, setIsLoaded] = React.useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -78,19 +83,28 @@ const LazyVideo: React.FC<{ src: string }> = React.memo(({ src }) => {
     const video = videoRef.current;
     if (!video) return;
 
+    // Safari fallback: timeout to ensure video loads even if observer fails
+    const fallbackTimer = setTimeout(() => {
+      if (!isLoaded) setIsLoaded(true);
+    }, 2000);
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
           setIsLoaded(true);
+          clearTimeout(fallbackTimer);
           observer.disconnect();
         }
       },
-      { rootMargin: '100px' }
+      { rootMargin: '100px', threshold: 0 }
     );
 
     observer.observe(video);
-    return () => observer.disconnect();
-  }, []);
+    return () => {
+      clearTimeout(fallbackTimer);
+      observer.disconnect();
+    };
+  }, [isLoaded]);
 
   const videoSrc = isLoaded ? (src.includes('#') ? src : `${src}#t=0.1`) : undefined;
 
@@ -107,11 +121,81 @@ const LazyVideo: React.FC<{ src: string }> = React.memo(({ src }) => {
         maxHeight: '400px',
         borderRadius: '4px',
         backgroundColor: '#f0f0f0',
-        minHeight: isLoaded ? undefined : '200px',
+        minHeight: '200px',
+        display: 'block',
       }}
     />
   );
 });
+
+// Lazy-loaded YouTube component with intersection observer
+// With Safari fallback timeout to ensure content loads
+const LazyYouTube: React.FC<{ videoId: string; style?: React.CSSProperties }> = React.memo(
+  ({ videoId, style }) => {
+    const [isLoaded, setIsLoaded] = React.useState(false);
+    const containerRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+      if (isLoaded) return;
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      // Safari fallback: timeout to ensure YouTube loads even if observer fails
+      const fallbackTimer = setTimeout(() => {
+        if (!isLoaded) setIsLoaded(true);
+      }, 2000);
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            setIsLoaded(true);
+            clearTimeout(fallbackTimer);
+            observer.disconnect();
+          }
+        },
+        { rootMargin: '100px', threshold: 0 }
+      );
+
+      observer.observe(container);
+      return () => {
+        clearTimeout(fallbackTimer);
+        observer.disconnect();
+      };
+    }, [isLoaded]);
+
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          ...style,
+          width: style?.width || '100%',
+          height: style?.height || '315px',
+          maxWidth: '560px',
+          backgroundColor: isLoaded ? '#fff' : '#f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {!isLoaded && (
+          <div style={{ color: '#999', fontSize: '14px' }}>Loading video...</div>
+        )}
+        {isLoaded && (
+          <iframe
+            width="100%"
+            height="100%"
+            src={`https://www.youtube.com/embed/${videoId}`}
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title="Embedded Video"
+            style={{ border: 'none' }}
+          />
+        )}
+      </div>
+    );
+  }
+);
 
 interface RichTextRendererProps {
   content: string;
@@ -203,21 +287,11 @@ export const RichTextRenderer: React.FC<RichTextRendererProps> = React.memo(
 
                   if (videoId) {
                     return (
-                      <div
+                      <LazyYouTube
                         key={wordIndex}
+                        videoId={videoId}
                         style={{ marginTop: '5px', marginBottom: '5px', display: 'block' }}
-                      >
-                        <iframe
-                          width="100%"
-                          height="315"
-                          src={`https://www.youtube.com/embed/${videoId}`}
-                          allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          title="Embedded Video"
-                          style={{ maxWidth: '560px' }}
-                          loading="lazy"
-                        ></iframe>
-                      </div>
+                      />
                     );
                   }
                 }

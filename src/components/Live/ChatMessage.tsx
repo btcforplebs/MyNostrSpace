@@ -26,7 +26,12 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
         };
       }
 
-      const zapRequest = new NDKEvent(msg.ndk, JSON.parse(description));
+      // Sanitize JSON to remove invalid control characters
+      const sanitized = description.replace(/[\x00-\x1F\x7F]/g, (char) => {
+        if (char === '\n' || char === '\t') return char;
+        return '';
+      });
+      const zapRequest = new NDKEvent(msg.ndk, JSON.parse(sanitized));
 
       // 2. If amount is still 0, try the zap request's amount tag
       if (amount === 0) {
@@ -60,18 +65,18 @@ export const ChatMessage = ({ msg }: ChatMessageProps) => {
   // Determine display name
   const displayName = String(
     profile?.name ||
-      profile?.display_name ||
-      msg.author?.profile?.name ||
-      msg.author?.profile?.display_name ||
-      displayPubkey.slice(0, 8)
+    profile?.display_name ||
+    msg.author?.profile?.name ||
+    msg.author?.profile?.display_name ||
+    displayPubkey.slice(0, 8)
   );
 
   // Get profile picture
   const profilePicture = String(
     profile?.picture ||
-      profile?.image ||
-      (zapperInfo ? '' : msg.author?.profile?.picture || msg.author?.profile?.image) ||
-      `https://robohash.org/${displayPubkey}`
+    profile?.image ||
+    (zapperInfo ? '' : msg.author?.profile?.picture || msg.author?.profile?.image) ||
+    `https://robohash.org/${displayPubkey}`
   );
 
   if (zapperInfo) {

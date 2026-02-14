@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, memo, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef, memo, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import {
@@ -27,6 +27,60 @@ import { RichTextRenderer } from '../Shared/RichTextRenderer';
 import { InteractionBar } from '../Shared/InteractionBar';
 
 import './HomePage.css';
+
+// Virtualized feed item - only renders when in viewport
+const VirtualFeedItem: React.FC<{ event: NDKEvent; hideThreadButton?: boolean }> = React.memo(
+  ({ event, hideThreadButton }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    const itemRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const element = itemRef.current;
+      if (!element) return;
+
+      // Use IntersectionObserver to only render when near viewport
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            setIsVisible(true);
+            // Once visible, disconnect - we keep it rendered
+            observer.disconnect();
+          }
+        },
+        { rootMargin: '200px', threshold: 0 }
+      );
+
+      observer.observe(element);
+
+      return () => observer.disconnect();
+    }, []);
+
+    // If not yet visible, show a compact placeholder
+    if (!isVisible) {
+      return (
+        <div
+          ref={itemRef}
+          style={{
+            minHeight: '120px',
+            background: '#f9f9f9',
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span style={{ color: '#ccc', fontSize: '12px' }}>Loading...</span>
+        </div>
+      );
+    }
+
+    return (
+      <div ref={itemRef}>
+        <FeedItem event={event} hideThreadButton={hideThreadButton} />
+      </div>
+    );
+  }
+);
 
 // Single notification item - shows who did what to your post
 const NotificationItem = memo(
@@ -97,6 +151,98 @@ const NotificationItem = memo(
   }
 );
 
+// Lazy video embed component for Media gallery
+const LazyVideoEmbed: React.FC<{
+  type: 'youtube' | 'vimeo' | 'streamable' | 'video';
+  videoId?: string;
+  url?: string;
+}> = ({ type, videoId, url }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsLoaded(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  if (!isLoaded) {
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%',
+          aspectRatio: '16/9',
+          backgroundColor: '#f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span>Loading video...</span>
+      </div>
+    );
+  }
+
+  if (type === 'youtube' && videoId) {
+    return (
+      <iframe
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+        title="YouTube video"
+        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        style={{ width: '100%', height: '100%', border: 'none' }}
+      />
+    );
+  }
+
+  if (type === 'vimeo' && videoId) {
+    return (
+      <iframe
+        src={`https://player.vimeo.com/video/${videoId}?autoplay=1`}
+        title="Vimeo video"
+        allow="autoplay; fullscreen; picture-in-picture"
+        allowFullScreen
+        style={{ width: '100%', height: '100%', border: 'none' }}
+      />
+    );
+  }
+
+  if (type === 'streamable' && videoId) {
+    return (
+      <iframe
+        src={`https://streamable.com/e/${videoId}?autoplay=1`}
+        title="Streamable video"
+        allowFullScreen
+        style={{ width: '100%', height: '100%', border: 'none' }}
+      />
+    );
+  }
+
+  // Direct video file
+  return (
+    <video
+      src={url}
+      controls
+      autoPlay
+      preload="metadata"
+      style={{ width: '100%', height: '100%' }}
+    />
+  );
+};
+
 const ReplyCard = memo(({ event }: { event: NDKEvent }) => {
   const { profile } = useProfile(event.pubkey);
   const authorName = profile?.name || profile?.displayName || event.pubkey.slice(0, 8);
@@ -124,7 +270,7 @@ const ReplyCard = memo(({ event }: { event: NDKEvent }) => {
           Posted {new Date((event.created_at || 0) * 1000).toLocaleString()}
         </div>
         <div className="reply-card-actions">
-          <InteractionBar event={event} onCommentClick={() => {}} />
+          <InteractionBar event={event} onCommentClick={() => { }} />
           <Link to={`/thread/${event.id}`} className="show-thread-link">
             Show thread
           </Link>
@@ -718,8 +864,13 @@ const HomePage = () => {
     let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
     const startFeedSub = async () => {
       if (feed.length === 0) setFeedLoading(true);
+
+      // Small delay to allow initial render to complete before heavy operations
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       const authors = await getFollows();
-      const filter: NDKFilter = { kinds: [1, 6], authors: authors, limit: 25 };
+      // Reduced limit from 25 to 10 to decrease initial load
+      const filter: NDKFilter = { kinds: [1, 6], authors: authors, limit: 10 };
       sub = ndk.subscribe(filter, {
         closeOnEose: false,
         cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
@@ -727,6 +878,10 @@ const HomePage = () => {
 
       let eventBuffer: NDKEvent[] = [];
       let flushTimeout: ReturnType<typeof setTimeout> | null = null;
+      let hasReceivedEose = false;
+
+      // Increased flush interval to reduce re-renders during initial load
+      const FLUSH_INTERVAL = 500;
 
       const flushBuffer = () => {
         if (eventBuffer.length === 0) return;
@@ -734,7 +889,8 @@ const HomePage = () => {
         eventBuffer = [];
 
         // Use functional setState - React batches these efficiently
-        if (feedEoseRef.current) {
+        // Only add to pending if we've received EOSE (indicating these are truly new posts after initial load)
+        if (hasReceivedEose) {
           setPendingPosts((prev) => dedupAndSortFeed(currentBuffer, prev));
         } else {
           setFeed((prev) => dedupAndSortFeed(currentBuffer, prev));
@@ -770,11 +926,16 @@ const HomePage = () => {
           flushTimeout = setTimeout(() => {
             flushBuffer();
             flushTimeout = null;
-          }, 300); // Batch updates every 300ms
+          }, FLUSH_INTERVAL); // Batch updates - increased to 500ms for better performance
         }
       });
       sub.on('eose', () => {
+        // Flush any remaining pre-EOSE events to feed first
         flushBuffer();
+
+        // Now mark that EOSE has been received - future events go to pending
+        hasReceivedEose = true;
+
         setFeedLoading(false);
         feedEoseRef.current = true;
         eoseTimestampRef.current = Math.floor(Date.now() / 1000);
@@ -801,8 +962,13 @@ const HomePage = () => {
     let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
     const startRepliesSub = async () => {
       if (replies.length === 0) setIsRepliesLoading(true);
+
+      // Small delay to allow initial render to complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       const authors = await getFollows();
-      const filter: NDKFilter = { kinds: [1], authors: authors, limit: 50 };
+      // Reduced limit from 50 to 20
+      const filter: NDKFilter = { kinds: [1], authors: authors, limit: 20 };
       sub = ndk.subscribe(filter, {
         closeOnEose: false,
         cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
@@ -831,7 +997,7 @@ const HomePage = () => {
           flushTimeout = setTimeout(() => {
             flushBuffer();
             flushTimeout = null;
-          }, 400);
+          }, 600); // Increased batch interval
         }
       });
 
@@ -860,8 +1026,13 @@ const HomePage = () => {
     let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
     const startMediaSub = async () => {
       if (mediaItems.length === 0) setMediaLoading(true);
+
+      // Small delay to allow initial render to complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       const authors = await getFollows();
-      const filter: NDKFilter = { kinds: [1, 1063], authors: authors, limit: 50 };
+      // Reduced limit from 50 to 25
+      const filter: NDKFilter = { kinds: [1, 1063], authors: authors, limit: 25 };
       sub = ndk.subscribe(filter, {
         closeOnEose: false,
         cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
@@ -886,7 +1057,7 @@ const HomePage = () => {
             mFlushTimeout = setTimeout(() => {
               flushMBuffer();
               mFlushTimeout = null;
-            }, 400);
+            }, 600); // Increased batch interval
           }
         }
       });
@@ -1408,7 +1579,7 @@ const HomePage = () => {
                       </div>
                     )}
                     {feed.slice(0, displayedFeedCount).map((event) => (
-                      <FeedItem key={event.id} event={event} />
+                      <VirtualFeedItem key={event.id} event={event} />
                     ))}
                     <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
                     {isLoadingMoreFeed && (
@@ -1462,38 +1633,24 @@ const HomePage = () => {
                                     />
                                   ) : isExpanded ? (
                                     ytMatch ? (
-                                      <iframe
-                                        src={`https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`}
-                                        title="YouTube video"
-                                        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                        allowFullScreen
-                                        style={{ width: '100%', height: '100%', border: 'none' }}
-                                        loading="lazy"
+                                      <LazyVideoEmbed
+                                        type="youtube"
+                                        videoId={ytMatch[1]}
                                       />
                                     ) : vimeoMatch ? (
-                                      <iframe
-                                        src={`https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`}
-                                        title="Vimeo video"
-                                        allow="autoplay; fullscreen; picture-in-picture"
-                                        allowFullScreen
-                                        style={{ width: '100%', height: '100%', border: 'none' }}
-                                        loading="lazy"
+                                      <LazyVideoEmbed
+                                        type="vimeo"
+                                        videoId={vimeoMatch[1]}
                                       />
                                     ) : streamableMatch ? (
-                                      <iframe
-                                        src={`https://streamable.com/e/${streamableMatch[1]}?autoplay=1`}
-                                        title="Streamable video"
-                                        allowFullScreen
-                                        style={{ width: '100%', height: '100%', border: 'none' }}
-                                        loading="lazy"
+                                      <LazyVideoEmbed
+                                        type="streamable"
+                                        videoId={streamableMatch[1]}
                                       />
                                     ) : (
-                                      <video
-                                        src={item.url}
-                                        controls
-                                        autoPlay
-                                        preload="metadata"
-                                        style={{ width: '100%', height: '100%' }}
+                                      <LazyVideoEmbed
+                                        type="video"
+                                        url={item.url}
                                       />
                                     )
                                   ) : (
@@ -1687,7 +1844,7 @@ const HomePage = () => {
       <BlogEditor
         isOpen={isBlogModalOpen}
         onClose={() => setIsBlogModalOpen(false)}
-        onPostComplete={() => {}}
+        onPostComplete={() => { }}
       />
     </div>
   );

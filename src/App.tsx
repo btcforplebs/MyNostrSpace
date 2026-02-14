@@ -92,41 +92,28 @@ const GamePlayerPage = lazy(() =>
 import { ErrorBoundary } from './components/Shared/ErrorBoundary';
 
 function App() {
-  const { user, isLoading } = useNostr();
+  const { user } = useNostr();
 
-  if (isLoading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-box">
-          <div className="loading-header">MyNostrSpace.com</div>
-          <div className="loading-body">
-            <p>Connecting to Nostr...</p>
-            <p style={{ fontSize: '8pt' }}>(Please Wait)</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Let skeleton loaders handle loading states - no blocking screen
   return (
     <HelmetProvider>
       <NotificationProvider>
         <LightboxProvider>
           <div className="app-container">
             <ErrorBoundary>
-              <Suspense
-                fallback={
-                  <div className="loading-screen">
-                    <div className="loading-box">
-                      <div className="loading-body">
-                        <p>Loading...</p>
-                      </div>
-                    </div>
-                  </div>
-                }
-              >
+              <Suspense fallback={null}>
                 <Routes>
-                  <Route path="/" element={user ? <HomePage /> : <LandingPage />} />
+                  <Route
+                    path="/"
+                    element={
+                      user ? (
+                        <HomePage />
+                      ) : (
+                        // Show landing page even while connecting in background
+                        <LandingPage />
+                      )
+                    }
+                  />
                   <Route path="/p/:pubkey" element={<ProfilePage />} />
                   <Route path="/p/:pubkey/friends" element={<FriendsPage />} />
                   <Route path="/search" element={<SearchPage />} />

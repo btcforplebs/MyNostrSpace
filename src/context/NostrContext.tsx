@@ -7,6 +7,8 @@ interface NostrContextType {
   ndk: NDK;
   user: NDKUser | null;
   isLoading: boolean;
+  isConnecting: boolean;
+  isFirstLoad: boolean;
   login: () => Promise<void>;
   loginWithNip46: (connectionString: string) => Promise<void>;
   logout: () => void;
@@ -45,6 +47,8 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
 
   const [user, setUser] = useState<NDKUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(true);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   const updateRelays = (newRelays: string[]) => {
     const deduplicated = filterRelays(Array.from(new Set(newRelays.map((r) => r.trim()))));
@@ -81,6 +85,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
       } catch (e) {
         console.warn('NDK connection warning:', e);
       } finally {
+        setIsConnecting(false);
         // Only set not loading if we are NOT waiting for auto-login
         // If there's a saved pubkey or bunker config, we let the auth effect handle turning off loading
         if (
@@ -89,6 +94,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
         ) {
           setIsLoading(false);
         }
+        setIsFirstLoad(false);
       }
     };
 
@@ -189,7 +195,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
       console.error('NIP-46 Login failed:', error);
       alert(
         'Failed to connect to remote signer: ' +
-          (error instanceof Error ? error.message : String(error))
+        (error instanceof Error ? error.message : String(error))
       );
       throw error;
     }
@@ -251,7 +257,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <NostrContext.Provider
-      value={{ ndk, user, isLoading, login, loginWithNip46, logout, relays, updateRelays }}
+      value={{ ndk, user, isLoading, isConnecting, isFirstLoad, login, loginWithNip46, logout, relays, updateRelays }}
     >
       {children}
     </NostrContext.Provider>

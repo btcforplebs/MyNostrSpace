@@ -135,8 +135,12 @@ export const ThreadPage = () => {
       });
     };
 
-    const loadReplies = (rootId: string) => {
+    const loadReplies = async (rootId: string) => {
       setLoadingReplies(true);
+
+      // Small delay to allow initial render to complete before heavy operations
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       const replyFilter: NDKFilter = {
         kinds: [1],
         '#e': [rootId],
@@ -148,20 +152,53 @@ export const ThreadPage = () => {
       });
       replySubRef = replySub;
 
-      replySub.on('event', (reply: NDKEvent) => {
-        if (!repliesRef.current.has(reply.id) && !isBlockedUser(reply.pubkey)) {
-          repliesRef.current.set(reply.id, reply);
-          reply.author.fetchProfile().catch(() => { });
+      // Buffer replies and batch updates to prevent UI freezing
+      let replyBuffer: NDKEvent[] = [];
+      let flushTimeout: ReturnType<typeof setTimeout> | null = null;
+      const FLUSH_INTERVAL = 400; // Batch updates every 400ms
+
+      const flushBuffer = () => {
+        if (replyBuffer.length === 0) return;
+
+        const currentBuffer = [...replyBuffer];
+        replyBuffer = [];
+
+        // Process buffered replies
+        const newReplies: NDKEvent[] = [];
+        for (const reply of currentBuffer) {
+          if (!repliesRef.current.has(reply.id) && !isBlockedUser(reply.pubkey)) {
+            repliesRef.current.set(reply.id, reply);
+            reply.author.fetchProfile().catch(() => { });
+            newReplies.push(reply);
+          }
+        }
+
+        // Only trigger re-render if we have new unique replies
+        if (newReplies.length > 0) {
           setReplies(Array.from(repliesRef.current.values()));
+        }
+      };
+
+      replySub.on('event', (reply: NDKEvent) => {
+        replyBuffer.push(reply);
+
+        if (!flushTimeout) {
+          flushTimeout = setTimeout(() => {
+            flushBuffer();
+            flushTimeout = null;
+          }, FLUSH_INTERVAL);
         }
       });
 
       replySub.on('eose', () => {
+        // Flush any remaining buffered replies
+        flushBuffer();
         setLoadingReplies(false);
       });
 
       // Stop listening for new replies after 30 seconds
       setTimeout(() => {
+        flushBuffer();
         replySub.stop();
         setLoadingReplies(false);
       }, 30000);

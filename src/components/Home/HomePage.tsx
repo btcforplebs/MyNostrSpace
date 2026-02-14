@@ -88,35 +88,39 @@ const NotificationItem = memo(
     const { profile } = useProfile(event.pubkey);
 
     const authorName = profile?.name || profile?.displayName || event.pubkey.slice(0, 8);
-    const targetId = event.tags.find((t) => t[0] === 'e')?.[1];
+    const targetId = event.tags.find((t) => t[0] === 'e')?.[1] || null;
 
     // Determine action text
     let actionText = '';
     let actionIcon = '';
+    let threadId: string | null = null;
+
     if (event.kind === 7) {
       actionIcon = '♥';
       actionText = 'liked your post';
+      threadId = targetId;
     } else if (event.kind === 6) {
       actionIcon = '↻';
       actionText = 'reposted your post';
+      threadId = targetId;
     } else if (event.kind === 1) {
       actionIcon = '💬';
       actionText = 'replied to your post';
+      // For replies, the targetId is the post they replied to (parent)
+      // Navigate to that parent post's thread
+      threadId = targetId;
     } else if (event.kind === 9735) {
       actionIcon = '⚡';
       actionText = 'zapped your post';
+      threadId = targetId;
     }
 
     return (
       <div
         className="notification-item clickable"
         onClick={() => {
-          if (event.kind === 1) {
-            // For replies, navigate to the reply itself so ThreadPage
-            // resolves the full thread and highlights this reply
-            onClick(`/thread/${event.id}`);
-          } else if (targetId) {
-            onClick(`/thread/${targetId}`);
+          if (threadId) {
+            onClick(`/thread/${threadId}`);
           }
         }}
       >

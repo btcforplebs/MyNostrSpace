@@ -6,6 +6,13 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+#### **Notification Thread Navigation**
+
+- Fixed issue where clicking on notifications showed the thread URL but didn't display the page content.
+- **Root Cause:** For reply notifications (Kind 1), the code was navigating to the reply event itself instead of the parent post's thread.
+- **Solution:** Updated notification click handler to navigate to the `targetId` (the post being replied to/liked/zapped) for all notification types.
+- **Files modified:** `HomePage.tsx`
+
 #### **JSON Sanitization for Event Parsing**
 
 - Fixed "JSON Parse Error" issues when parsing embedded NDKEvent objects in `FeedItem.tsx` and `ChatMessage.tsx`.

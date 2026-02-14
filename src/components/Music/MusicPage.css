@@ -35,6 +35,47 @@
   border-radius: var(--myspace-border-radius-sm);
 }
 
+.mp-header-controls {
+  margin-bottom: var(--myspace-spacing-xl);
+  background: var(--myspace-orange);
+  padding: var(--myspace-spacing-md);
+  border: 1px solid var(--myspace-orange-hover);
+  border-radius: var(--myspace-border-radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--myspace-spacing-sm);
+}
+
+.mp-header-controls .mp-section-header {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font-size: var(--myspace-font-size-lg);
+}
+
+.mp-search-form {
+  display: flex;
+  gap: var(--myspace-spacing-sm);
+}
+
+.mp-search-input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid white;
+  border-radius: 4px;
+  font-family: var(--myspace-font-family);
+}
+
+.mp-search-btn {
+  background: var(--myspace-blue);
+  color: white;
+  border: 1px solid var(--myspace-blue-dark);
+  padding: 8px 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
 .sticky-player-container {
   position: sticky;
   top: 0;
@@ -118,18 +159,26 @@
   color: var(--myspace-error);
 }
 
-@media (max-width: 768px) {
-  .music-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--myspace-spacing-md);
-  }
-}
-
 @media (max-width: 600px) {
+  .mp-header-controls {
+    padding: var(--myspace-spacing-sm);
+  }
+
+  .mp-search-form {
+    flex-direction: row;
+  }
+
+  .mp-section-header {
+    font-size: var(--myspace-font-size-md);
+  }
+
   .music-grid {
     display: flex !important;
     flex-direction: column !important;
-    gap: var(--myspace-spacing-md);
+    gap: 0 !important;
+    padding: 0 !important;
+    border: 1px solid var(--myspace-border);
+    background: white;
   }
 
   .music-card {
@@ -137,34 +186,301 @@
     flex-direction: row !important;
     align-items: center !important;
     text-align: left !important;
-    padding: var(--myspace-spacing-sm);
-    height: 60px !important;
+    padding: 8px 12px !important;
+    min-height: 60px !important;
+    height: auto !important;
+    background: white !important;
+    border: none !important;
+    border-bottom: 1px solid var(--myspace-border) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .music-card:last-child {
+    border-bottom: none !important;
+  }
+
+  .music-card:nth-child(even) {
+    background-color: var(--myspace-bg-alt) !important;
+  }
+
+  .music-card.active-track {
+    background-color: var(--myspace-orange-light) !important;
+    border-left: 4px solid var(--myspace-orange) !important;
   }
 
   .album-art-wrapper {
     margin-bottom: 0 !important;
-    margin-right: var(--myspace-spacing-md) !important;
+    margin-right: 12px !important;
     flex-shrink: 0;
-    width: 50px !important;
-    height: 50px !important;
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 0 !important;
+    overflow: hidden;
+    position: relative;
+    box-shadow: none !important;
+    border: 1px solid var(--myspace-border) !important;
   }
 
   .album-art {
-    width: 50px !important;
-    height: 50px !important;
+    width: 40px !important;
+    height: 40px !important;
+    border: none !important;
   }
 
   .track-info {
     margin-top: 0 !important;
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.2;
   }
 
   .track-title {
     font-size: var(--myspace-font-size-md);
+    color: var(--myspace-link) !important;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+    width: fit-content;
+    max-width: 100%;
   }
 
-  .track-artist {
+  .track-artist-link {
     font-size: var(--myspace-font-size-sm);
+    color: black !important;
+    opacity: 1;
+    font-weight: normal;
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .card-actions {
+    display: none !important;
+  }
+
+  /* Tap to play indicator REMOVED */
+
+  .music-card.active-track::after {
+    content: 'ılıll';
+    /* Fake visualizer or just playing icon */
+    font-size: 10px;
+    letter-spacing: 1px;
+    animation: pulse 1s infinite;
+  }
+
+  /* Adjust play overlay for mobile - make it cover but hidden until active/tap */
+  .card-overlay {
+    display: none !important;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.5;
+  }
+}
+
+/* New Interactive Elements */
+
+.album-art-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+
+.music-card:hover .card-overlay {
+  opacity: 1;
+}
+
+.play-overlay-btn {
+  background: var(--myspace-orange);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.track-artist-link {
+  display: block;
+  color: var(--myspace-text);
+  font-size: var(--myspace-font-size-sm);
+  text-decoration: none;
+  margin-top: 2px;
+}
+
+.track-artist-link:hover {
+  text-decoration: underline;
+  color: var(--myspace-link);
+}
+
+.card-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: var(--myspace-spacing-sm);
+}
+
+.btn-play-small,
+.btn-view-small {
+  padding: 4px 12px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  text-decoration: none;
+  border: 1px solid var(--myspace-border);
+}
+
+.btn-play-small {
+  background: var(--myspace-orange);
+  color: white;
+  border-color: var(--myspace-orange-hover);
+}
+
+.btn-view-small {
+  background: white;
+  color: var(--myspace-text);
+}
+
+/* Artist & Track Page Specifics */
+
+.artist-header-section {
+  margin-bottom: var(--myspace-spacing-xl);
+  border-bottom: 2px solid var(--myspace-border);
+  padding-bottom: var(--myspace-spacing-lg);
+}
+
+.artist-banner {
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  border-radius: var(--myspace-border-radius-md);
+  margin-bottom: -50px;
+}
+
+.banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.artist-info-bar {
+  display: flex;
+  align-items: flex-end;
+  padding: 0 var(--myspace-spacing-lg);
+  gap: var(--myspace-spacing-lg);
+}
+
+.artist-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 4px solid var(--myspace-bg-content);
+  object-fit: cover;
+  box-shadow: var(--myspace-shadow-md);
+  background: white;
+}
+
+.artist-text {
+  flex: 1;
+  padding-bottom: 10px;
+}
+
+.artist-bio {
+  font-size: var(--myspace-font-size-sm);
+  color: var(--myspace-text-muted);
+  margin-top: var(--myspace-spacing-xs);
+  max-width: 600px;
+}
+
+.track-detail-section {
+  padding: var(--myspace-spacing-xl) 0;
+}
+
+.track-main-info {
+  display: flex;
+  gap: var(--myspace-spacing-xl);
+  margin-bottom: var(--myspace-spacing-xl);
+}
+
+.track-large-art {
+  width: 250px;
+  height: 250px;
+  object-fit: cover;
+  border: 1px solid var(--myspace-border);
+  box-shadow: var(--myspace-shadow-lg);
+}
+
+.track-meta-links {
+  margin-top: var(--myspace-spacing-md);
+  font-size: var(--myspace-font-size-md);
+}
+
+.wavlake-btn-external {
+  display: inline-block;
+  padding: 10px 24px;
+  background: #003399;
+  color: white;
+  text-decoration: none;
+  border-radius: var(--myspace-border-radius-sm);
+  font-weight: bold;
+}
+
+@media (max-width: 600px) {
+  .artist-info-bar {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0;
+  }
+
+  .artist-avatar {
+    width: 100px;
+    height: 100px;
+    margin-top: 20px;
+  }
+
+  .track-main-info {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .track-large-art {
+    width: 200px;
+    height: 200px;
   }
 }

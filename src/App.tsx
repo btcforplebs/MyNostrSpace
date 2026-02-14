@@ -38,6 +38,12 @@ const LivestreamsPage = lazy(() =>
 const MusicPage = lazy(() =>
   import('./components/Music/MusicPage').then((m) => ({ default: m.MusicPage }))
 );
+const ArtistPage = lazy(() =>
+  import('./components/Music/ArtistPage').then((m) => ({ default: m.ArtistPage }))
+);
+const TrackPage = lazy(() =>
+  import('./components/Music/TrackPage').then((m) => ({ default: m.TrackPage }))
+);
 const FilmPage = lazy(() =>
   import('./components/Film/FilmPage').then((m) => ({ default: m.FilmPage }))
 );
@@ -130,6 +136,8 @@ function App() {
                   <Route path="/photos" element={<PhotosPage />} />
                   <Route path="/marketplace" element={<MarketplacePage />} />
                   <Route path="/music" element={<MusicPage />} />
+                  <Route path="/music/artist/:artistId" element={<ArtistPage />} />
+                  <Route path="/music/track/:trackId" element={<TrackPage />} />
                   <Route path="/film" element={<FilmPage />} />
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="/recipes" element={<RecipesPage />} />

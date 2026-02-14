@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import './WavlakePlayer.css';
 
 interface WavlakeTrack {
@@ -77,6 +77,16 @@ export const WavlakePlayer = ({
   if (isLegacyEmbed && playbackUrl && !playbackUrl.includes('embed.wavlake.com')) {
     playbackUrl = playbackUrl.replace('www.wavlake.com/embed', 'embed.wavlake.com');
   }
+
+  // Explicitly handle autoplay when the playbackUrl or autoplay prop changes
+  useEffect(() => {
+    if (autoplay && audioRef.current) {
+      audioRef.current.play().catch((err) => {
+        console.warn('Autoplay blocked or failed:', err);
+      });
+      setIsPlaying(true);
+    }
+  }, [playbackUrl, autoplay]);
 
   return (
     <div className="wavlake-player">

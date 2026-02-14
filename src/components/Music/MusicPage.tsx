@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Navbar } from '../Shared/Navbar';
 import { WavlakePlayer } from './WavlakePlayer';
 import './MusicPage.css';
@@ -7,8 +8,10 @@ interface WavlakeTrack {
   id: string;
   title: string;
   artist: string;
+  artistId: string;
   albumArtUrl: string;
-  url: string; // Link to Wavlake page
+  url: string; // Link to Player (Embed URL)
+  link?: string; // Link to Wavlake page (optional)
 }
 
 export const MusicPage = () => {
@@ -16,55 +19,81 @@ export const MusicPage = () => {
   const [loading, setLoading] = useState(true);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [shouldAutoplay, setShouldAutoplay] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   const handleTrackSelect = (index: number) => {
     setCurrentTrackIndex(index);
     setShouldAutoplay(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // window.scrollTo({ top: 0, behavior: 'smooth' }); // Optional: don't scroll on mobile list view?
   };
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const fetchMusic = async (term: string = '') => {
+    setLoading(true);
+    setIsSearching(!!term);
+    try {
+      let url = 'https://wavlake.com/api/v1/content/rankings?sort=sats&days=7';
+      if (term) {
+        url = `https://wavlake.com/api/v1/content/search?term=${encodeURIComponent(term)}`;
+      }
 
-    const fetchMusic = async () => {
-      try {
-        const res = await fetch('https://wavlake.com/api/v1/content/rankings?sort=sats&days=7', {
-          signal: controller.signal,
-        });
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.error('Wavlake API returned', res.status, res.statusText);
+        setLoading(false);
+        return;
+      }
 
-        if (!res.ok) {
-          console.error('Wavlake API returned', res.status, res.statusText);
-          return;
-        }
+      const data = await res.json();
 
-        const data = await res.json();
+      let formatted: WavlakeTrack[] = [];
 
-        if (!controller.signal.aborted && Array.isArray(data)) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const formatted = data.map((item: any) => ({
+      if (term) {
+        // Search returns a mixed array, filter for favorites or tracks/albums?
+        // Let's just show tracks for now to keep it simple for the player
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        formatted = data
+          .filter((item: any) => item.type === 'track')
+          .map((item: any) => ({
             id: item.id,
             title: item.title,
             artist: item.artist,
+            artistId: item.artistId,
+            albumArtUrl: item.albumArtUrl,
+            url: `https://embed.wavlake.com/track/${item.id}`,
+            link: `https://wavlake.com/track/${item.id}`,
+          }));
+      } else {
+        if (Array.isArray(data)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          formatted = data.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            artist: item.artist,
+            artistId: item.artistId,
             albumArtUrl: item.albumArtUrl,
             url: `https://embed.wavlake.com/track/${item.id}`,
             link: item.url,
           }));
-          setTracks(formatted);
-        }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        console.error('Failed to fetch Wavlake music', err);
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
         }
       }
-    };
 
+      setTracks(formatted);
+    } catch (err) {
+      console.error('Failed to fetch Wavlake music', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchMusic();
-
-    return () => controller.abort();
   }, []);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchMusic(searchTerm);
+  };
 
   return (
     <div className="home-page-container mp-page-container">
@@ -72,7 +101,23 @@ export const MusicPage = () => {
         <Navbar />
 
         <div className="home-content mp-content">
-          <h2 className="mp-section-header">Top Music on Wavlake (Last 7 Days)</h2>
+          <div className="mp-header-controls">
+            <h2 className="mp-section-header">
+              {isSearching ? `Search Results: "${searchTerm}"` : 'Top Music on Wavlake (Last 7 Days)'}
+            </h2>
+            <form onSubmit={handleSearchSubmit} className="mp-search-form">
+              <input
+                type="text"
+                className="mp-search-input"
+                placeholder="Search songs..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <button type="submit" className="mp-search-btn">
+                Search
+              </button>
+            </form>
+          </div>
 
           {!loading && tracks.length > 0 && (
             <div className="sticky-player-container">
@@ -87,14 +132,20 @@ export const MusicPage = () => {
           )}
 
           {loading ? (
-            <div style={{ padding: '20px', textAlign: 'center' }}>Loading top tracks...</div>
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              {isSearching ? 'Searching Wavlake...' : 'Loading top tracks...'}
+            </div>
           ) : (
             <div className="music-grid">
-              {tracks.map((track, index) => (
+              {tracks.map((track: WavlakeTrack, index: number) => (
                 <div
                   key={track.id}
                   className={`music-card ${currentTrackIndex === index ? 'active-track' : ''}`}
-                  onClick={() => handleTrackSelect(index)}
+                  onClick={(e) => {
+                    // Prevent playback if clicking a link
+                    if ((e.target as HTMLElement).tagName === 'A') return;
+                    handleTrackSelect(index);
+                  }}
                 >
                   <div className="album-art-wrapper">
                     <img
@@ -105,25 +156,37 @@ export const MusicPage = () => {
                       alt={`${track.title} Album Art`}
                       className="album-art"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          `https://robohash.org/${track.id}.png?set=set4&bgset=bg2&size=150x150`;
+                        (e.target as HTMLImageElement).src = `https://robohash.org/${track.id}.png?set=set4&bgset=bg2&size=150x150`;
                       }}
                     />
+                    {/* Overlay still works for desktop hover */}
+                    <div className="card-overlay" onClick={(e) => {
+                      e.stopPropagation(); // Prevent double trigger
+                      handleTrackSelect(index);
+                    }}>
+                      <button className="play-overlay-btn">Play</button>
+                    </div>
                   </div>
                   <div className="track-info">
-                    <a
-                      href={track.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Link
+                      to={`/music/track/${track.id}`}
                       className="track-title"
                       title={track.title}
                     >
                       {track.title}
-                    </a>
+                    </Link>
 
-                    <span className="track-artist" title={track.artist}>
+                    <Link
+                      to={`/music/artist/${track.artistId}`}
+                      className="track-artist-link"
+                      title={track.artist}
+                    >
                       {track.artist}
-                    </span>
+                    </Link>
+
+                    <div className="card-actions">
+                      {/* Removed View Button - Title is the link now */}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -132,7 +195,7 @@ export const MusicPage = () => {
 
           {!loading && tracks.length === 0 && (
             <div style={{ padding: '20px', textAlign: 'center' }}>
-              No tracks found right now. Check back later!
+              No tracks found. Try a different search!
             </div>
           )}
         </div>

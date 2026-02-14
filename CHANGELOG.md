@@ -4,6 +4,16 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 ## [Unreleased] - 2026-02-14
 
+### ⚡ Performance Optimizations
+
+#### **Virtualization & Lazy Embedding**
+
+- Implemented **Feed Item Virtualization** and IntersectionObserver-based loading for improved scroll performance in long feeds.
+- **Lazy Video Embedding**: Deferred YouTube/Wavlake/Video iframe creation until they enter the viewport to reduce initial DOM pressure and memory usage.
+- **Optimized Subscriptions**: Refined subscription limits and implemented more aggressive event batching to prevent UI jank during high-frequency network updates.
+- **Deterministic Avatars**: Memoized color generation and improved identification fallback logic in `Avatar.tsx`.
+- **Files modified:** `HomePage.tsx`, `FeedItem.tsx`, `RichTextRenderer.tsx`, `ThreadPage.tsx`, `Avatar.tsx`, `NostrContext.tsx`, `index.css`
+
 ### 🐛 Bug Fixes
 
 #### **Notification Thread Navigation**
@@ -64,6 +74,18 @@ All notable changes to the MyNostrSpace project will be documented in this file.
 
 - Simplified and cleaned up route definitions in `App.tsx` for better maintainability.
 - **Files modified:** `App.tsx`
+
+### 🚀 New Features
+
+#### **Advanced Music Navigation & Detail Pages**
+
+- Added dedicated **Artist** and **Track** pages for more granular music exploration.
+- **Wavlake Integration**:
+  - Implemented `ArtistPage.tsx` to display full artist bios, banners, and their entire catalog fetched via Wavlake API.
+  - Implemented `TrackPage.tsx` for individual track viewing with high-quality album art and direct player integration.
+- **Enhanced Hub**: Updated `MusicPage.tsx` with deep-linking to artist and track pages, replacing generic "View" buttons with semantic links.
+- **Player Autoplay**: Added explicit autoplay support to `WavlakePlayer.tsx` for seamless playback when navigating to specific tracks or artist selections.
+- **Files modified:** `ArtistPage.tsx`, `TrackPage.tsx`, `MusicPage.tsx`, `MusicPage.css`, `WavlakePlayer.tsx`, `App.tsx`
 
 ## [Unreleased] - 2026-02-12
 

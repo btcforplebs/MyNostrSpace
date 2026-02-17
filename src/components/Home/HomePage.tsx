@@ -1184,8 +1184,7 @@ const HomePage = () => {
     let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
 
     const startNotificationSub = async () => {
-      const maxLookback = Math.floor(Date.now() / 1000) - 86400 * 7;
-      const sinceTimestamp = lastSeen === 0 ? maxLookback : Math.max(lastSeen, maxLookback);
+      const sinceTimestamp = Math.floor(Date.now() / 1000) - 86400 * 7;
 
       const filter: NDKFilter = {
         kinds: [1, 6, 7, 9735],
@@ -1236,6 +1235,7 @@ const HomePage = () => {
         if (notifRafId !== null) cancelAnimationFrame(notifRafId);
         notifRafId = null;
         flushNotifications();
+        markAsRead();
       });
     };
 
@@ -1567,7 +1567,6 @@ const HomePage = () => {
                   onClick={() => {
                     setViewMode('notifications');
                     setHasNewNotifs(false);
-                    markAsRead();
                   }}
                   style={{ position: 'relative' }}
                 >

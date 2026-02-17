@@ -41,6 +41,7 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
     const n = new NDK({
       explicitRelayUrls: relays,
       cacheAdapter: cacheAdapter as import('@nostr-dev-kit/ndk').NDKCacheAdapter,
+      outboxRelayUrls: ['wss://purplepag.es'],
     });
     return n;
   });

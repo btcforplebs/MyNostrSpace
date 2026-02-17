@@ -873,73 +873,59 @@ const HomePage = () => {
       await new Promise(resolve => setTimeout(resolve, 50));
 
       const authors = await getFollows();
-      // Reduced limit from 25 to 10 to decrease initial load
-      const filter: NDKFilter = { kinds: [1, 6], authors: authors, limit: 10 };
+      const filter: NDKFilter = { kinds: [1, 6], authors: authors, limit: 25 };
       sub = ndk.subscribe(filter, {
         closeOnEose: false,
         cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+        groupable: false,
       });
 
-      let eventBuffer: NDKEvent[] = [];
-      let flushTimeout: ReturnType<typeof setTimeout> | null = null;
       let hasReceivedEose = false;
-
-      // Increased flush interval to reduce re-renders during initial load
-      const FLUSH_INTERVAL = 500;
+      let eventBuffer: NDKEvent[] = [];
+      let mediaBuffer: MediaItem[] = [];
+      let rafId: number | null = null;
 
       const flushBuffer = () => {
-        if (eventBuffer.length === 0) return;
-        const currentBuffer = [...eventBuffer];
-        eventBuffer = [];
-
-        // Use functional setState - React batches these efficiently
-        // Only add to pending if we've received EOSE (indicating these are truly new posts after initial load)
-        if (hasReceivedEose) {
-          setPendingPosts((prev) => dedupAndSortFeed(currentBuffer, prev));
-        } else {
-          setFeed((prev) => dedupAndSortFeed(currentBuffer, prev));
+        rafId = null;
+        if (eventBuffer.length > 0) {
+          const batch = eventBuffer;
+          eventBuffer = [];
+          if (hasReceivedEose) {
+            setPendingPosts((prev) => dedupAndSortFeed(batch, prev));
+          } else {
+            setFeed((prev) => dedupAndSortFeed(batch, prev));
+          }
         }
-      };
-
-      let mediaEventBuffer: MediaItem[] = [];
-      let mediaFlushTimeout: ReturnType<typeof setTimeout> | null = null;
-      const flushMediaBuffer = () => {
-        if (mediaEventBuffer.length === 0) return;
-        const currentMBuffer = [...mediaEventBuffer];
-        mediaEventBuffer = [];
-        addMediaItems(currentMBuffer);
+        if (mediaBuffer.length > 0) {
+          const mediaBatch = mediaBuffer;
+          mediaBuffer = [];
+          addMediaItems(mediaBatch);
+        }
       };
 
       sub.on('event', (apiEvent: NDKEvent) => {
-        // 1. Process for media (Feed -> Media Integration)
+        // Collect media items
         const mediaItem = processMediaEvent(apiEvent);
         if (mediaItem) {
-          mediaEventBuffer.push(mediaItem);
-          if (!mediaFlushTimeout) {
-            mediaFlushTimeout = setTimeout(() => {
-              flushMediaBuffer();
-              mediaFlushTimeout = null;
-            }, 500);
-          }
+          mediaBuffer.push(mediaItem);
         }
 
+        // Skip replies (kind 1 events with 'e' tags are replies)
         if (apiEvent.kind === 1 && apiEvent.tags.some((t) => t[0] === 'e')) return;
 
         eventBuffer.push(apiEvent);
-        if (!flushTimeout) {
-          flushTimeout = setTimeout(() => {
-            flushBuffer();
-            flushTimeout = null;
-          }, FLUSH_INTERVAL); // Batch updates - increased to 500ms for better performance
+        // Flush once per animation frame (~16ms) for smooth streaming
+        if (rafId === null) {
+          rafId = requestAnimationFrame(flushBuffer);
         }
       });
       sub.on('eose', () => {
-        // Flush any remaining pre-EOSE events to feed first
+        // Flush any remaining buffered events
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        rafId = null;
         flushBuffer();
 
-        // Now mark that EOSE has been received - future events go to pending
         hasReceivedEose = true;
-
         setFeedLoading(false);
         feedEoseRef.current = true;
         eoseTimestampRef.current = Math.floor(Date.now() / 1000);

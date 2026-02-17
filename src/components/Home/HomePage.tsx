@@ -752,12 +752,24 @@ const HomePage = () => {
   const getFollows = useCallback(async () => {
     if (!ndk || !user) return [];
 
-    // Return cached immediately if available
+    // Return in-memory cache immediately if available
     if (followsCacheRef.current.length > 0) {
       return followsCacheRef.current;
     }
 
-    // Start fetching if not already started
+    // Try localStorage cache for instant start while we refresh from network
+    const storageKey = `mynostrspace_follows_${user.pubkey}`;
+    const cached = localStorage.getItem(storageKey);
+    if (cached && !followsFetchedRef.current) {
+      try {
+        const parsed = JSON.parse(cached) as string[];
+        if (parsed.length > 0) {
+          followsCacheRef.current = parsed;
+        }
+      } catch { /* ignore bad cache */ }
+    }
+
+    // Start fetching from network if not already started
     if (!followsFetchedRef.current) {
       followsFetchedRef.current = true;
 
@@ -769,23 +781,41 @@ const HomePage = () => {
         ]);
       };
 
-      try {
-        const followedUsersSet = await withTimeout(
-          activeUser.follows().catch(() => new Set<import('@nostr-dev-kit/ndk').NDKUser>()),
-          3000,
-          new Set<import('@nostr-dev-kit/ndk').NDKUser>()
-        );
-        const followPubkeys = Array.from(followedUsersSet || new Set()).map((u) => u.pubkey);
-        if (!followPubkeys.includes(user.pubkey)) followPubkeys.push(user.pubkey);
-        followsCacheRef.current = followPubkeys;
-      } catch {
-        // Fallback to just self if follows fails
-        followsCacheRef.current = [user.pubkey];
+      // If we have cached follows, fetch network data in background (don't block)
+      const fetchFromNetwork = async () => {
+        try {
+          const followedUsersSet = await withTimeout(
+            activeUser.follows().catch(() => new Set<import('@nostr-dev-kit/ndk').NDKUser>()),
+            3000,
+            new Set<import('@nostr-dev-kit/ndk').NDKUser>()
+          );
+          const followPubkeys = Array.from(followedUsersSet || new Set()).map((u) => u.pubkey);
+          if (!followPubkeys.includes(user.pubkey)) followPubkeys.push(user.pubkey);
+          if (followPubkeys.length > 0) {
+            followsCacheRef.current = followPubkeys;
+            localStorage.setItem(storageKey, JSON.stringify(followPubkeys));
+          }
+        } catch {
+          if (followsCacheRef.current.length === 0) {
+            followsCacheRef.current = [user.pubkey];
+          }
+        }
+      };
+
+      if (followsCacheRef.current.length > 0) {
+        // We have stale data - return it now, refresh in background
+        fetchFromNetwork();
+      } else {
+        // No cache at all - must wait for network
+        await fetchFromNetwork();
+        if (followsCacheRef.current.length === 0) {
+          followsCacheRef.current = [user.pubkey];
+        }
       }
     } else {
       // If fetch is in progress, wait for it to complete (but not indefinitely)
       let attempts = 0;
-      while (followsCacheRef.current.length === 0 && attempts < 60) {
+      while (followsCacheRef.current.length === 0 && attempts < 30) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         attempts++;
       }
@@ -941,6 +971,7 @@ const HomePage = () => {
       let hasReceivedEose = false;
       let eventBuffer: NDKEvent[] = [];
       let mediaBuffer: MediaItem[] = [];
+      let replyBuffer: NDKEvent[] = [];
       let rafId: number | null = null;
 
       const flushBuffer = () => {
@@ -959,6 +990,19 @@ const HomePage = () => {
           mediaBuffer = [];
           addMediaItems(mediaBatch);
         }
+        if (replyBuffer.length > 0) {
+          const replyBatch = replyBuffer;
+          replyBuffer = [];
+          setReplies((prev) => {
+            const ids = new Set(prev.map((e) => e.id));
+            const newReplies = replyBatch.filter((e) => !ids.has(e.id));
+            if (newReplies.length === 0) return prev;
+            const result = [...prev, ...newReplies];
+            result.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+            if (result.length > 200) result.length = 200;
+            return result;
+          });
+        }
       };
 
       sub.on('event', (apiEvent: NDKEvent) => {
@@ -968,15 +1012,12 @@ const HomePage = () => {
           mediaBuffer.push(mediaItem);
         }
 
-        // Route replies to the replies tab instead of discarding them
+        // Route replies to buffer instead of main feed
         if (apiEvent.kind === 1 && apiEvent.tags.some((t) => t[0] === 'e')) {
-          setReplies((prev) => {
-            if (prev.some((e) => e.id === apiEvent.id)) return prev;
-            const result = [...prev, apiEvent];
-            result.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-            if (result.length > 200) result.length = 200;
-            return result;
-          });
+          replyBuffer.push(apiEvent);
+          if (rafId === null) {
+            rafId = requestAnimationFrame(flushBuffer);
+          }
           return;
         }
 
@@ -1100,7 +1141,7 @@ const HomePage = () => {
     const start = async () => {
       const authors = await getFollows();
       const kind = viewMode === 'blog' ? [30023] : [30311];
-      sub = ndk.subscribe({ kinds: kind, authors, limit: 20 }, { closeOnEose: false });
+      sub = ndk.subscribe({ kinds: kind, authors, limit: 20 }, { closeOnEose: true });
       sub.on('event', (ev) => {
         if (viewMode === 'blog') {
           setBlogEvents((prev) => {

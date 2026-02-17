@@ -41,10 +41,10 @@ export const useBlockList = () => {
 
     fetchMuteList();
 
-    // Optionally subscribe for live updates
+    // Subscribe for live updates, close after initial sync
     const sub = ndk.subscribe(
       { kinds: [10000], authors: [user.pubkey] },
-      { cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY }
+      { cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY, closeOnEose: true }
     );
 
     sub.on('event', (ev: NDKEvent) => {

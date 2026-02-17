@@ -28,7 +28,32 @@ import { InteractionBar } from '../Shared/InteractionBar';
 
 import './HomePage.css';
 
-// Virtualized feed item - only renders when in viewport
+// Shared IntersectionObserver for all feed items (Safari-friendly: single observer)
+const feedObserverCallbacks = new Map<Element, () => void>();
+let sharedFeedObserver: IntersectionObserver | null = null;
+
+function getSharedFeedObserver(): IntersectionObserver {
+  if (!sharedFeedObserver) {
+    sharedFeedObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const cb = feedObserverCallbacks.get(entry.target);
+            if (cb) {
+              cb();
+              feedObserverCallbacks.delete(entry.target);
+              sharedFeedObserver!.unobserve(entry.target);
+            }
+          }
+        }
+      },
+      { rootMargin: '200px', threshold: 0 }
+    );
+  }
+  return sharedFeedObserver;
+}
+
+// Virtualized feed item - only renders when in viewport (uses shared observer)
 const VirtualFeedItem: React.FC<{ event: NDKEvent; hideThreadButton?: boolean }> = React.memo(
   ({ event, hideThreadButton }) => {
     const [isVisible, setIsVisible] = useState(false);
@@ -38,24 +63,16 @@ const VirtualFeedItem: React.FC<{ event: NDKEvent; hideThreadButton?: boolean }>
       const element = itemRef.current;
       if (!element) return;
 
-      // Use IntersectionObserver to only render when near viewport
-      const observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0].isIntersecting) {
-            setIsVisible(true);
-            // Once visible, disconnect - we keep it rendered
-            observer.disconnect();
-          }
-        },
-        { rootMargin: '200px', threshold: 0 }
-      );
-
+      const observer = getSharedFeedObserver();
+      feedObserverCallbacks.set(element, () => setIsVisible(true));
       observer.observe(element);
 
-      return () => observer.disconnect();
+      return () => {
+        feedObserverCallbacks.delete(element);
+        observer.unobserve(element);
+      };
     }, []);
 
-    // If not yet visible, show a compact placeholder
     if (!isVisible) {
       return (
         <div
@@ -475,7 +492,9 @@ const HomePage = () => {
   const [hasMoreFeed, setHasMoreFeed] = useState(true);
   const [hasMoreMedia, setHasMoreMedia] = useState(true);
   const [hasMoreReplies, setHasMoreReplies] = useState(true);
-  const fetchingRef = useRef(false);
+  const fetchingFeedRef = useRef(false);
+  const fetchingMediaRef = useRef(false);
+  const fetchingRepliesRef = useRef(false);
   const feedEoseRef = useRef(false);
   const eoseTimestampRef = useRef(0);
   const followsCacheRef = useRef<string[]>([]);
@@ -486,6 +505,25 @@ const HomePage = () => {
   const [displayedFeedCount, setDisplayedFeedCount] = useState(20);
   const [displayedRepliesCount, setDisplayedRepliesCount] = useState(20);
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  // Refs for infinite scroll observer to avoid re-creating observer on every state change
+  const feedRef = useRef(feed);
+  feedRef.current = feed;
+  const repliesRef = useRef(replies);
+  repliesRef.current = replies;
+  const displayedFeedCountRef = useRef(displayedFeedCount);
+  displayedFeedCountRef.current = displayedFeedCount;
+  const displayedRepliesCountRef = useRef(displayedRepliesCount);
+  displayedRepliesCountRef.current = displayedRepliesCount;
+  const hasMoreFeedRef = useRef(hasMoreFeed);
+  hasMoreFeedRef.current = hasMoreFeed;
+  const hasMoreRepliesRef = useRef(hasMoreReplies);
+  hasMoreRepliesRef.current = hasMoreReplies;
+  const isLoadingMoreFeedRef = useRef(isLoadingMoreFeed);
+  isLoadingMoreFeedRef.current = isLoadingMoreFeed;
+  const isLoadingMoreRepliesRef = useRef(isLoadingMoreReplies);
+  isLoadingMoreRepliesRef.current = isLoadingMoreReplies;
+  const loadMoreFeedRef = useRef<typeof loadMoreFeed | null>(null);
+  const loadMoreRepliesRef = useRef<typeof loadMoreReplies | null>(null);
   const [displayedStreamsCount, setDisplayedStreamsCount] = useState(15);
   const loadMoreStreamsTriggerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(3);
@@ -506,11 +544,27 @@ const HomePage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Helper to dedupe and sort feed events (used by flushBuffer and pending posts)
+  // Helper to dedupe and insert feed events in sorted order (avoids full re-sort)
   const dedupAndSortFeed = (newEvents: NDKEvent[], existingEvents: NDKEvent[]): NDKEvent[] => {
-    const combined = [...newEvents, ...existingEvents];
-    const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-    return unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 200);
+    const existingIds = new Set(existingEvents.map((e) => e.id));
+    const toInsert = newEvents.filter((e) => !existingIds.has(e.id));
+    if (toInsert.length === 0) return existingEvents;
+
+    // Binary insert each new event into the already-sorted array
+    const result = [...existingEvents];
+    for (const ev of toInsert) {
+      const ts = ev.created_at || 0;
+      let lo = 0, hi = result.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if ((result[mid].created_at || 0) > ts) lo = mid + 1;
+        else hi = mid;
+      }
+      result.splice(lo, 0, ev);
+    }
+    // Cap at 200
+    if (result.length > 200) result.length = 200;
+    return result;
   };
 
   const getCanonicalUrl = (url: string) => {
@@ -741,8 +795,8 @@ const HomePage = () => {
   }, [ndk, user]);
 
   const loadMoreFeed = useCallback(async () => {
-    if (!feedUntil || !ndk || isLoadingMoreFeed || !hasMoreFeed || fetchingRef.current) return;
-    fetchingRef.current = true;
+    if (!feedUntil || !ndk || isLoadingMoreFeed || !hasMoreFeed || fetchingFeedRef.current) return;
+    fetchingFeedRef.current = true;
     setIsLoadingMoreFeed(true);
     try {
       const authors = await getFollows();
@@ -772,13 +826,13 @@ const HomePage = () => {
       console.error('Error loading more feed:', e);
     } finally {
       setIsLoadingMoreFeed(false);
-      fetchingRef.current = false;
+      fetchingFeedRef.current = false;
     }
   }, [feedUntil, ndk, getFollows, isLoadingMoreFeed, hasMoreFeed]);
 
   const loadMoreMedia = useCallback(async () => {
-    if (!mediaUntil || !ndk || isLoadingMoreMedia || !hasMoreMedia || fetchingRef.current) return;
-    fetchingRef.current = true;
+    if (!mediaUntil || !ndk || isLoadingMoreMedia || !hasMoreMedia || fetchingMediaRef.current) return;
+    fetchingMediaRef.current = true;
     setIsLoadingMoreMedia(true);
     try {
       const authors = await getFollows();
@@ -808,7 +862,7 @@ const HomePage = () => {
       console.error('Error loading more media:', e);
     } finally {
       setIsLoadingMoreMedia(false);
-      fetchingRef.current = false;
+      fetchingMediaRef.current = false;
     }
   }, [
     mediaUntil,
@@ -821,9 +875,9 @@ const HomePage = () => {
   ]);
 
   const loadMoreReplies = useCallback(async () => {
-    if (!repliesUntil || !ndk || isLoadingMoreReplies || !hasMoreReplies || fetchingRef.current)
+    if (!repliesUntil || !ndk || isLoadingMoreReplies || !hasMoreReplies || fetchingRepliesRef.current)
       return;
-    fetchingRef.current = true;
+    fetchingRepliesRef.current = true;
     setIsLoadingMoreReplies(true);
     try {
       const authors = await getFollows();
@@ -855,9 +909,13 @@ const HomePage = () => {
       console.error('Error loading more replies:', e);
     } finally {
       setIsLoadingMoreReplies(false);
-      fetchingRef.current = false;
+      fetchingRepliesRef.current = false;
     }
   }, [repliesUntil, ndk, getFollows, isLoadingMoreReplies, hasMoreReplies]);
+
+  // Keep refs in sync for infinite scroll observer (must be after useCallback declarations)
+  loadMoreFeedRef.current = loadMoreFeed;
+  loadMoreRepliesRef.current = loadMoreReplies;
 
   // Initial Feed Subscription
   useEffect(() => {
@@ -910,8 +968,17 @@ const HomePage = () => {
           mediaBuffer.push(mediaItem);
         }
 
-        // Skip replies (kind 1 events with 'e' tags are replies)
-        if (apiEvent.kind === 1 && apiEvent.tags.some((t) => t[0] === 'e')) return;
+        // Route replies to the replies tab instead of discarding them
+        if (apiEvent.kind === 1 && apiEvent.tags.some((t) => t[0] === 'e')) {
+          setReplies((prev) => {
+            if (prev.some((e) => e.id === apiEvent.id)) return prev;
+            const result = [...prev, apiEvent];
+            result.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+            if (result.length > 200) result.length = 200;
+            return result;
+          });
+          return;
+        }
 
         eventBuffer.push(apiEvent);
         // Flush once per animation frame (~16ms) for smooth streaming
@@ -945,113 +1012,69 @@ const HomePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ndk, user, viewMode, getFollows]);
 
-  // Initial Replies Subscription
+  // Replies are populated from the feed subscription (replies aren't discarded anymore).
+  // When switching to replies tab, just set repliesUntil for pagination and clear loading.
   useEffect(() => {
-    if (!ndk || !user || viewMode !== 'replies') return;
+    if (viewMode !== 'replies') return;
     setDisplayedRepliesCount(20);
-    let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
-    const startRepliesSub = async () => {
-      if (replies.length === 0) setIsRepliesLoading(true);
+    setIsRepliesLoading(false);
+    setReplies((prev) => {
+      if (prev.length > 0) {
+        const oldest = prev[prev.length - 1];
+        if (oldest.created_at) setRepliesUntil(oldest.created_at - 1);
+      }
+      return prev;
+    });
+  }, [viewMode]);
 
-      // Small delay to allow initial render to complete
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      const authors = await getFollows();
-      // Reduced limit from 50 to 20
-      const filter: NDKFilter = { kinds: [1], authors: authors, limit: 20 };
-      sub = ndk.subscribe(filter, {
-        closeOnEose: false,
-        cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
-      });
-
-      let replyBuffer: NDKEvent[] = [];
-      let flushTimeout: ReturnType<typeof setTimeout> | null = null;
-
-      const flushBuffer = () => {
-        if (replyBuffer.length === 0) return;
-        const currentBuffer = [...replyBuffer];
-        replyBuffer = [];
-
-        setReplies((prev) => {
-          const combined = [...currentBuffer, ...prev];
-          const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-          return unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 200);
-        });
-      };
-
-      sub.on('event', (ev: NDKEvent) => {
-        if (!ev.tags.some((t) => t[0] === 'e' || t[0] === 'q')) return;
-
-        replyBuffer.push(ev);
-        if (!flushTimeout) {
-          flushTimeout = setTimeout(() => {
-            flushBuffer();
-            flushTimeout = null;
-          }, 600); // Increased batch interval
-        }
-      });
-
-      sub.on('eose', () => {
-        flushBuffer();
-        setIsRepliesLoading(false);
-        setReplies((prev) => {
-          if (prev.length > 0) {
-            const oldest = prev[prev.length - 1];
-            if (oldest.created_at) setRepliesUntil(oldest.created_at - 1);
-          }
-          return prev;
-        });
-      });
-    };
-    startRepliesSub();
-    return () => {
-      if (sub) sub.stop();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ndk, user, viewMode, getFollows]);
-
-  // Initial Media Subscription
+  // Media tab: kind 1 media is already captured by feed subscription.
+  // Only fetch kind 1063 (file metadata) events which the feed sub doesn't cover.
   useEffect(() => {
     if (!ndk || !user || viewMode !== 'media') return;
+    // Set pagination cursor from existing media items (populated by feed sub)
+    setMediaLoading(mediaItems.length === 0);
+    setMediaItems((prev) => {
+      if (prev.length > 0) {
+        const oldest = prev[prev.length - 1];
+        if (oldest.created_at) setMediaUntil(oldest.created_at - 1);
+      }
+      return prev;
+    });
+
     let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
     const startMediaSub = async () => {
-      if (mediaItems.length === 0) setMediaLoading(true);
-
-      // Small delay to allow initial render to complete
-      await new Promise(resolve => setTimeout(resolve, 50));
-
       const authors = await getFollows();
-      // Reduced limit from 50 to 25
-      const filter: NDKFilter = { kinds: [1, 1063], authors: authors, limit: 25 };
+      // Only fetch kind 1063 - kind 1 media is already captured by the feed subscription
+      const filter: NDKFilter = { kinds: [1063], authors: authors, limit: 25 };
       sub = ndk.subscribe(filter, {
-        closeOnEose: false,
+        closeOnEose: true,
         cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+        groupable: false,
       });
-      /* Removed redundant logic */
 
       let mBuffer: MediaItem[] = [];
-      let mFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+      let mRafId: number | null = null;
 
       const flushMBuffer = () => {
+        mRafId = null;
         if (mBuffer.length === 0) return;
-        const currentBuffer = [...mBuffer];
+        const batch = mBuffer;
         mBuffer = [];
-        addMediaItems(currentBuffer);
+        addMediaItems(batch);
       };
 
       sub.on('event', (ev: NDKEvent) => {
         const newItem = processMediaEvent(ev);
         if (newItem) {
           mBuffer.push(newItem);
-          if (!mFlushTimeout) {
-            mFlushTimeout = setTimeout(() => {
-              flushMBuffer();
-              mFlushTimeout = null;
-            }, 600); // Increased batch interval
+          if (mRafId === null) {
+            mRafId = requestAnimationFrame(flushMBuffer);
           }
         }
       });
       sub.on('eose', () => {
+        if (mRafId !== null) cancelAnimationFrame(mRafId);
+        mRafId = null;
         flushMBuffer();
         setMediaLoading(false);
         setMediaItems((prev) => {
@@ -1114,25 +1137,15 @@ const HomePage = () => {
     };
   }, [ndk, user, viewMode, getFollows]);
 
+  // Notification subscription - only opens when notifications tab is active
   useEffect(() => {
-    if (!ndk || !user) return;
+    if (!ndk || !user || viewMode !== 'notifications') return;
     let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
 
     const startNotificationSub = async () => {
-      // Use since to avoid re-downloading old events on every page load
-      // Cap at 7 days to prevent massive initial fetches
       const maxLookback = Math.floor(Date.now() / 1000) - 86400 * 7;
+      const sinceTimestamp = lastSeen === 0 ? maxLookback : Math.max(lastSeen, maxLookback);
 
-      // If we are actively viewing notifications, we want to see history (up to maxLookback)
-      // regardless of when we last checked. Otherwise, just check for new items.
-      const sinceTimestamp =
-        viewMode === 'notifications' || lastSeen === 0
-          ? maxLookback
-          : Math.max(lastSeen, maxLookback);
-
-      // Main notification stream: replies, reposts, reactions, zaps
-      // Kind 3 (contacts) is handled separately — each event is 50-100KB+
-      // and would cause massive bandwidth usage in an open subscription
       const filter: NDKFilter = {
         kinds: [1, 6, 7, 9735],
         '#p': [user.pubkey],
@@ -1140,23 +1153,20 @@ const HomePage = () => {
         limit: 50,
       };
 
-      sub = ndk.subscribe(filter, { closeOnEose: false });
+      sub = ndk.subscribe(filter, { closeOnEose: true, groupable: false });
 
-      // Batch notifications to avoid excessive re-renders
       let notifBuffer: NDKEvent[] = [];
-      let notifFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+      let notifRafId: number | null = null;
 
       const flushNotifications = () => {
+        notifRafId = null;
         if (notifBuffer.length === 0) return;
-        const buffer = [...notifBuffer];
+        const buffer = notifBuffer;
         notifBuffer = [];
 
         setNotifications((prev) => {
           const combined = [...buffer, ...prev];
-
-          // Dedupe by ID
           const uniqueById = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-
           const sorted = uniqueById
             .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
             .slice(0, 50);
@@ -1164,12 +1174,11 @@ const HomePage = () => {
           if (sorted.length > 0 && (sorted[0].created_at || 0) > lastSeen) {
             setHasNewNotifs(true);
           }
-
           return sorted;
         });
       };
 
-      sub.on('event', async (ev: NDKEvent) => {
+      sub.on('event', (ev: NDKEvent) => {
         const isTargetedToUs = ev.tags.some(
           (t) => (t[0] === 'p' || t[0] === 'e') && t[1] === user.pubkey
         );
@@ -1177,15 +1186,14 @@ const HomePage = () => {
         if (ev.pubkey === user.pubkey || allBlockedPubkeys.has(ev.pubkey)) return;
 
         notifBuffer.push(ev);
-        if (!notifFlushTimeout) {
-          notifFlushTimeout = setTimeout(() => {
-            flushNotifications();
-            notifFlushTimeout = null;
-          }, 500);
+        if (notifRafId === null) {
+          notifRafId = requestAnimationFrame(flushNotifications);
         }
       });
 
       sub.on('eose', () => {
+        if (notifRafId !== null) cancelAnimationFrame(notifRafId);
+        notifRafId = null;
         flushNotifications();
       });
     };
@@ -1194,9 +1202,10 @@ const HomePage = () => {
     return () => {
       if (sub) sub.stop();
     };
-  }, [ndk, user, allBlockedPubkeys, lastSeen, viewMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ndk, user, viewMode]);
 
-  // Intersection Observer for infinite scroll
+  // Intersection Observer for infinite scroll - uses refs to avoid observer recreation
   useEffect(() => {
     if (viewMode !== 'feed' && viewMode !== 'replies') return;
 
@@ -1210,16 +1219,20 @@ const HomePage = () => {
 
           debounceTimer = setTimeout(() => {
             if (viewMode === 'feed') {
-              if (displayedFeedCount < feed.length) {
-                setDisplayedFeedCount((prev) => Math.min(prev + 20, feed.length));
-              } else if (hasMoreFeed && !isLoadingMoreFeed) {
-                loadMoreFeed();
+              const curFeedLen = feedRef.current.length;
+              const curDisplayed = displayedFeedCountRef.current;
+              if (curDisplayed < curFeedLen) {
+                setDisplayedFeedCount((prev) => Math.min(prev + 20, curFeedLen));
+              } else if (hasMoreFeedRef.current && !isLoadingMoreFeedRef.current) {
+                loadMoreFeedRef.current?.();
               }
             } else if (viewMode === 'replies') {
-              if (displayedRepliesCount < replies.length) {
-                setDisplayedRepliesCount((prev) => Math.min(prev + 20, replies.length));
-              } else if (hasMoreReplies && !isLoadingMoreReplies) {
-                loadMoreReplies();
+              const curRepliesLen = repliesRef.current.length;
+              const curDisplayed = displayedRepliesCountRef.current;
+              if (curDisplayed < curRepliesLen) {
+                setDisplayedRepliesCount((prev) => Math.min(prev + 20, curRepliesLen));
+              } else if (hasMoreRepliesRef.current && !isLoadingMoreRepliesRef.current) {
+                loadMoreRepliesRef.current?.();
               }
             }
           }, 150);
@@ -1236,28 +1249,9 @@ const HomePage = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       observer.disconnect();
     };
-  }, [
-    viewMode,
-    displayedFeedCount,
-    feed.length,
-    hasMoreFeed,
-    isLoadingMoreFeed,
-    loadMoreFeed,
-    displayedRepliesCount,
-    replies.length,
-    hasMoreReplies,
-    isLoadingMoreReplies,
-    loadMoreReplies,
-  ]);
+  }, [viewMode]); // Only recreate observer when tab changes
 
-  // Reset displayed count when feed or replies change significantly
-  useEffect(() => {
-    if (viewMode === 'feed' && feed.length > 0) {
-      setDisplayedFeedCount((prev) => Math.min(prev, Math.max(20, feed.length)));
-    } else if (viewMode === 'replies' && replies.length > 0) {
-      setDisplayedRepliesCount((prev) => Math.min(prev, Math.max(20, replies.length)));
-    }
-  }, [viewMode, feed.length, replies.length]);
+  // No need for a separate effect to reset displayed count - the observer handles pagination
 
   // Intersection Observer for streams infinite scroll
   useEffect(() => {
@@ -1803,9 +1797,7 @@ const HomePage = () => {
                       </div>
                     )}
                     <div className="notifications-list">
-                      {notifications
-                        .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
-                        .map((event) => (
+                      {notifications.map((event) => (
                           <NotificationItem
                             key={event.id}
                             event={event}

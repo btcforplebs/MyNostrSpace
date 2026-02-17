@@ -76,7 +76,7 @@ export function subscribeToStats(
   };
 }
 
-const BATCH_INTERVAL = 500; // Collect for 500ms
+const BATCH_INTERVAL = 800; // Collect for 800ms to batch more items together
 
 function scheduleBatchFetch(): void {
   if (batchTimeout) return;
@@ -154,18 +154,24 @@ async function processBatch(
     });
   });
 
-  sub.on('eose', () => {
-    // Commit all updates
-    tempCounts.forEach((stats, id) => {
-      updateStats(id, () => stats);
-    });
-    sub.stop();
-  });
+  return new Promise<void>((resolve) => {
+    const safetyTimeout = setTimeout(() => {
+      sub.stop();
+      tempCounts.forEach((stats, id) => {
+        updateStats(id, () => stats);
+      });
+      resolve();
+    }, 4000);
 
-  // Safety timeout
-  setTimeout(() => {
-    sub.stop();
-  }, 4000);
+    sub.on('eose', () => {
+      clearTimeout(safetyTimeout);
+      tempCounts.forEach((stats, id) => {
+        updateStats(id, () => stats);
+      });
+      sub.stop();
+      resolve();
+    });
+  });
 }
 
 async function executeBatchFetch(): Promise<void> {
@@ -187,11 +193,15 @@ async function executeBatchFetch(): Promise<void> {
     }
   });
 
-  // Split into chunks to avoid too big filters
-  const CHUNK_SIZE = 50; // Requests with 50 IDs in #e filter is generally safe for relays
+  // Split into chunks and process sequentially with delays to avoid relay overload
+  const CHUNK_SIZE = 30;
   for (let i = 0; i < allEventIds.length; i += CHUNK_SIZE) {
     const chunk = allEventIds.slice(i, i + CHUNK_SIZE);
-    processBatch(chunk, currentNdkRef, currentUserPubkeyRef);
+    await processBatch(chunk, currentNdkRef, currentUserPubkeyRef);
+    // Small delay between chunks to let the main thread breathe
+    if (i + CHUNK_SIZE < allEventIds.length) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
   }
 }
 

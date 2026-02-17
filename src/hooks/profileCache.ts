@@ -66,22 +66,43 @@ export function subscribeToProfile(pubkey: string, ndk: NDK, callback: Subscribe
   };
 }
 
+// Concurrency limiter to avoid slamming relays with 50+ simultaneous profile fetches
+// Safari is especially sensitive to concurrent WebSocket frames
+let activeFetches = 0;
+const MAX_CONCURRENT_FETCHES = 5;
+const fetchQueue: Array<() => void> = [];
+
+function runNextInQueue(): void {
+  if (fetchQueue.length > 0 && activeFetches < MAX_CONCURRENT_FETCHES) {
+    const next = fetchQueue.shift();
+    if (next) next();
+  }
+}
+
 async function fetchProfile(normalizedKey: string, ndk: NDK, entry: CacheEntry): Promise<void> {
+  // Check if NDK already has it cached (no relay hit needed)
+  const user = ndk.getUser({ pubkey: normalizedKey });
+  if (user.profile) {
+    entry.profile = user.profile as ExtendedProfile;
+    notifySubscribers(entry);
+    entry.fetchPromise = null;
+    return;
+  }
+
+  // Queue the relay fetch if too many are in-flight
+  if (activeFetches >= MAX_CONCURRENT_FETCHES) {
+    await new Promise<void>((resolve) => {
+      fetchQueue.push(resolve);
+    });
+  }
+
+  activeFetches++;
   try {
-    const user = ndk.getUser({ pubkey: normalizedKey });
-
-    // Check if NDK already has it cached on the user object
-    if (user.profile) {
-      entry.profile = user.profile as ExtendedProfile;
-      notifySubscribers(entry);
-    }
-
-    // Fetch from relays/cache with timeout
     await Promise.race([
       user.fetchProfile({ cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000)),
-    ]).catch((err) => {
-      console.warn(`Profile fetch for ${normalizedKey.slice(0, 8)} timed out or failed:`, err);
+    ]).catch(() => {
+      // Timeout or failure - silently continue
     });
 
     if (user.profile) {
@@ -91,7 +112,9 @@ async function fetchProfile(normalizedKey: string, ndk: NDK, entry: CacheEntry):
   } catch (e) {
     console.error('Error fetching profile:', e);
   } finally {
+    activeFetches--;
     entry.fetchPromise = null;
+    runNextInQueue();
   }
 }
 

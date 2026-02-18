@@ -980,7 +980,13 @@ const HomePage = () => {
           const batch = eventBuffer;
           eventBuffer = [];
           if (hasReceivedEose) {
-            setPendingPosts((prev) => dedupAndSortFeed(batch, prev));
+            setPendingPosts((prev) => {
+              // Filter out events already in the main feed before counting as pending
+              const feedIds = new Set(feedRef.current.map((e) => e.id));
+              const trulyNew = batch.filter((e) => !feedIds.has(e.id));
+              if (trulyNew.length === 0) return prev;
+              return dedupAndSortFeed(trulyNew, prev);
+            });
           } else {
             setFeed((prev) => dedupAndSortFeed(batch, prev));
           }

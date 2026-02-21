@@ -1,1754 +1,384 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useProfile } from '../../hooks/useProfile';
 import { useTop8 } from '../../hooks/useTop8';
-import { CommentWall } from './CommentWall';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
-import { useExtendedProfile } from '../../hooks/useExtendedProfile';
-import { useResolvedPubkey } from '../../hooks/useResolvedPubkey';
-import { useRelationshipStatus } from '../../hooks/useRelationshipStatus';
 import { useNostr } from '../../context/NostrContext';
-import { WavlakePlayer } from '../Music/WavlakePlayer';
-import { ContactBox } from './ContactBox';
+import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
-import { RichTextRenderer } from '../Shared/RichTextRenderer';
+import { Avatar } from '../Shared/Avatar';
 import { SEO } from '../Shared/SEO';
-import { useLightbox } from '../../context/LightboxContext';
-import {
-  type NDKEvent,
-  type NDKFilter,
-  NDKSubscriptionCacheUsage,
-  NDKKind,
-  NDKRelaySet,
-} from '@nostr-dev-kit/ndk';
-import { FeedItem } from '../Shared/FeedItem';
-import './ProfilePage.css';
 import { isBlockedUser } from '../../utils/blockedUsers';
-import { AwardBadgeModal } from '../Badges/AwardBadgeModal';
-import { ANTIPRIMAL_RELAY, PRIMAL_BOT_PUBKEY } from '../../utils/antiprimal';
-
-// --- Tab Sub-Components ---
-
-const ProfileRecipes = ({ pubkey }: { pubkey: string }) => {
-  const { ndk } = useNostr();
-  const [recipes, setRecipes] = useState<NDKEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [until, setUntil] = useState<number | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
-
-  const fetchRecipes = useCallback(
-    async (untilTimestamp?: number) => {
-      if (!ndk || !pubkey) return;
-
-      try {
-        const filter: NDKFilter = {
-          kinds: [30023 as number],
-          authors: [pubkey],
-          '#t': ['zapcooking', 'nostrcooking'],
-          limit: 25,
-        };
-        if (untilTimestamp) filter.until = untilTimestamp;
-
-        const events = await ndk.fetchEvents(filter);
-        const sorted = Array.from(events).sort((a, b) => b.created_at! - a.created_at!);
-
-        if (sorted.length < 25) setHasMore(false);
-
-        if (sorted.length > 0) {
-          setUntil(sorted[sorted.length - 1].created_at! - 1);
-          setRecipes((prev) => {
-            const combined = [...prev, ...sorted];
-            const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-            return unique.sort((a, b) => b.created_at! - a.created_at!);
-          });
-        } else {
-          setHasMore(false);
-        }
-      } catch (e) {
-        console.error('Error fetching recipes:', e);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [ndk, pubkey]
-  );
-
-  useEffect(() => {
-    fetchRecipes();
-  }, [fetchRecipes]);
-
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && until) {
-      setLoadingMore(true);
-      fetchRecipes(until);
-    }
-  }, [loadingMore, hasMore, until, fetchRecipes]);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
-          handleLoadMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-    if (loadMoreTriggerRef.current) observer.observe(loadMoreTriggerRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, handleLoadMore]);
-
-  if (loading) return <div>Loading recipes...</div>;
-  if (recipes.length === 0) return <div>No recipes found.</div>;
-
-  return (
-    <div className="profile-recipes-list">
-      {recipes.map((evt) => {
-        const title =
-          evt.tags.find((t) => t[0] === 'title')?.[1] ||
-          evt.tags.find((t) => t[0] === 'd')?.[1] ||
-          'Untitled';
-        const image = evt.tags.find((t) => t[0] === 'image')?.[1];
-        const summary = evt.tags.find((t) => t[0] === 'summary')?.[1];
-
-        return (
-          <div
-            key={evt.id}
-            style={{
-              marginBottom: '15px',
-              padding: '10px',
-              border: '1px solid #ccc',
-              background: 'white',
-              display: 'flex',
-              gap: '10px',
-            }}
-          >
-            {image && (
-              <img
-                src={image}
-                style={{ width: '80px', height: '80px', objectFit: 'cover' }}
-                loading="lazy"
-                decoding="async"
-              />
-            )}
-            <div>
-              <div style={{ fontWeight: 'bold', color: '#003399' }}>{title}</div>
-              {summary && <div style={{ fontSize: '0.9em', color: '#666' }}>{summary}</div>}
-            </div>
-          </div>
-        );
-      })}
-      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
-      {loadingMore && (
-        <div style={{ textAlign: 'center', padding: '10px', color: '#666', fontSize: '10pt' }}>
-          Loading more...
-        </div>
-      )}
-    </div>
-  );
-};
-
-const ProfileBlog = ({ pubkey }: { pubkey: string }) => {
-  const { ndk } = useNostr();
-  const [posts, setPosts] = useState<NDKEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [until, setUntil] = useState<number | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
-
-  const fetchPosts = useCallback(
-    async (untilTimestamp?: number) => {
-      if (!ndk || !pubkey) return;
-
-      try {
-        const filter: NDKFilter = {
-          kinds: [30023 as number],
-          authors: [pubkey],
-          limit: 25,
-        };
-        if (untilTimestamp) filter.until = untilTimestamp;
-
-        const events = await ndk.fetchEvents(filter);
-        const blogPosts = Array.from(events).filter((evt) => {
-          const tags = evt.tags.map((t) => t[1]);
-          return !tags.includes('zapcooking') && !tags.includes('nostrcooking');
-        });
-
-        const sorted = blogPosts.sort((a, b) => b.created_at! - a.created_at!);
-
-        if (sorted.length < 25) setHasMore(false);
-
-        if (sorted.length > 0) {
-          setUntil(sorted[sorted.length - 1].created_at! - 1);
-          setPosts((prev) => {
-            const combined = [...prev, ...sorted];
-            const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-            return unique.sort((a, b) => b.created_at! - a.created_at!);
-          });
-        } else {
-          setHasMore(false);
-        }
-      } catch (e) {
-        console.error('Error fetching blog posts:', e);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [ndk, pubkey]
-  );
-
-  useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
-
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && until) {
-      setLoadingMore(true);
-      fetchPosts(until);
-    }
-  }, [loadingMore, hasMore, until, fetchPosts]);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
-          handleLoadMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-    if (loadMoreTriggerRef.current) observer.observe(loadMoreTriggerRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, handleLoadMore]);
-
-  if (loading) return <div>Loading posts...</div>;
-  if (posts.length === 0) return <div>No blog posts found.</div>;
-
-  return (
-    <div className="profile-blog-list">
-      {posts.map((evt) => {
-        const title =
-          evt.tags.find((t) => t[0] === 'title')?.[1] ||
-          evt.tags.find((t) => t[0] === 'd')?.[1] ||
-          'Untitled';
-        const summary = evt.tags.find((t) => t[0] === 'summary')?.[1];
-        return (
-          <div
-            key={evt.id}
-            style={{ marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px dashed #ccc' }}
-          >
-            <div style={{ fontWeight: 'bold', color: '#003399', fontSize: '1.1em' }}>{title}</div>
-            <div style={{ fontSize: '0.8em', color: '#999', marginBottom: '5px' }}>
-              {new Date(evt.created_at! * 1000).toLocaleDateString()}
-            </div>
-            {summary && <div>{summary}</div>}
-          </div>
-        );
-      })}
-      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
-      {loadingMore && (
-        <div style={{ textAlign: 'center', padding: '10px', color: '#666', fontSize: '10pt' }}>
-          Loading more...
-        </div>
-      )}
-    </div>
-  );
-};
-
-const ProfileFeed = ({ pubkey }: { pubkey: string }) => {
-  const { ndk } = useNostr();
-  const [events, setEvents] = useState<NDKEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [until, setUntil] = useState<number | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
-
-  const fetchFeed = useCallback(
-    async (untilTimestamp?: number) => {
-      if (!ndk || !pubkey) return;
-
-      try {
-        const filter: NDKFilter = {
-          kinds: [1],
-          authors: [pubkey],
-          limit: 25,
-        };
-        if (untilTimestamp) {
-          filter.until = untilTimestamp;
-        }
-
-        const fetched = await ndk.fetchEvents(filter);
-        const newEvents = Array.from(fetched).sort((a, b) => b.created_at! - a.created_at!);
-
-        if (newEvents.length < 25) {
-          setHasMore(false);
-        }
-
-        if (newEvents.length > 0) {
-          setUntil(newEvents[newEvents.length - 1].created_at! - 1);
-          setEvents((prev) => {
-            // Dedupe just in case
-            const combined = [...prev, ...newEvents];
-            const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-            return unique.sort((a, b) => b.created_at! - a.created_at!);
-          });
-        } else {
-          setHasMore(false);
-        }
-      } catch (e) {
-        console.error('Error fetching feed:', e);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [ndk, pubkey]
-  );
-
-  useEffect(() => {
-    fetchFeed();
-  }, [fetchFeed]);
-
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && until) {
-      setLoadingMore(true);
-      fetchFeed(until);
-    }
-  }, [loadingMore, hasMore, until, fetchFeed]);
-
-  // Intersection Observer for infinite scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
-          handleLoadMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-
-    if (loadMoreTriggerRef.current) {
-      observer.observe(loadMoreTriggerRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, handleLoadMore]);
-
-  if (loading) return <div>Loading feed...</div>;
-
-  return (
-    <div className="profile-feed-section">
-      <h3 className="section-header">
-        {events.length > 0 ? 'Recent Activity' : 'No recent activity'}
-      </h3>
-      <div className="profile-feed-list">
-        {events.map((event) => (
-          <FeedItem key={event.id} event={event} />
-        ))}
-      </div>
-      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
-      {loadingMore && (
-        <div style={{ textAlign: 'center', padding: '10px', color: '#666', fontSize: '10pt' }}>
-          Loading more...
-        </div>
-      )}
-    </div>
-  );
-};
-
-// --- ProfilePhotos (Masonry) ---
-
-interface PhotoFile {
-  id: string;
-  pubkey: string;
-  url: string;
-  title: string;
-  authorName?: string;
-  created_at: number;
-}
-
-const ProfilePhotos = ({ pubkey }: { pubkey: string }) => {
-  const { ndk } = useNostr();
-  const [photos, setPhotos] = useState<PhotoFile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<PhotoFile | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [columnCount, setColumnCount] = useState(3);
-
-  const photoBufferRef = useRef<PhotoFile[]>([]);
-  const isUpdatePendingRef = useRef(false);
-  const fetchingRef = useRef(false);
-  const loadTrackerRef = useRef(0);
-
-  // Buffer processing
-  const processBuffer = useCallback(() => {
-    if (photoBufferRef.current.length === 0) return;
-
-    setPhotos((prev) => {
-      const next = [...prev];
-      let changed = false;
-      for (const photo of photoBufferRef.current) {
-        if (!next.find((p) => p.id === photo.id)) {
-          next.push(photo);
-          changed = true;
-        }
-      }
-      photoBufferRef.current = [];
-      isUpdatePendingRef.current = false;
-      if (!changed) return prev;
-      return next.sort((a, b) => b.created_at - a.created_at);
-    });
-  }, []);
-
-  const handleEvent = useCallback(
-    (event: NDKEvent) => {
-      // Basic NSFW check (simplified for profile view)
-      const tags = event.tags.map((t) => t[1]?.toLowerCase());
-      if (tags.some((t) => ['nsfw', 'explicit', 'porn', 'xxx'].includes(t))) return;
-
-      let url: string | undefined;
-      let title = '';
-
-      if (event.kind === 1) {
-        const content = event.content;
-        const imetaTags = event.getMatchingTags('imeta');
-        for (const tag of imetaTags) {
-          let tagUrl: string | undefined;
-          let tagMime: string | undefined;
-          for (let i = 1; i < tag.length; i++) {
-            const part = tag[i];
-            if (part === 'url') tagUrl = tag[i + 1];
-            else if (part.startsWith('url ')) tagUrl = part.slice(4);
-            else if (part === 'm') tagMime = tag[i + 1];
-            else if (part.startsWith('m ')) tagMime = part.slice(2);
-          }
-          if (tagUrl && tagMime?.startsWith('image/')) {
-            url = tagUrl;
-            break;
-          }
-        }
-
-        if (!url) {
-          const imgMatches = content.match(
-            /https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)(\?[^\s]*)?/i
-          );
-          if (imgMatches) url = imgMatches[0];
-        }
-
-        if (url) {
-          if (loadingMore) loadTrackerRef.current++;
-          const titleTag = event.getMatchingTags('title')[0]?.[1];
-          title = titleTag || 'Untitled Photo';
-
-          const photo: PhotoFile = {
-            id: event.id,
-            pubkey: event.pubkey,
-            url,
-            title,
-            created_at: event.created_at || 0,
-          };
-
-          photoBufferRef.current.push(photo);
-          if (!isUpdatePendingRef.current) {
-            isUpdatePendingRef.current = true;
-            setTimeout(processBuffer, 300);
-          }
-        }
-      }
-    },
-    [loadingMore, processBuffer]
-  );
-
-  useEffect(() => {
-    if (!ndk || !pubkey) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    const filter: NDKFilter = { kinds: [1], authors: [pubkey], limit: 25 };
-    const sub = ndk.subscribe(filter, {
-      closeOnEose: false,
-      cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
-    });
-    sub.on('event', handleEvent);
-    sub.on('eose', () => {
-      setLoading(false);
-      processBuffer();
-    });
-    return () => sub.stop();
-  }, [ndk, pubkey, handleEvent, processBuffer]);
-
-  const handleLoadMore = useCallback(async () => {
-    if (!ndk || photos.length === 0 || loadingMore || fetchingRef.current || !hasMore) return;
-    fetchingRef.current = true;
-    setLoadingMore(true);
-    loadTrackerRef.current = 0;
-
-    const oldestTimestamp = Math.min(...photos.map((p) => p.created_at));
-    const filter: NDKFilter = {
-      kinds: [1],
-      authors: [pubkey],
-      until: oldestTimestamp - 1,
-      limit: 25,
-    };
-    const sub = ndk.subscribe(filter, { closeOnEose: true });
-    sub.on('event', handleEvent);
-    sub.on('eose', () => {
-      setLoadingMore(false);
-      fetchingRef.current = false;
-      processBuffer();
-      if (loadTrackerRef.current === 0) setHasMore(false);
-    });
-  }, [ndk, pubkey, photos, loadingMore, hasMore, handleEvent, processBuffer]);
-
-  // Intersection Observer for infinite scroll
-  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && photos.length > 0) {
-          handleLoadMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-
-    if (loadMoreTriggerRef.current) {
-      observer.observe(loadMoreTriggerRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, handleLoadMore, photos.length]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      if (width <= 600)
-        setColumnCount(2); // Keep 2 columns on mobile for profile tabs usually
-      else setColumnCount(3);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const columns = Array.from({ length: columnCount }, () => [] as PhotoFile[]);
-  photos.forEach((photo, index) => {
-    columns[index % columnCount].push(photo);
-  });
-
-  if (loading && photos.length === 0) return <div>Loading photos...</div>;
-  if (photos.length === 0) return <div>No photos found.</div>;
-
-  return (
-    <div className="profile-photos-section">
-      <div className="pp-photos-grid-container" style={{ display: 'flex', gap: '15px' }}>
-        {columns.map((colPhotos, colIndex) => (
-          <div
-            key={colIndex}
-            className="pp-masonry-column"
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '15px' }}
-          >
-            {colPhotos.map((photo) => (
-              <div
-                key={photo.id}
-                className="pp-photo-card"
-                onClick={() => setSelectedPhoto(photo)}
-                style={{ cursor: 'pointer' }}
-              >
-                <img
-                  src={photo.url}
-                  alt={photo.title}
-                  style={{ width: '100%', display: 'block' }}
-                  loading="lazy"
-                />
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
-      {loadingMore && (
-        <div style={{ textAlign: 'center', padding: '20px', color: '#666', fontSize: '10pt' }}>
-          Loading more photos...
-        </div>
-      )}
-
-      {selectedPhoto && (
-        <div
-          className="pp-modal-overlay"
-          onClick={() => setSelectedPhoto(null)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.8)',
-            zIndex: 1000,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <div
-            className="pp-modal-content"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxHeight: '90vh', maxWidth: '90vw' }}
-          >
-            <img
-              src={selectedPhoto.url}
-              alt={selectedPhoto.title}
-              style={{ maxHeight: '80vh', maxWidth: '100%' }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// --- ProfileVideos ---
-
-interface VideoItem {
-  id: string;
-  url: string;
-  thumb?: string;
-  title: string;
-  created_at: number;
-}
-
-const ProfileVideos = ({ pubkey }: { pubkey: string }) => {
-  const { ndk } = useNostr();
-  const [videos, setVideos] = useState<VideoItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [until, setUntil] = useState<number | null>(null);
-  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
-
-  const fetchVideos = useCallback(
-    async (untilTimestamp?: number) => {
-      if (!ndk || !pubkey) return;
-
-      try {
-        const filter: NDKFilter = {
-          kinds: [1, 1063],
-          authors: [pubkey],
-          limit: 25,
-        };
-        if (untilTimestamp) {
-          filter.until = untilTimestamp;
-        }
-
-        const events = await ndk.fetchEvents(filter);
-        const sortedEvents = Array.from(events).sort(
-          (a, b) => (b.created_at || 0) - (a.created_at || 0)
-        );
-
-        if (sortedEvents.length < 25) {
-          setHasMore(false);
-        }
-
-        if (sortedEvents.length > 0) {
-          setUntil((sortedEvents[sortedEvents.length - 1].created_at || 0) - 1);
-        } else {
-          setHasMore(false);
-        }
-
-        const videoItems: VideoItem[] = [];
-        for (const event of events) {
-          let url = '';
-          let thumb = '';
-
-          if (event.kind === 1063) {
-            url = event.tags.find((t) => t[0] === 'url')?.[1] || '';
-            thumb = event.tags.find((t) => t[0] === 'thumb' || t[0] === 'image')?.[1] || '';
-          } else if (event.kind === 1) {
-            const content = event.content;
-
-            // First check imeta tags for video URLs (used by Primal, Damus, etc.)
-            const imetaTags = event.getMatchingTags('imeta');
-            for (const tag of imetaTags) {
-              let tagUrl: string | undefined;
-              let tagMime: string | undefined;
-              for (let i = 1; i < tag.length; i++) {
-                const part = tag[i];
-                if (part === 'url') tagUrl = tag[i + 1];
-                else if (part.startsWith('url ')) tagUrl = part.slice(4);
-                else if (part === 'm') tagMime = tag[i + 1];
-                else if (part.startsWith('m ')) tagMime = part.slice(2);
-              }
-              if (tagUrl && tagMime?.startsWith('video/')) {
-                url = tagUrl;
-                break;
-              }
-            }
-
-            // Fallback to content regex if no imeta video found
-            if (!url) {
-              // Video regex - handles URLs with query params like video.mp4?token=xxx
-              const vidMatch = content.match(
-                /(https?:\/\/\S+\.(?:mp4|mov|webm|avi|mkv|m3u8))(\?\S*)?/i
-              );
-              const ytMatch = content.match(
-                /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
-              );
-              const vimeoMatch = content.match(/vimeo\.com\/(\d+)/);
-
-              if (vidMatch) url = vidMatch[0];
-              else if (ytMatch) {
-                url = `https://www.youtube.com/watch?v=${ytMatch[1]}`;
-                thumb = `https://img.youtube.com/vi/${ytMatch[1]}/maxresdefault.jpg`;
-              } else if (vimeoMatch) url = `https://vimeo.com/${vimeoMatch[1]}`;
-            }
-          }
-
-          if (url) {
-            videoItems.push({
-              id: event.id,
-              url,
-              thumb,
-              title: '',
-              created_at: event.created_at || 0,
-            });
-          }
-        }
-
-        // Add any videos found to state
-        if (videoItems.length > 0) {
-          setVideos((prev) => {
-            const combined = [...prev, ...videoItems];
-            // Dedupe
-            const unique = Array.from(new Map(combined.map((v) => [v.id, v])).values());
-            return unique.sort((a, b) => b.created_at - a.created_at);
-          });
-        }
-      } catch (e) {
-        console.error('Error fetching videos:', e);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [ndk, pubkey]
-  );
-
-  useEffect(() => {
-    setLoading(true);
-    fetchVideos();
-  }, [fetchVideos]);
-
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && until) {
-      setLoadingMore(true);
-      fetchVideos(until);
-    }
-  }, [loadingMore, hasMore, until, fetchVideos]);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && videos.length > 0) {
-          handleLoadMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-    if (loadMoreTriggerRef.current) observer.observe(loadMoreTriggerRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, handleLoadMore, videos.length]);
-
-  if (loading) return <div>Loading videos...</div>;
-  if (videos.length === 0) return <div>No videos found.</div>;
-
-  return (
-    <div className="profile-videos-section">
-      <div
-        className="profile-videos-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '15px',
-        }}
-      >
-        {videos.map((video) => {
-          const ytMatch = video.url.match(
-            /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
-          );
-          const vimeoMatch = video.url.match(/vimeo\.com\/(\d+)/);
-
-          return (
-            <div
-              key={video.id}
-              style={{ border: '1px solid #ccc', background: '#000', aspectRatio: '16/9' }}
-            >
-              {ytMatch ? (
-                <iframe
-                  src={`https://www.youtube.com/embed/${ytMatch[1]}`}
-                  title="YouTube"
-                  frameBorder="0"
-                  allowFullScreen
-                  style={{ width: '100%', height: '100%' }}
-                />
-              ) : vimeoMatch ? (
-                <iframe
-                  src={`https://player.vimeo.com/video/${vimeoMatch[1]}`}
-                  title="Vimeo"
-                  frameBorder="0"
-                  allowFullScreen
-                  style={{ width: '100%', height: '100%' }}
-                />
-              ) : (
-                <video
-                  src={video.url}
-                  controls
-                  preload="metadata"
-                  style={{ width: '100%', height: '100%' }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
-      {loadingMore && (
-        <div style={{ textAlign: 'center', padding: '20px', color: '#666', fontSize: '10pt' }}>
-          Loading more videos...
-        </div>
-      )}
-    </div>
-  );
-};
-
-// --- ProfileLivestreams ---
-
-const ProfileLivestreams = ({ pubkey }: { pubkey: string }) => {
-  const { ndk } = useNostr();
-  const [streams, setStreams] = useState<NDKEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [until, setUntil] = useState<number | null>(null);
-  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
-
-  const fetchStreams = useCallback(
-    async (untilTimestamp?: number) => {
-      if (!ndk || !pubkey) return;
-      try {
-        const filter: NDKFilter = {
-          kinds: [30311 as NDKKind],
-          authors: [pubkey],
-          limit: 25,
-        };
-        if (untilTimestamp) filter.until = untilTimestamp;
-
-        const events = await ndk.fetchEvents(filter);
-        const sorted = Array.from(events).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-
-        if (sorted.length < 25) setHasMore(false);
-
-        if (sorted.length > 0) {
-          setUntil((sorted[sorted.length - 1].created_at || 0) - 1);
-          setStreams((prev) => {
-            const combined = [...prev, ...sorted];
-            const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-            return unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-          });
-        } else {
-          setHasMore(false);
-        }
-      } catch (e) {
-        console.error('Error fetching livestreams:', e);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    },
-    [ndk, pubkey]
-  );
-
-  useEffect(() => {
-    fetchStreams();
-  }, [fetchStreams]);
-
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && until) {
-      setLoadingMore(true);
-      fetchStreams(until);
-    }
-  }, [loadingMore, hasMore, until, fetchStreams]);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && streams.length > 0) {
-          handleLoadMore();
-        }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    );
-    if (loadMoreTriggerRef.current) observer.observe(loadMoreTriggerRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, handleLoadMore, streams.length]);
-
-  if (loading) return <div>Loading streams...</div>;
-  if (streams.length === 0) return <div>No livestreams found.</div>;
-
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-        gap: '15px',
-      }}
-    >
-      {streams.map((stream) => {
-        const title = stream.getMatchingTags('title')[0]?.[1] || 'Untitled Stream';
-        const image = stream.getMatchingTags('image')[0]?.[1];
-        const status = stream.getMatchingTags('status')[0]?.[1] || 'offline';
-        const dTag = stream.getMatchingTags('d')[0]?.[1];
-        const url = `/live/${pubkey}/${dTag}`;
-
-        return (
-          <Link
-            key={stream.id}
-            to={url}
-            style={{
-              textDecoration: 'none',
-              color: 'inherit',
-              border: '1px solid #ccc',
-              display: 'block',
-              background: 'white',
-            }}
-          >
-            <div style={{ aspectRatio: '16/9', background: '#000', position: 'relative' }}>
-              {image && (
-                <img src={image} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              )}
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 5,
-                  right: 5,
-                  background: status === 'live' ? 'red' : '#666',
-                  color: 'white',
-                  padding: '2px 5px',
-                  fontSize: '10px',
-                  borderRadius: 3,
-                  textTransform: 'uppercase',
-                }}
-              >
-                {status}
-              </span>
-            </div>
-            <div style={{ padding: '10px' }}>
-              <div style={{ fontWeight: 'bold', color: '#003399' }}>{title}</div>
-            </div>
-          </Link>
-        );
-      })}
-      <div ref={loadMoreTriggerRef} style={{ height: '1px' }} />
-      {loadingMore && (
-        <div style={{ textAlign: 'center', padding: '10px', color: '#666', fontSize: '10pt' }}>
-          Loading more streams...
-        </div>
-      )}
-    </div>
-  );
-};
-
-// --- ProfileBadges ---
-
-interface BadgeDisplay {
-  id: string;
-  dTag: string;
-  name: string;
-  description: string;
-  image: string;
-  issuerPubkey: string;
-  issuerName?: string;
-}
-
-const ProfileBadges = ({ pubkey }: { pubkey: string }) => {
-  const { ndk } = useNostr();
-  const [badges, setBadges] = useState<BadgeDisplay[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!ndk || !pubkey) return;
-
-    const fetchBadges = async () => {
-      // Fetch user's profile badges (Kind 30008 with d=profile_badges)
-      const profileBadgesEvent = await ndk.fetchEvent({
-        kinds: [30008 as number],
-        authors: [pubkey],
-        '#d': ['profile_badges'],
-      });
-
-      if (!profileBadgesEvent) {
-        setLoading(false);
-        return;
-      }
-
-      // Parse badge references from profile badges event
-      const badgeRefs: { aTag: string; eTag: string }[] = [];
-      const tags = profileBadgesEvent.tags;
-      for (let i = 0; i < tags.length; i++) {
-        if (tags[i][0] === 'a' && tags[i + 1]?.[0] === 'e') {
-          badgeRefs.push({ aTag: tags[i][1], eTag: tags[i + 1][1] });
-          i++; // Skip the e tag
-        }
-      }
-
-      // Fetch badge definitions for each reference
-      const badgeDisplays: BadgeDisplay[] = [];
-      for (const ref of badgeRefs) {
-        // Parse a tag: 30009:pubkey:d-tag
-        const [, issuerPubkey, dTag] = ref.aTag.split(':');
-        if (!issuerPubkey || !dTag) continue;
-
-        const defEvent = await ndk.fetchEvent({
-          kinds: [30009 as number],
-          authors: [issuerPubkey],
-          '#d': [dTag],
-        });
-
-        if (defEvent) {
-          const name = defEvent.getMatchingTags('name')[0]?.[1] || dTag;
-          const description = defEvent.getMatchingTags('description')[0]?.[1] || '';
-          const image = defEvent.getMatchingTags('image')[0]?.[1] || '';
-          const thumb = defEvent.getMatchingTags('thumb')[0]?.[1];
-
-          if (image) {
-            badgeDisplays.push({
-              id: defEvent.id,
-              dTag,
-              name,
-              description,
-              image: thumb || image,
-              issuerPubkey,
-            });
-          }
-        }
-      }
-
-      // Fetch issuer profiles
-      for (const badge of badgeDisplays) {
-        try {
-          const profile = await ndk.getUser({ pubkey: badge.issuerPubkey }).fetchProfile();
-          if (profile) {
-            badge.issuerName =
-              profile.name || profile.displayName || badge.issuerPubkey.slice(0, 8);
-          }
-        } catch {
-          badge.issuerName = badge.issuerPubkey.slice(0, 8);
-        }
-      }
-
-      setBadges(badgeDisplays);
-      setLoading(false);
-    };
-
-    fetchBadges();
-  }, [ndk, pubkey]);
-
-  if (loading) return null;
-  if (badges.length === 0) return null;
-
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '8px',
-        padding: '10px',
-        background: '#f9f9f9',
-        border: '1px solid #ccc',
-        marginBottom: '15px',
-      }}
-    >
-      {badges.map((badge) => (
-        <div
-          key={badge.id}
-          title={`${badge.name}${badge.description ? ` - ${badge.description}` : ''}`}
-          style={{
-            width: '40px',
-            height: '40px',
-            cursor: 'pointer',
-          }}
-        >
-          <img
-            src={badge.image}
-            alt={badge.name}
-            style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }}
-            loading="lazy"
-          />
-        </div>
-      ))}
-    </div>
-  );
-};
-
-// --- Main ProfilePage ---
+import { PRIMAL_BOT_PUBKEY } from '../../utils/antiprimal';
+import { useProfileStats } from '../../hooks/useProfileStats';
+
+// Tab Sub-Components
+import { ProfileRecipes } from './ProfileRecipes';
+import { ProfileBlog } from './ProfileBlog';
+import { ProfileFeed } from './ProfileFeed';
+import { ProfilePhotos } from './ProfilePhotos';
+import { ProfileVideos } from './ProfileVideos';
+import { ProfileLivestreams } from './ProfileLivestreams';
+import { ProfileBadges } from './ProfileBadges';
+
+import './ProfilePage.css';
 
 const ProfilePage = () => {
-  const { user, ndk } = useNostr();
+  const { pubkey } = useParams<{ pubkey: string }>();
   const navigate = useNavigate();
-  const { pubkey: identifier } = useParams<{ pubkey: string }>();
-  const { hexPubkey, loading: resolving } = useResolvedPubkey(identifier);
-  const { openLightbox } = useLightbox();
+  const { profile, loading: profileLoading } = useProfile(pubkey);
+  const {
+    top8,
+    loading: top8Loading,
+  } = useTop8(pubkey || '');
 
-  const { profile, loading: profileLoading } = useProfile(hexPubkey || undefined);
-  const { top8, loading: top8Loading } = useTop8(hexPubkey || undefined);
-  const { status: relationshipStatus } = useRelationshipStatus(hexPubkey || undefined);
+  const { layoutCss } = useCustomLayout(pubkey);
+  const { user, ndk } = useNostr();
+  const [activeTab, setActiveTab] = useState<'feed' | 'blog' | 'media' | 'recipes' | 'live' | 'badges'>('feed');
 
-  const userObj = hexPubkey ? ndk?.getUser({ pubkey: hexPubkey }) : null;
-  const npub = userObj?.npub;
+  // Build a set of blocked pubkeys for stats filtering
+  const blockedSet = new Set<string>();
+  if (user) {
+    // isBlockedUser is synchronous
+    if (isBlockedUser(pubkey || '', blockedSet)) {
+      blockedSet.add(pubkey || '');
+    }
+  }
 
-  const { layoutCss } = useCustomLayout(hexPubkey || undefined);
-  const { data: extendedProfile } = useExtendedProfile(hexPubkey || undefined);
+  const { stats, loadingStats } = useProfileStats(ndk, { pubkey: pubkey || '' }, blockedSet);
 
-  const [stats, setStats] = useState<{
-    followers: number | null;
-    posts: number | null;
-    zaps: number | null;
-  }>({
-    followers: null,
-    posts: null,
-    zaps: null,
-  });
-  const [loadingStats, setLoadingStats] = useState(false);
+  // Follow/unfollow state – fetch the user's kind 3 contacts list
+  const [contactListEvent, setContactListEvent] = useState<NDKEvent | null>(null);
 
-  // Tab State
-  const [activeTab, setActiveTab] = useState('home');
-  const [hasPhotos, setHasPhotos] = useState(false);
-  const [hasVideos, setHasVideos] = useState(false);
-  const [hasRecipes, setHasRecipes] = useState(false);
-  const [hasLivestreams, setHasLivestreams] = useState(false);
-  const [hasBlog, setHasBlog] = useState(false);
-  const [isBadgeCreator, setIsBadgeCreator] = useState(false);
-  const [showAwardModal, setShowAwardModal] = useState(false);
-
-  // Content Check Effect
-  useEffect(() => {
-    if (!ndk || !hexPubkey) return;
-
-    const checkAll = async () => {
-      // Check Photos (Kind 1 with image tag or regex, approximate check with limit 1)
-      // Note: Regex checks on relays are limited, so we rely on client-side check of small batch or specific tags check if supported.
-      // For now, simpler check: Kind 1
-      // Actually, "Media" includes photos and videos.
-      // Let's do a quick check for Kind 1 events.
-      const photosCheck = await ndk.fetchEvents({ kinds: [1], authors: [hexPubkey], limit: 20 });
-      const hasP = Array.from(photosCheck).some(
-        (e) =>
-          e.content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i) ||
-          e.getMatchingTags('imeta').length > 0
-      );
-      setHasPhotos(hasP);
-
-      // Check Videos
-      const videosCheck1 = await ndk.fetchEvents({ kinds: [1063], authors: [hexPubkey], limit: 1 });
-      const videosCheck2 = Array.from(photosCheck).some((e) => {
-        // Check imeta tags for video content
-        const imetaTags = e.getMatchingTags('imeta');
-        for (const tag of imetaTags) {
-          let tagMime: string | undefined;
-          for (let i = 1; i < tag.length; i++) {
-            const part = tag[i];
-            if (part === 'm') tagMime = tag[i + 1];
-            else if (part.startsWith('m ')) tagMime = part.slice(2);
-          }
-          if (tagMime?.startsWith('video/')) return true;
-        }
-        // Fallback to content regex
-        return (
-          e.content.match(/(https?:\/\/\S+\.(?:mp4|mov|webm|avi|mkv|m3u8))(\?\S*)?/i) ||
-          e.content.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|vimeo\.com\/)/)
-        );
-      });
-      setHasVideos(videosCheck1.size > 0 || videosCheck2);
-
-      // Check Recipes
-      const recipesCheck = await ndk.fetchEvents({
-        kinds: [30023 as number],
-        authors: [hexPubkey],
-        '#t': ['zapcooking', 'nostrcooking'],
-        limit: 1,
-      });
-      setHasRecipes(recipesCheck.size > 0);
-
-      // Check Livestreams
-      const liveCheck = await ndk.fetchEvents({
-        kinds: [30311 as NDKKind],
-        authors: [hexPubkey],
-        limit: 1,
-      });
-      setHasLivestreams(liveCheck.size > 0);
-
-      // Check Blog
-      const blogCheck = await ndk.fetchEvents({
-        kinds: [30023 as number],
-        authors: [hexPubkey],
-        limit: 10,
-      });
-      const hasB = Array.from(blogCheck).some((e) => {
-        const tags = e.tags.map((t) => t[1]);
-        return !tags.includes('zapcooking') && !tags.includes('nostrcooking');
-      });
-      setHasBlog(hasB);
-
-      // Check if logged-in user is a badge creator
-      if (user?.pubkey) {
-        const myBadges = await ndk.fetchEvents({
-          kinds: [30009 as number],
-          authors: [user.pubkey],
-          limit: 1,
-        });
-        setIsBadgeCreator(myBadges.size > 0);
-      }
-    };
-
-    checkAll();
-  }, [ndk, hexPubkey, user?.pubkey]);
-
-  const fetchStats = async () => {
-    if (loadingStats || !ndk || !hexPubkey) return;
-    setLoadingStats(true);
-
+  const fetchContactList = useCallback(async () => {
+    if (!ndk || !user) return;
     try {
-      // Use Antiprimal for instant stats (NIP-85 Kind 30382)
-      const antiprimalRelaySet = NDKRelaySet.fromRelayUrls([ANTIPRIMAL_RELAY], ndk);
+      const ev = await ndk.fetchEvent({
+        kinds: [3],
+        authors: [user.pubkey],
+      });
+      setContactListEvent(ev);
+    } catch {
+      // ignore
+    }
+  }, [ndk, user]);
 
-      const statsEvent = await ndk.fetchEvent(
-        {
-          kinds: [30382 as number],
-          authors: [PRIMAL_BOT_PUBKEY],
-          '#d': [hexPubkey],
-        },
-        {
-          relaySet: antiprimalRelaySet,
-          cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+  useEffect(() => {
+    fetchContactList();
+  }, [fetchContactList]);
+
+  if (!pubkey) {
+    return <div>No profile specified.</div>;
+  }
+
+  const isMyProfile = user?.pubkey === pubkey;
+  const isBlocked = isBlockedUser(pubkey, blockedSet);
+
+  const isFollowing = contactListEvent?.tags.some(
+    (t: string[]) => t[0] === 'p' && t[1] === pubkey
+  ) || false;
+
+  const handleFollowToggle = async () => {
+    if (!ndk || !user) {
+      alert('Please login to follow/unfollow users.');
+      return;
+    }
+    try {
+      if (!isFollowing) {
+        const followEvent = new NDKEvent(ndk);
+        followEvent.kind = 3;
+        followEvent.tags = [['p', pubkey]];
+        if (contactListEvent) {
+          followEvent.tags = [
+            ...contactListEvent.tags.filter((t: string[]) => t[0] === 'p'),
+            ['p', pubkey],
+          ];
         }
-      );
-
-      if (statsEvent) {
-        try {
-          const content = JSON.parse(statsEvent.content);
-          setStats({
-            followers: content.followers_count || content.followers || 0,
-            posts: content.note_count || content.notes || 0,
-            zaps: content.zaps_received || content.zap_count || 0,
-          });
-        } catch (e) {
-          console.warn('Failed to parse Primal stats JSON', e);
-          // Fallback to parsing tags if content isn't JSON
-          let followers = 0;
-          let posts = 0;
-          let zaps = 0;
-
-          statsEvent.tags.forEach((tag) => {
-            if (tag[0] === 'followers') followers = parseInt(tag[1]) || 0;
-            if (tag[0] === 'notes' || tag[0] === 'note_count') posts = parseInt(tag[1]) || 0;
-            if (tag[0] === 'zaps_received' || tag[0] === 'zap_count') zaps = parseInt(tag[1]) || 0;
-          });
-
-          setStats({ followers, posts, zaps });
-        }
+        await followEvent.publish();
+        window.location.reload();
       } else {
-        // Fallback or just set to 0 if not found
-        setStats({ followers: 0, posts: 0, zaps: 0 });
+        const unFollowEvent = new NDKEvent(ndk);
+        unFollowEvent.kind = 3;
+        if (contactListEvent) {
+          unFollowEvent.tags = contactListEvent.tags.filter(
+            (t: string[]) => t[0] === 'p' && t[1] !== pubkey
+          );
+        }
+        await unFollowEvent.publish();
+        window.location.reload();
       }
     } catch (e) {
-      console.error('Error fetching stats:', e);
-    } finally {
-      setLoadingStats(false);
+      console.error('Failed to update follow list:', e);
+      alert('Failed to update follow list. Please try again.');
     }
   };
 
-  if (resolving) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-box">
-          <div className="loading-header">MyNostrSpace.com</div>
-          <div className="loading-body">
-            <p>Loading Profile...</p>
-            <p style={{ fontSize: '8pt' }}>(Please Wait)</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleStartChat = () => {
+    navigate(`/chat?p=${pubkey}`);
+  };
 
-  if (hexPubkey && isBlockedUser(hexPubkey)) {
-    return (
-      <div className="profile-container">
-        <Navbar />
-        <div className="profile-body" style={{ padding: '40px', textAlign: 'center' }}>
-          <h2 className="section-header" style={{ background: '#cc0000', color: 'white' }}>
-            Profile Blocked
-          </h2>
-          <p style={{ marginTop: '20px' }}>
-            Content from this user has been blocked according to your settings.
-          </p>
-          <div style={{ marginTop: '20px' }}>
-            <Link to="/" style={{ color: '#003399', fontWeight: 'bold' }}>
-              &laquo; Back to Home
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback name if profile isn't loaded yet
-  const displayName =
-    profile?.displayName || profile?.name || (hexPubkey ? `${hexPubkey.slice(0, 8)}...` : 'User');
-  const displayAbout =
-    profile?.about ||
-    (profileLoading ? 'Loading info...' : 'Currently building my brand new NostrSpace page.');
-
-  // Construct Tabs List
-  const tabs = [
-    { id: 'home', label: 'Home', visible: true },
-    { id: 'notes', label: 'Notes', visible: true },
-    { id: 'photos', label: 'Photos', visible: hasPhotos },
-    { id: 'videos', label: 'Videos', visible: hasVideos },
-    { id: 'recipes', label: 'Recipes', visible: hasRecipes },
-    { id: 'livestream', label: 'Livestream', visible: hasLivestreams },
-    { id: 'blog', label: 'Blog', visible: hasBlog },
-  ].filter((t) => t.visible);
+  const displayName = profile?.name || profile?.displayName || pubkey.slice(0, 8);
 
   return (
-    <div className="profile-container">
+    <div className="profile-page-container">
       {layoutCss && <style>{layoutCss}</style>}
-
       <SEO
         title={displayName}
-        description={`${displayName}'s profile on MyNostrSpace. ${profile?.about || ''}`}
-        image={profile?.image}
-        url={window.location.href}
+        description={profile?.about || 'View my profile on MyNostrSpace.'}
+        image={profile?.picture}
       />
+      <Navbar />
 
-      {/* Header / Banner Area */}
-      <div className="profile-header">
-        <Navbar />
-      </div>
-
-      <div className="profile-body">
-        {/* Left Column: Basic Info */}
-        <div className="left-column">
-          <div className="profile-pic-box">
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                gap: '10px',
-                flexWrap: 'wrap',
-              }}
-            >
-              <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {displayName}
-                {profile?.nip05 && (
-                  <span
-                    title={profile.nip05}
-                    style={{ color: '#0099ff', fontSize: '0.6em', verticalAlign: 'middle' }}
-                  >
-                    ✓
-                  </span>
-                )}
-              </h1>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {user?.pubkey === hexPubkey && (
-                  <Link
-                    to="/edit-profile"
-                    style={{ fontSize: '8pt', textDecoration: 'none', color: '#003399' }}
-                  >
-                    [ Edit Profile ]
-                  </Link>
-                )}
-              </div>
+      <div className="profile-wrapper">
+        <div className="profile-content">
+          <div className="profile-header-top">
+            <h1 className="profile-title">{displayName}'s Space</h1>
+            {isMyProfile && (
+              <Link to="/edit-layout" className="page-themes-link">
+                <div className="theme-icon"></div>
+                Edit Theme
+              </Link>
+            )}
+          </div>
+          <div className="profile-header-sub">
+            <div className="my-url-text">
+              URL: http://mynostrspace.com/p/{profile?.nip05 || pubkey.slice(0, 16)}
             </div>
-            <div className="profile-details-grid">
-              {profile?.image ? (
-                <img
-                  src={profile.image}
-                  alt={profile.name || 'Profile'}
-                  className="profile-pic"
-                  onClick={() => openLightbox(profile.image!)}
-                  style={{ cursor: 'pointer' }}
-                />
-              ) : (
-                <div
-                  className="profile-pic"
+            {isMyProfile && (
+              <Link to="/edit-profile" className="edit-profile-link">
+                Edit Profile
+              </Link>
+            )}
+            {!isMyProfile && !isBlocked && (
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={handleStartChat}
                   style={{
-                    background: '#eee',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  ?
-                </div>
-              )}
-              <div className="profile-text-details">
-                <div className="personal-text" style={{ fontSize: '8pt' }}>
-                  <RichTextRenderer content={extendedProfile?.headline || '...'} />
-                  <p>{extendedProfile?.gender}</p>
-                  <p>
-                    {[extendedProfile?.city, extendedProfile?.region, extendedProfile?.country]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </p>
-                </div>
-                {profile?.nip05 && (
-                  <div
-                    className="nip05"
-                    style={{ fontSize: '8pt', color: '#666', fontWeight: 'bold' }}
-                  >
-                    {profile.nip05}
-                  </div>
-                )}
-                <div className="last-login" style={{ fontSize: '8pt', margin: '10px 0' }}>
-                  Last Login: {new Date().toLocaleDateString()}
-                </div>
-                <div
-                  className="user-stats-clickable"
-                  style={{
-                    fontSize: '8pt',
-                    marginTop: '5px',
+                    padding: '4px 12px',
+                    backgroundColor: '#1E90FF',
+                    color: 'white',
+                    border: '1px solid #104E8B',
+                    borderRadius: '4px',
                     cursor: 'pointer',
                     fontWeight: 'bold',
+                    fontSize: '12px',
                   }}
-                  onClick={fetchStats}
-                  title="Click to load stats"
                 >
-                  {loadingStats ? (
-                    <span>Loading stats...</span>
+                  Message
+                </button>
+                <button
+                  onClick={handleFollowToggle}
+                  className="edit-profile-link"
+                  style={{
+                    backgroundColor: isFollowing ? '#f0f0f0' : '#ff9933',
+                    color: isFollowing ? '#333' : 'white',
+                    borderColor: isFollowing ? '#ccc' : '#cc7a29',
+                  }}
+                >
+                  {isFollowing ? 'Unfollow' : 'Follow'}
+                </button>
+              </div>
+            )}
+            {!isMyProfile && isBlocked && (
+              <div style={{ color: 'red', fontWeight: 'bold' }}>User is Blocked</div>
+            )}
+          </div>
+
+          <div className="profile-layout">
+            {/* Left Sidebar */}
+            <div className="profile-left">
+              <div className="profile-box user-pic-box">
+                <div className="profile-box-header">{displayName}</div>
+                <div className="profile-box-body">
+                  <div className="user-pic-container">
+                    {profile?.picture ? (
+                      <Avatar pubkey={pubkey} src={profile.picture} size={170} className="user-pic" />
+                    ) : (
+                      <div className="user-pic-placeholder">No Picture</div>
+                    )}
+                  </div>
+
+                  {!loadingStats ? (
+                    <div className="stats-container">
+                      <div className="stat-item">
+                        <span className="stat-label">Followers</span>
+                        <span className="stat-value">{stats.followers ?? 'N/A'}</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">Posts</span>
+                        <span className="stat-value">{stats.posts ?? 'N/A'}</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-label">Zaps Recv</span>
+                        <span className="stat-value">{stats.zaps ?? 'N/A'} 丰</span>
+                      </div>
+                    </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span>Followers: {stats.followers ?? '∞'}</span>
-                      <span>Posts: {stats.posts ?? '∞'}</span>
-                      <span>Zaps Received: {stats.zaps ?? '∞'} 丰</span>
+                    <div style={{ fontSize: '11px', textAlign: 'center', marginTop: '10px' }}>
+                      Loading Stats...
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <ContactBox
-            name={profile?.name || ''}
-            pubkey={hexPubkey || ''}
-            showAwardButton={isBadgeCreator && user?.pubkey !== hexPubkey}
-            onAwardBadge={() => setShowAwardModal(true)}
-          />
-
-          <div className="profile-box">
-            <h3 className="section-header">My Apps</h3>
-            <div className="profile-box-body">
-              <ul className="my-apps-list">
-                <li className="app-item" onClick={() => navigate('/blogs')}>
-                  <span className="app-icon">✍️</span> Blogs
-                </li>
-                <li className="app-item" onClick={() => navigate('/videos')}>
-                  <span className="app-icon">🎥</span> Videos
-                </li>
-                <li className="app-item" onClick={() => navigate('/music')}>
-                  <span className="app-icon">🎵</span> Music
-                </li>
-                <li className="app-item" onClick={() => navigate('/recipes')}>
-                  <span className="app-icon">🍳</span> Recipes
-                </li>
-                <li className="app-item" onClick={() => navigate('/livestreams')}>
-                  <span className="app-icon">📺</span> Live
-                </li>
-                <li className="app-item" onClick={() => navigate('/badges')}>
-                  <span className="app-icon">🏆</span> Badges
-                </li>
-                <li className="app-item" onClick={() => navigate('/marketplace')}>
-                  <span className="app-icon">🛒</span> Shop
-                </li>
-                <li className="app-item" onClick={() => navigate('/photos')}>
-                  <span className="app-icon">🖼️</span> Photos
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="url-box">
-            <b>MyNostrSpace URL:</b>
-            <br />
-            http://mynostrspace.com/p/{npub || hexPubkey}
-          </div>
-
-          <div className="interests-box">
-            <h3 className="section-header">{displayName}'s Interests</h3>
-            <table className="interests-table myspace-table">
-              <tbody>
-                <tr>
-                  <td className="label">General</td>
-                  <td>
-                    <RichTextRenderer content={extendedProfile?.interests?.general || 'N/A'} />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="label">Music</td>
-                  <td>
-                    <RichTextRenderer content={extendedProfile?.interests?.music || 'N/A'} />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="label">Movies</td>
-                  <td>
-                    <RichTextRenderer content={extendedProfile?.interests?.movies || 'N/A'} />
-                  </td>
-                </tr>
-                {extendedProfile?.mainClient && (
-                  <tr>
-                    <td className="label">Client</td>
-                    <td>{extendedProfile.mainClient}</td>
-                  </tr>
-                )}
-                {extendedProfile?.bitcoinerSince && (
-                  <tr>
-                    <td className="label">Bitcoiner Since</td>
-                    <td>{extendedProfile.bitcoinerSince}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Badges Display - Icons */}
-          <div className="badges-box">
-            <h3 className="section-header">Badges</h3>
-            <ProfileBadges pubkey={hexPubkey || ''} />
-          </div>
-
-          {/* Pass the dynamic music URL or Playlist */}
-          {Array.isArray(extendedProfile?.music) ? (
-            <WavlakePlayer tracks={extendedProfile.music} />
-          ) : (
-            <WavlakePlayer trackUrl={extendedProfile?.music?.url} />
-          )}
-        </div>
-
-        {/* Right Column: The "Dope" Content */}
-        <div className="right-column">
-          <div
-            className="extended-network"
-            style={{
-              border: '1px solid black',
-              padding: '10px',
-              marginBottom: '15px',
-              background: '#f5f5f5',
-            }}
-          >
-            <h2 style={{ fontSize: '14pt', margin: 0 }}>
-              {displayName} {relationshipStatus || 'is in your extended network'}
-            </h2>
-          </div>
-
-          {/* Profile Tabs */}
-          <div className="profile-tabs" style={{ marginBottom: '0', display: 'flex', gap: '0' }}>
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '8px 16px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  backgroundColor: activeTab === tab.id ? 'var(--myspace-orange)' : '#eee',
-                  color: activeTab === tab.id ? 'white' : '#333',
-                  border: '1px solid #ccc',
-                  borderBottom: 'none',
-                  borderRadius: '5px 5px 0 0',
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab: HOME (Legacy Profile Content) */}
-          {activeTab === 'home' && (
-            <>
-              <div className="blurbs-section">
-                <h3 className="section-header">{displayName}'s Blurbs</h3>
-                <div className="blurb-content" style={{ padding: '10px' }}>
-                  <h4>About me:</h4>
-                  <RichTextRenderer content={displayAbout} />
-
-                  <h4>Who I'd like to meet:</h4>
-                  <RichTextRenderer content="Developers building on Nostr and people enjoying freedom." />
-                </div>
-              </div>
-
-              <div className="top-8-section">
-                <h3 className="section-header">{displayName}'s Friend Space</h3>
-                <div className="top-8-grid">
-                  {top8Loading ? (
-                    <div>Loading Top 8...</div>
-                  ) : (
-                    top8.map((friend) => (
-                      <div
-                        key={friend.pubkey}
-                        className="friend-slot"
-                        style={{ cursor: 'default' }}
+                  {pubkey === PRIMAL_BOT_PUBKEY && (
+                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                      <button
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          backgroundColor: '#eee',
+                          border: '1px solid #ccc',
+                          borderRadius: '4px',
+                        }}
                       >
-                        <a href={`/p/${friend.npub}`}>
-                          <p className="friend-name">
-                            {friend.profile?.displayName || friend.profile?.name || 'Friend'}
-                          </p>
-                          <div className="friend-pic-container">
-                            {friend.profile?.image ? (
-                              <img
-                                src={friend.profile.image}
-                                alt={friend.profile?.name || 'Friend'}
-                                className="friend-pic"
-                                style={{
-                                  width: '90px',
-                                  height: '90px',
-                                  objectFit: 'cover',
-                                  border: '1px solid white',
-                                }}
-                              />
-                            ) : (
-                              <div
-                                className="friend-pic"
-                                style={{ background: '#eee', width: '90px', height: '90px' }}
-                              ></div>
-                            )}
-                          </div>
-                        </a>
-                      </div>
-                    ))
+                        Force Sync Primal Stats
+                      </button>
+                    </div>
                   )}
-                  {/* Fill empty slots if less than 8 */}
-                  {!top8Loading &&
-                    top8.length < 8 &&
-                    [...Array(8 - top8.length)].map((_, i) => (
-                      <div key={`empty-${i}`} className="friend-slot empty">
-                        <p className="friend-name" style={{ visibility: 'hidden' }}>
-                          Top 8
-                        </p>
-                        <div
-                          className="friend-pic-placeholder"
-                          style={{ width: '90px', height: '90px' }}
-                        ></div>
-                      </div>
-                    ))}
+
+                  <div className="user-bio">{profile?.about || 'No bio provided.'}</div>
+
+                  {profileLoading ? (
+                    <div style={{ fontSize: '12px' }}>Loading profile data...</div>
+                  ) : null}
                 </div>
+              </div>
+
+              {/* Friends List Component */}
+              <div className="profile-box friends-box">
+                <div className="profile-box-header">
+                  {displayName}'s Friends Space ({top8Loading ? '...' : top8.length})
+                </div>
+                <div className="profile-box-body">
+                  {top8Loading ? (
+                    <div className="loading-friends">Loading friends...</div>
+                  ) : top8.length === 0 ? (
+                    <div className="no-friends">No friends found.</div>
+                  ) : (
+                    <div className="friends-grid">
+                      {top8.map((friend) => (
+                        <Link
+                          to={`/p/${friend.pubkey}`}
+                          key={friend.pubkey}
+                          className="friend-tile"
+                        >
+                          <Avatar
+                            pubkey={friend.pubkey}
+                            src={friend.profile?.image}
+                            size={70}
+                            className="friend-avatar"
+                          />
+                          <div className="friend-name">
+                            {friend.profile?.name ||
+                              friend.profile?.displayName ||
+                              friend.pubkey.slice(0, 8)}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ textAlign: 'right', marginTop: '10px' }}>
+                    <Link to={`/friends/${pubkey}`} className="view-all-friends">
+                      View All
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="profile-main">
+              {profile?.banner && (
                 <div
+                  className="profile-banner-container"
                   style={{
-                    textAlign: 'right',
-                    marginTop: '10px',
-                    fontSize: '10pt',
-                    fontWeight: 'bold',
+                    width: '100%',
+                    height: '250px',
+                    marginBottom: '15px',
+                    border: '1px solid #6699cc',
+                    background: '#000',
+                    overflow: 'hidden',
                   }}
                 >
-                  View {displayName}'s Friends: <a href={`/p/${hexPubkey}/friends`}>All</a> |{' '}
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      alert('Coming soon!');
-                    }}
-                  >
-                    Online
-                  </a>{' '}
-                  |{' '}
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      alert('Coming soon!');
-                    }}
-                  >
-                    New
-                  </a>
+                  <img
+                    src={profile.banner}
+                    alt="Banner"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
                 </div>
+              )}
+
+              <div className="view-mode-tabs profile-tabs">
+                <button
+                  className={activeTab === 'feed' ? 'active' : ''}
+                  onClick={() => setActiveTab('feed')}
+                >
+                  Feed
+                </button>
+                <button
+                  className={activeTab === 'media' ? 'active' : ''}
+                  onClick={() => setActiveTab('media')}
+                >
+                  Media
+                </button>
+                <button
+                  className={activeTab === 'blog' ? 'active' : ''}
+                  onClick={() => setActiveTab('blog')}
+                >
+                  Blog
+                </button>
+                <button
+                  className={activeTab === 'recipes' ? 'active' : ''}
+                  onClick={() => setActiveTab('recipes')}
+                >
+                  Recipes
+                </button>
+                <button
+                  className={activeTab === 'live' ? 'active' : ''}
+                  onClick={() => setActiveTab('live')}
+                >
+                  Live
+                </button>
+                <button
+                  className={activeTab === 'badges' ? 'active' : ''}
+                  onClick={() => setActiveTab('badges')}
+                >
+                  Badges
+                </button>
               </div>
 
-              {/* Comment Wall */}
-              <div className="comment-wall-section" style={{ marginTop: '20px' }}>
-                <CommentWall pubkey={hexPubkey || ''} />
+              <div
+                className="profile-tab-content"
+                style={{
+                  background: 'white',
+                  border: '1px solid #6699cc',
+                  borderTop: 'none',
+                  minHeight: '400px',
+                }}
+              >
+                {activeTab === 'feed' && <ProfileFeed ndk={ndk} pubkey={pubkey} />}
+
+                {activeTab === 'media' && (
+                  <div>
+                    <h3 style={{ margin: '15px 15px 5px', color: '#6699cc' }}>Photos</h3>
+                    <ProfilePhotos ndk={ndk} pubkey={pubkey} />
+                    <h3 style={{ margin: '15px 15px 5px', color: '#6699cc' }}>Videos</h3>
+                    <ProfileVideos ndk={ndk} pubkey={pubkey} />
+                  </div>
+                )}
+
+                {activeTab === 'blog' && <ProfileBlog ndk={ndk} pubkey={pubkey} />}
+
+                {activeTab === 'recipes' && <ProfileRecipes ndk={ndk} pubkey={pubkey} />}
+
+                {activeTab === 'live' && <ProfileLivestreams ndk={ndk} pubkey={pubkey} />}
+
+                {activeTab === 'badges' && <ProfileBadges ndk={ndk} pubkey={pubkey} userNpub={user?.npub} />}
               </div>
-
-              {/* Home Feed (Recent Activity) */}
-              <div className="profile-section-tab" style={{ marginTop: '20px' }}>
-                <ProfileFeed pubkey={hexPubkey || ''} />
-              </div>
-            </>
-          )}
-
-          {/* Tab: NOTES (Profile Feed) */}
-          {activeTab === 'notes' && (
-            <div className="profile-section-tab">
-              <ProfileFeed pubkey={hexPubkey || ''} />
             </div>
-          )}
-
-          {/* Tab: PHOTOS */}
-          {activeTab === 'photos' && (
-            <div className="profile-section-tab">
-              <h3 className="section-header">{displayName}'s Photos</h3>
-              <ProfilePhotos pubkey={hexPubkey || ''} />
-            </div>
-          )}
-
-          {/* Tab: VIDEOS */}
-          {activeTab === 'videos' && (
-            <div className="profile-section-tab">
-              <h3 className="section-header">{displayName}'s Videos</h3>
-              <ProfileVideos pubkey={hexPubkey || ''} />
-            </div>
-          )}
-
-          {/* Tab: RECIPES */}
-          {activeTab === 'recipes' && (
-            <div className="profile-section-tab">
-              <h3 className="section-header">{displayName}'s Recipes</h3>
-              <ProfileRecipes pubkey={hexPubkey || ''} />
-            </div>
-          )}
-
-          {/* Tab: LIVESTREAM */}
-          {activeTab === 'livestream' && (
-            <div className="profile-section-tab">
-              <h3 className="section-header">{displayName}'s Livestreams</h3>
-              <ProfileLivestreams pubkey={hexPubkey || ''} />
-            </div>
-          )}
-
-          {/* Tab: BLOG */}
-          {activeTab === 'blog' && (
-            <div className="profile-section-tab">
-              <h3 className="section-header">{displayName}'s Blog Posts</h3>
-              <ProfileBlog pubkey={hexPubkey || ''} />
-            </div>
-          )}
+          </div>
         </div>
       </div>
-
-      {showAwardModal && hexPubkey && (
-        <AwardBadgeModal
-          recipientPubkey={hexPubkey}
-          onClose={() => setShowAwardModal(false)}
-          onSuccess={() => {
-            // refresh badges or count if needed
-          }}
-        />
-      )}
     </div>
   );
 };

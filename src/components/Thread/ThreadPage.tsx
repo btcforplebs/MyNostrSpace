@@ -14,6 +14,20 @@ interface ThreadNode {
   children: ThreadNode[];
 }
 
+// Helper to extract parent and root IDs following NIP-10
+const getThreadPointers = (event: NDKEvent) => {
+  const eTags = event.tags.filter((t) => t[0] === 'e');
+  if (eTags.length === 0) return { rootId: null, parentId: null };
+
+  const rootTag = eTags.find((t) => t[3] === 'root') || eTags[0];
+  const replyTag = eTags.find((t) => t[3] === 'reply') || (eTags.length > 1 ? eTags[eTags.length - 1] : eTags[0]);
+
+  return {
+    rootId: rootTag[1],
+    parentId: replyTag[1],
+  };
+};
+
 // Memoized thread item row to prevent unnecessary re-renders
 const ThreadItemRow = memo(
   ({
@@ -42,10 +56,13 @@ const ThreadItemRow = memo(
       <div
         ref={isHighlighted ? ref : undefined}
         className={`${depth > 0 ? 'nested-reply' : ''} ${isHighlighted ? 'highlighted-reply' : ''}`}
+        style={{ position: 'relative' }}
       >
         <FeedItem event={node.event} hideThreadButton={true} />
         {node.children.length > 0 && (
-          <div className="reply-children">{onRenderThread(node.children, depth + 1)}</div>
+          <div className="reply-children">
+            {onRenderThread(node.children, depth + 1)}
+          </div>
         )}
       </div>
     );
@@ -86,29 +103,42 @@ export const ThreadPage = () => {
   // Get custom layout for the root event author
   const { layoutCss } = useCustomLayout(rootEvent?.pubkey);
 
-  // Build tree from flat replies list
-  const buildTree = useCallback((parentId: string, allReplies: NDKEvent[]): ThreadNode[] => {
-    const fetchChildren = (pid: string): ThreadNode[] => {
-      const children = allReplies.filter((reply) => {
-        const eTags = reply.tags.filter((t) => t[0] === 'e');
-        const replyMarkerTag = eTags.find((t) => t[3] === 'reply');
-        const directParentId = replyMarkerTag
-          ? replyMarkerTag[1]
-          : eTags.length > 0
-            ? eTags[eTags.length - 1][1]
-            : null;
-        return directParentId === pid;
-      });
+  // Optimized O(N) tree builder
+  const buildTree = useCallback((rootId: string, allReplies: NDKEvent[]): ThreadNode[] => {
+    const nodesMap = new Map<string, ThreadNode>();
 
-      return children
-        .sort((a, b) => (a.created_at || 0) - (b.created_at || 0))
-        .map((child) => ({
-          event: child,
-          children: fetchChildren(child.id),
-        }));
+    // Create nodes for all replies
+    allReplies.forEach(event => {
+      nodesMap.set(event.id, { event, children: [] });
+    });
+
+    const rootNodes: ThreadNode[] = [];
+
+    allReplies.forEach(event => {
+      const { parentId } = getThreadPointers(event);
+      const node = nodesMap.get(event.id)!;
+
+      if (parentId === rootId || !parentId) {
+        rootNodes.push(node);
+      } else {
+        const parentNode = nodesMap.get(parentId);
+        if (parentNode) {
+          parentNode.children.push(node);
+        } else {
+          // Parent not found in fetched replies - treat as a top-level reply for now
+          rootNodes.push(node);
+        }
+      }
+    });
+
+    // Sort all children by date
+    const sortNodes = (nodes: ThreadNode[]) => {
+      nodes.sort((a, b) => (a.event.created_at || 0) - (b.event.created_at || 0));
+      nodes.forEach(n => sortNodes(n.children));
     };
+    sortNodes(rootNodes);
 
-    return fetchChildren(parentId);
+    return rootNodes;
   }, []);
 
   const threadTree = rootEvent ? buildTree(rootEvent.id, replies) : [];
@@ -119,12 +149,11 @@ export const ThreadPage = () => {
     let cancelled = false;
     let replySubRef: ReturnType<typeof ndk.subscribe> | null = null;
 
-    const fetchEventById = async (id: string): Promise<NDKEvent | null> => {
+    const fetchEventById = async (id: string, relayHints: string[] = []): Promise<NDKEvent | null> => {
       try {
         let hexId = id;
-        let relays: string[] = [];
+        let relays = [...relayHints];
 
-        // Check if it's a bech32 ID
         if (id.startsWith('note1') || id.startsWith('nevent1')) {
           try {
             const decoded = nip19.decode(id);
@@ -132,7 +161,7 @@ export const ThreadPage = () => {
               hexId = decoded.data as string;
             } else if (decoded.type === 'nevent') {
               hexId = decoded.data.id;
-              relays = decoded.data.relays || [];
+              relays = [...relays, ...(decoded.data.relays || [])];
             }
           } catch (e) {
             console.warn('Failed to decode bech32 ID:', id, e);
@@ -140,19 +169,13 @@ export const ThreadPage = () => {
           }
         }
 
-        // Validate hex ID format
-        if (!/^[0-9a-f]{64}$/.test(hexId)) {
-          return null;
-        }
+        if (!/^[0-9a-f]{64}$/.test(hexId)) return null;
 
-        // Use fetchEvent for better management and reliability
-        const event = await ndk.fetchEvent(
+        return await ndk.fetchEvent(
           { ids: [hexId] },
           { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST },
           relays.length > 0 ? NDKRelaySet.fromRelayUrls(relays, ndk) : undefined
         );
-
-        return event;
       } catch (err) {
         console.error('Error in fetchEventById:', id, err);
         return null;
@@ -161,8 +184,6 @@ export const ThreadPage = () => {
 
     const loadReplies = async (rootId: string) => {
       setLoadingReplies(true);
-
-      // Small delay to allow initial render to complete before heavy operations
       await new Promise(resolve => setTimeout(resolve, 50));
 
       const replyFilter: NDKFilter = {
@@ -176,18 +197,15 @@ export const ThreadPage = () => {
       });
       replySubRef = replySub;
 
-      // Buffer replies and batch updates to prevent UI freezing
       let replyBuffer: NDKEvent[] = [];
       let flushTimeout: ReturnType<typeof setTimeout> | null = null;
-      const FLUSH_INTERVAL = 400; // Batch updates every 400ms
+      const FLUSH_INTERVAL = 400;
 
       const flushBuffer = () => {
         if (replyBuffer.length === 0) return;
-
         const currentBuffer = [...replyBuffer];
         replyBuffer = [];
 
-        // Process buffered replies
         const newReplies: NDKEvent[] = [];
         for (const reply of currentBuffer) {
           if (!repliesRef.current.has(reply.id) && !isBlockedUser(reply.pubkey)) {
@@ -197,7 +215,6 @@ export const ThreadPage = () => {
           }
         }
 
-        // Only trigger re-render if we have new unique replies
         if (newReplies.length > 0) {
           setReplies(Array.from(repliesRef.current.values()));
         }
@@ -205,7 +222,6 @@ export const ThreadPage = () => {
 
       replySub.on('event', (reply: NDKEvent) => {
         replyBuffer.push(reply);
-
         if (!flushTimeout) {
           flushTimeout = setTimeout(() => {
             flushBuffer();
@@ -215,12 +231,10 @@ export const ThreadPage = () => {
       });
 
       replySub.on('eose', () => {
-        // Flush any remaining buffered replies
         flushBuffer();
         setLoadingReplies(false);
       });
 
-      // Stop listening for new replies after 30 seconds
       setTimeout(() => {
         flushBuffer();
         replySub.stop();
@@ -228,63 +242,49 @@ export const ThreadPage = () => {
       }, 30000);
     };
 
-    const loadThread = async () => {
-      // Phase 1: Fetch the clicked event
-      const clickedEvent = await fetchEventById(eventId);
-
+    const loadThreadRecursive = async () => {
+      // 1. Fetch current event
+      let currentEvent = await fetchEventById(eventId);
       if (cancelled) return;
-
-      if (!clickedEvent) {
+      if (!currentEvent) {
         setLoading(false);
         return;
       }
 
-      if (isBlockedUser(clickedEvent.pubkey)) {
+      if (isBlockedUser(currentEvent.pubkey)) {
         setIsBlocked(true);
         setLoading(false);
         return;
       }
 
-      // Phase 2: Check if the clicked event is a reply
-      const eTags = clickedEvent.tags.filter((t) => t[0] === 'e');
-      const rootMarkerTag = eTags.find((t) => t[3] === 'root');
-      const trueRootId = rootMarkerTag
-        ? rootMarkerTag[1]
-        : eTags.length > 0
-          ? eTags[0][1]
-          : null;
-
-      // If the clicked event is the root (no e-tags or root points to itself)
-      if (!trueRootId || trueRootId === eventId) {
-        clickedEvent.author.fetchProfile().catch(() => { });
-        setRootEvent(clickedEvent);
-        setHighlightedEventId(null);
-        setLoading(false);
-        loadReplies(clickedEvent.id);
-        return;
-      }
-
-      // The clicked event is a reply — fetch the true root
+      // 2. Climb up the chain to find the absolute root
       setHighlightedEventId(eventId);
+      let absoluteRoot = currentEvent;
+      let visitedIds = new Set([currentEvent.id]);
 
-      const actualRoot = await fetchEventById(trueRootId);
+      while (true) {
+        const { rootId, parentId } = getThreadPointers(absoluteRoot);
+        const nextId = rootId || parentId;
+
+        if (!nextId || visitedIds.has(nextId)) break;
+
+        console.log(`[Thread] Climbing to parent: ${nextId}`);
+        const parent = await fetchEventById(nextId);
+        if (!parent || cancelled) break;
+
+        absoluteRoot = parent;
+        visitedIds.add(parent.id);
+
+        // If we found a note with no e-tags, it's the true root
+        if (parent.tags.filter(t => t[0] === 'e').length === 0) break;
+      }
 
       if (cancelled) return;
 
-      if (actualRoot && !isBlockedUser(actualRoot.pubkey)) {
-        actualRoot.author.fetchProfile().catch(() => { });
-        setRootEvent(actualRoot);
-        setLoading(false);
-        loadReplies(actualRoot.id);
-      } else {
-        // Fallback: if root can't be found, show clicked event as root
-        clickedEvent.author.fetchProfile().catch(() => { });
-        setRootEvent(clickedEvent);
-        setHighlightedEventId(null);
-        setLoading(false);
-        // If we can't find the root, we can still show replies to the clicked event
-        loadReplies(clickedEvent.id);
-      }
+      absoluteRoot.author.fetchProfile().catch(() => { });
+      setRootEvent(absoluteRoot);
+      setLoading(false);
+      loadReplies(absoluteRoot.id);
     };
 
     const loadThreadWithTimeout = async () => {
@@ -292,7 +292,7 @@ export const ThreadPage = () => {
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Fetch timeout')), 10000)
         );
-        await Promise.race([loadThread(), timeoutPromise]);
+        await Promise.race([loadThreadRecursive(), timeoutPromise]);
       } catch (err) {
         if (!cancelled) {
           console.error('Thread load failed:', err);
@@ -387,23 +387,21 @@ export const ThreadPage = () => {
             <div className="thread-root" style={{ marginTop: '10px' }}>
               <FeedItem event={rootEvent} hideThreadButton={true} />
 
-              {threadTree.length > 0 && (
-                <div style={{ marginTop: '15px' }}>{renderThread(threadTree)}</div>
-              )}
-
-              {threadTree.length === 0 && !loadingReplies && (
-                <div
-                  style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}
-                >
-                  No replies yet.
+              {(threadTree.length > 0 || loadingReplies) && (
+                <div className="thread-replies-container">
+                  <div className="thread-replies-header">Replies</div>
+                  {renderThread(threadTree)}
+                  {loadingReplies && (
+                    <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
+                      More replies loading...
+                    </div>
+                  )}
                 </div>
               )}
 
-              {loadingReplies && (
-                <div
-                  style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}
-                >
-                  Loading replies...
+              {threadTree.length === 0 && !loadingReplies && (
+                <div style={{ padding: '15px', color: '#888', fontStyle: 'italic', fontSize: '9pt' }}>
+                  No replies yet.
                 </div>
               )}
             </div>
@@ -434,26 +432,56 @@ export const ThreadPage = () => {
         .thread-root {
           padding: 10px;
         }
+        .thread-replies-container {
+          margin-top: 25px;
+          border-top: 2px solid var(--myspace-orange);
+          padding-top: 15px;
+        }
+        .thread-replies-header {
+          font-weight: bold;
+          font-size: 11pt;
+          margin-bottom: 20px;
+          color: var(--myspace-link);
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
         .reply-children {
           margin-left: 20px;
-          padding-left: 10px;
-          border-left: 2px solid #ddd;
+          padding-left: 15px;
+          border-left: 1px solid #ddd;
+          position: relative;
+        }
+        
+        /* Thread visual connectors */
+        .reply-children::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          height: 30px;
+          width: 15px;
+          border-bottom: 1px solid #ddd;
+          border-left: 1px solid #ddd;
+          border-bottom-left-radius: 10px;
+          display: none; /* Optional: simpler border-left is often cleaner */
         }
 
         @media (max-width: 768px) {
           .reply-children {
-            margin-left: 8px;
-            padding-left: 5px;
-            border-left: 1px solid #ddd;
+            margin-left: 10px;
+            padding-left: 8px;
+            border-left: 1px solid #eee;
           }
         }
         .nested-reply {
-          margin-top: 10px;
+          margin-top: 15px;
         }
         .highlighted-reply {
           background-color: #fffde7;
-          border-left: 3px solid #ff9933;
-          padding-left: 8px;
+          border-left: 3px solid #ff9933 !important;
+          padding-left: 12px;
+          margin-left: -12px;
+          border-radius: 0 4px 4px 0;
         }
       `}</style>
 

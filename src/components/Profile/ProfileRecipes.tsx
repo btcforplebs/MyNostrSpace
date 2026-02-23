@@ -3,17 +3,17 @@ import { Link } from 'react-router-dom';
 import NDK, { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import type { NDKFilter } from '@nostr-dev-kit/ndk';
 
-export const ProfileRecipes = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: string }) => {
+export const ProfileRecipes = ({ ndk, pubkey: hexPubkey }: { ndk: NDK | undefined; pubkey: string }) => {
     const [recipes, setRecipes] = useState<NDKEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!ndk || !pubkey) return;
+        if (!ndk || !hexPubkey) return;
         setLoading(true);
 
         const filter: NDKFilter = {
             kinds: [30023],
-            authors: [pubkey],
+            authors: [hexPubkey],
             '#d': ['recipe'],
         };
 
@@ -37,7 +37,8 @@ export const ProfileRecipes = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: 
         return () => {
             sub.stop();
         };
-    }, [ndk, pubkey]);
+    }, [ndk, hexPubkey]);
+
 
     if (loading) return <div style={{ padding: '20px' }}>Loading Recipes...</div>;
 

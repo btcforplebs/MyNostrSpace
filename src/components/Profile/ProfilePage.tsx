@@ -1,18 +1,21 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useProfile } from '../../hooks/useProfile';
 import { useTop8 } from '../../hooks/useTop8';
+import { CommentWall } from './CommentWall';
 import { useCustomLayout } from '../../hooks/useCustomLayout';
+import { useExtendedProfile } from '../../hooks/useExtendedProfile';
+import { useResolvedPubkey } from '../../hooks/useResolvedPubkey';
+import { useRelationshipStatus } from '../../hooks/useRelationshipStatus';
 import { useNostr } from '../../context/NostrContext';
-import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { WavlakePlayer } from '../Music/WavlakePlayer';
+import { ContactBox } from './ContactBox';
 import { Navbar } from '../Shared/Navbar';
-import { Avatar } from '../Shared/Avatar';
+import { RichTextRenderer } from '../Shared/RichTextRenderer';
 import { SEO } from '../Shared/SEO';
-import { isBlockedUser } from '../../utils/blockedUsers';
-import { PRIMAL_BOT_PUBKEY } from '../../utils/antiprimal';
-import { useProfileStats } from '../../hooks/useProfileStats';
+import { useLightbox } from '../../context/LightboxContext';
 
-// Tab Sub-Components
+// Modular Tab Sub-Components
 import { ProfileRecipes } from './ProfileRecipes';
 import { ProfileBlog } from './ProfileBlog';
 import { ProfileFeed } from './ProfileFeed';
@@ -22,363 +25,436 @@ import { ProfileLivestreams } from './ProfileLivestreams';
 import { ProfileBadges } from './ProfileBadges';
 
 import './ProfilePage.css';
+import { isBlockedUser } from '../../utils/blockedUsers';
+import { AwardBadgeModal } from '../Badges/AwardBadgeModal';
+import { useProfileStats } from '../../hooks/useProfileStats';
 
 const ProfilePage = () => {
-  const { pubkey } = useParams<{ pubkey: string }>();
-  const navigate = useNavigate();
-  const { profile, loading: profileLoading } = useProfile(pubkey);
-  const {
-    top8,
-    loading: top8Loading,
-  } = useTop8(pubkey || '');
-
-  const { layoutCss } = useCustomLayout(pubkey);
   const { user, ndk } = useNostr();
-  const [activeTab, setActiveTab] = useState<'feed' | 'blog' | 'media' | 'recipes' | 'live' | 'badges'>('feed');
+  const navigate = useNavigate();
+  const { pubkey: identifier } = useParams<{ pubkey: string }>();
+  const { hexPubkey, loading: resolving } = useResolvedPubkey(identifier);
+  const { openLightbox } = useLightbox();
+
+  const { profile, loading: profileLoading } = useProfile(hexPubkey || '');
+  const { top8, loading: top8Loading } = useTop8(hexPubkey || '');
+  const { status: relationshipStatus } = useRelationshipStatus(hexPubkey || '');
+
+  const { layoutCss } = useCustomLayout(hexPubkey || '');
+  const { data: extendedProfile } = useExtendedProfile(hexPubkey || '');
 
   // Build a set of blocked pubkeys for stats filtering
   const blockedSet = new Set<string>();
-  if (user) {
-    // isBlockedUser is synchronous
-    if (isBlockedUser(pubkey || '', blockedSet)) {
-      blockedSet.add(pubkey || '');
+  if (user && hexPubkey) {
+    if (isBlockedUser(hexPubkey, blockedSet)) {
+      blockedSet.add(hexPubkey);
     }
   }
 
-  const { stats, loadingStats } = useProfileStats(ndk, { pubkey: pubkey || '' }, blockedSet);
+  const { stats, loadingStats, fetchStats } = useProfileStats(ndk, { pubkey: hexPubkey || '' }, blockedSet);
 
-  // Follow/unfollow state – fetch the user's kind 3 contacts list
-  const [contactListEvent, setContactListEvent] = useState<NDKEvent | null>(null);
+  // Tab State
+  const [activeTab, setActiveTab] = useState('home');
+  const [hasPhotos, setHasPhotos] = useState(false);
+  const [hasVideos, setHasVideos] = useState(false);
+  const [hasRecipes, setHasRecipes] = useState(false);
+  const [hasLivestreams, setHasLivestreams] = useState(false);
+  const [hasBlog, setHasBlog] = useState(false);
+  const [isBadgeCreator, setIsBadgeCreator] = useState(false);
+  const [showAwardModal, setShowAwardModal] = useState(false);
 
-  const fetchContactList = useCallback(async () => {
-    if (!ndk || !user) return;
-    try {
-      const ev = await ndk.fetchEvent({
-        kinds: [3],
-        authors: [user.pubkey],
-      });
-      setContactListEvent(ev);
-    } catch {
-      // ignore
-    }
-  }, [ndk, user]);
-
+  // Content Check Effect - keeping it to show/hide tabs as in 3bd8583
   useEffect(() => {
-    fetchContactList();
-  }, [fetchContactList]);
+    if (!ndk || !hexPubkey) return;
 
-  if (!pubkey) {
-    return <div>No profile specified.</div>;
-  }
+    const checkAll = async () => {
+      // These are lightweight checks
+      const photosCheck = await ndk.fetchEvents({ kinds: [1], authors: [hexPubkey], limit: 20 });
+      const hasP = Array.from(photosCheck).some(
+        (e) => e.content.match(/https?:\/\/[^\s]+\.(jpg|jpeg|png|webp|gif)/i)
+      );
+      setHasPhotos(hasP);
 
-  const isMyProfile = user?.pubkey === pubkey;
-  const isBlocked = isBlockedUser(pubkey, blockedSet);
+      const videosCheck = await ndk.fetchEvents({ kinds: [1, 1063], authors: [hexPubkey], limit: 20 });
+      const hasV = Array.from(videosCheck).some(
+        (e) => e.kind === 1063 || e.content.match(/https?:\/\/[^\s]+\.(mp4|mov|webm|avi|mkv|m3u8)/i)
+      );
+      setHasVideos(hasV);
 
-  const isFollowing = contactListEvent?.tags.some(
-    (t: string[]) => t[0] === 'p' && t[1] === pubkey
-  ) || false;
+      const recipesCheck = await ndk.fetchEvents({
+        kinds: [30023 as number],
+        authors: [hexPubkey],
+        '#t': ['recipe', 'zapcooking', 'nostrcooking'],
+        limit: 1,
+      });
+      setHasRecipes(recipesCheck.size > 0);
 
-  const handleFollowToggle = async () => {
-    if (!ndk || !user) {
-      alert('Please login to follow/unfollow users.');
-      return;
-    }
-    try {
-      if (!isFollowing) {
-        const followEvent = new NDKEvent(ndk);
-        followEvent.kind = 3;
-        followEvent.tags = [['p', pubkey]];
-        if (contactListEvent) {
-          followEvent.tags = [
-            ...contactListEvent.tags.filter((t: string[]) => t[0] === 'p'),
-            ['p', pubkey],
-          ];
-        }
-        await followEvent.publish();
-        window.location.reload();
-      } else {
-        const unFollowEvent = new NDKEvent(ndk);
-        unFollowEvent.kind = 3;
-        if (contactListEvent) {
-          unFollowEvent.tags = contactListEvent.tags.filter(
-            (t: string[]) => t[0] === 'p' && t[1] !== pubkey
-          );
-        }
-        await unFollowEvent.publish();
-        window.location.reload();
+      const streamsCheck = await ndk.fetchEvents({
+        kinds: [30311 as number],
+        authors: [hexPubkey],
+        limit: 1,
+      });
+      setHasLivestreams(streamsCheck.size > 0);
+
+      const blogCheck = await ndk.fetchEvents({
+        kinds: [30023 as number],
+        authors: [hexPubkey],
+        limit: 10,
+      });
+      const hasB = Array.from(blogCheck).some((e) => {
+        const tags = e.tags.map((t) => t[1]);
+        return !tags.includes('recipe') && !tags.includes('zapcooking') && !tags.includes('nostrcooking');
+      });
+      setHasBlog(hasB);
+
+      if (user?.pubkey) {
+        const myBadges = await ndk.fetchEvents({
+          kinds: [30009 as number],
+          authors: [user.pubkey],
+          limit: 1,
+        });
+        setIsBadgeCreator(myBadges.size > 0);
       }
-    } catch (e) {
-      console.error('Failed to update follow list:', e);
-      alert('Failed to update follow list. Please try again.');
-    }
-  };
+    };
 
-  const handleStartChat = () => {
-    navigate(`/chat?p=${pubkey}`);
-  };
+    checkAll();
+  }, [ndk, hexPubkey, user?.pubkey]);
 
-  const displayName = profile?.name || profile?.displayName || pubkey.slice(0, 8);
-
-  return (
-    <div className="profile-page-container">
-      {layoutCss && <style>{layoutCss}</style>}
-      <SEO
-        title={displayName}
-        description={profile?.about || 'View my profile on MyNostrSpace.'}
-        image={profile?.picture}
-      />
-      <Navbar />
-
-      <div className="profile-wrapper">
-        <div className="profile-content">
-          <div className="profile-header-top">
-            <h1 className="profile-title">{displayName}'s Space</h1>
-            {isMyProfile && (
-              <Link to="/edit-layout" className="page-themes-link">
-                <div className="theme-icon"></div>
-                Edit Theme
-              </Link>
-            )}
-          </div>
-          <div className="profile-header-sub">
-            <div className="my-url-text">
-              URL: http://mynostrspace.com/p/{profile?.nip05 || pubkey.slice(0, 16)}
-            </div>
-            {isMyProfile && (
-              <Link to="/edit-profile" className="edit-profile-link">
-                Edit Profile
-              </Link>
-            )}
-            {!isMyProfile && !isBlocked && (
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={handleStartChat}
-                  style={{
-                    padding: '4px 12px',
-                    backgroundColor: '#1E90FF',
-                    color: 'white',
-                    border: '1px solid #104E8B',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '12px',
-                  }}
-                >
-                  Message
-                </button>
-                <button
-                  onClick={handleFollowToggle}
-                  className="edit-profile-link"
-                  style={{
-                    backgroundColor: isFollowing ? '#f0f0f0' : '#ff9933',
-                    color: isFollowing ? '#333' : 'white',
-                    borderColor: isFollowing ? '#ccc' : '#cc7a29',
-                  }}
-                >
-                  {isFollowing ? 'Unfollow' : 'Follow'}
-                </button>
-              </div>
-            )}
-            {!isMyProfile && isBlocked && (
-              <div style={{ color: 'red', fontWeight: 'bold' }}>User is Blocked</div>
-            )}
-          </div>
-
-          <div className="profile-layout">
-            {/* Left Sidebar */}
-            <div className="profile-left">
-              <div className="profile-box user-pic-box">
-                <div className="profile-box-header">{displayName}</div>
-                <div className="profile-box-body">
-                  <div className="user-pic-container">
-                    {profile?.picture ? (
-                      <Avatar pubkey={pubkey} src={profile.picture} size={170} className="user-pic" />
-                    ) : (
-                      <div className="user-pic-placeholder">No Picture</div>
-                    )}
-                  </div>
-
-                  {!loadingStats ? (
-                    <div className="stats-container">
-                      <div className="stat-item">
-                        <span className="stat-label">Followers</span>
-                        <span className="stat-value">{stats.followers ?? 'N/A'}</span>
-                      </div>
-                      <div className="stat-item">
-                        <span className="stat-label">Posts</span>
-                        <span className="stat-value">{stats.posts ?? 'N/A'}</span>
-                      </div>
-                      <div className="stat-item">
-                        <span className="stat-label">Zaps Recv</span>
-                        <span className="stat-value">{stats.zaps ?? 'N/A'} 丰</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: '11px', textAlign: 'center', marginTop: '10px' }}>
-                      Loading Stats...
-                    </div>
-                  )}
-
-                  {pubkey === PRIMAL_BOT_PUBKEY && (
-                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
-                      <button
-                        style={{
-                          padding: '4px 8px',
-                          fontSize: '11px',
-                          cursor: 'pointer',
-                          backgroundColor: '#eee',
-                          border: '1px solid #ccc',
-                          borderRadius: '4px',
-                        }}
-                      >
-                        Force Sync Primal Stats
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="user-bio">{profile?.about || 'No bio provided.'}</div>
-
-                  {profileLoading ? (
-                    <div style={{ fontSize: '12px' }}>Loading profile data...</div>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* Friends List Component */}
-              <div className="profile-box friends-box">
-                <div className="profile-box-header">
-                  {displayName}'s Friends Space ({top8Loading ? '...' : top8.length})
-                </div>
-                <div className="profile-box-body">
-                  {top8Loading ? (
-                    <div className="loading-friends">Loading friends...</div>
-                  ) : top8.length === 0 ? (
-                    <div className="no-friends">No friends found.</div>
-                  ) : (
-                    <div className="friends-grid">
-                      {top8.map((friend) => (
-                        <Link
-                          to={`/p/${friend.pubkey}`}
-                          key={friend.pubkey}
-                          className="friend-tile"
-                        >
-                          <Avatar
-                            pubkey={friend.pubkey}
-                            src={friend.profile?.image}
-                            size={70}
-                            className="friend-avatar"
-                          />
-                          <div className="friend-name">
-                            {friend.profile?.name ||
-                              friend.profile?.displayName ||
-                              friend.pubkey.slice(0, 8)}
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                  <div style={{ textAlign: 'right', marginTop: '10px' }}>
-                    <Link to={`/friends/${pubkey}`} className="view-all-friends">
-                      View All
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Main Content */}
-            <div className="profile-main">
-              {profile?.banner && (
-                <div
-                  className="profile-banner-container"
-                  style={{
-                    width: '100%',
-                    height: '250px',
-                    marginBottom: '15px',
-                    border: '1px solid #6699cc',
-                    background: '#000',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <img
-                    src={profile.banner}
-                    alt="Banner"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                </div>
-              )}
-
-              <div className="view-mode-tabs profile-tabs">
-                <button
-                  className={activeTab === 'feed' ? 'active' : ''}
-                  onClick={() => setActiveTab('feed')}
-                >
-                  Feed
-                </button>
-                <button
-                  className={activeTab === 'media' ? 'active' : ''}
-                  onClick={() => setActiveTab('media')}
-                >
-                  Media
-                </button>
-                <button
-                  className={activeTab === 'blog' ? 'active' : ''}
-                  onClick={() => setActiveTab('blog')}
-                >
-                  Blog
-                </button>
-                <button
-                  className={activeTab === 'recipes' ? 'active' : ''}
-                  onClick={() => setActiveTab('recipes')}
-                >
-                  Recipes
-                </button>
-                <button
-                  className={activeTab === 'live' ? 'active' : ''}
-                  onClick={() => setActiveTab('live')}
-                >
-                  Live
-                </button>
-                <button
-                  className={activeTab === 'badges' ? 'active' : ''}
-                  onClick={() => setActiveTab('badges')}
-                >
-                  Badges
-                </button>
-              </div>
-
-              <div
-                className="profile-tab-content"
-                style={{
-                  background: 'white',
-                  border: '1px solid #6699cc',
-                  borderTop: 'none',
-                  minHeight: '400px',
-                }}
-              >
-                {activeTab === 'feed' && <ProfileFeed ndk={ndk} pubkey={pubkey} />}
-
-                {activeTab === 'media' && (
-                  <div>
-                    <h3 style={{ margin: '15px 15px 5px', color: '#6699cc' }}>Photos</h3>
-                    <ProfilePhotos ndk={ndk} pubkey={pubkey} />
-                    <h3 style={{ margin: '15px 15px 5px', color: '#6699cc' }}>Videos</h3>
-                    <ProfileVideos ndk={ndk} pubkey={pubkey} />
-                  </div>
-                )}
-
-                {activeTab === 'blog' && <ProfileBlog ndk={ndk} pubkey={pubkey} />}
-
-                {activeTab === 'recipes' && <ProfileRecipes ndk={ndk} pubkey={pubkey} />}
-
-                {activeTab === 'live' && <ProfileLivestreams ndk={ndk} pubkey={pubkey} />}
-
-                {activeTab === 'badges' && <ProfileBadges ndk={ndk} pubkey={pubkey} userNpub={user?.npub} />}
-              </div>
-            </div>
+  if (resolving) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-box">
+          <div className="loading-header">MyNostrSpace.com</div>
+          <div className="loading-body">
+            <p>Loading Profile...</p>
+            <p style={{ fontSize: '8pt' }}>(Please Wait)</p>
           </div>
         </div>
       </div>
+    );
+  }
+
+  if (hexPubkey && isBlockedUser(hexPubkey)) {
+    return (
+      <div className="profile-container">
+        <Navbar />
+        <div className="profile-body" style={{ padding: '40px', textAlign: 'center' }}>
+          <h2 className="section-header" style={{ background: '#cc0000', color: 'white' }}>
+            Profile Blocked
+          </h2>
+          <p style={{ marginTop: '20px' }}>
+            Content from this user has been blocked according to your settings.
+          </p>
+          <div style={{ marginTop: '20px' }}>
+            <Link to="/" style={{ color: '#003399', fontWeight: 'bold' }}>
+              &laquo; Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const displayName = profile?.name || profile?.displayName || (hexPubkey ? `${hexPubkey.slice(0, 8)}...` : 'User');
+  const displayAbout = profile?.about || (profileLoading ? 'Loading info...' : 'Currently building my brand new NostrSpace page.');
+
+  const tabs = [
+    { id: 'home', label: 'Home', visible: true },
+    { id: 'notes', label: 'Notes', visible: true },
+    { id: 'photos', label: 'Photos', visible: hasPhotos },
+    { id: 'videos', label: 'Videos', visible: hasVideos },
+    { id: 'recipes', label: 'Recipes', visible: hasRecipes },
+    { id: 'livestream', label: 'Livestream', visible: hasLivestreams },
+    { id: 'blog', label: 'Blog', visible: hasBlog },
+    { id: 'badges', label: 'Badges', visible: true },
+  ].filter((t) => t.visible);
+
+  const npub = hexPubkey ? ndk?.getUser({ pubkey: hexPubkey }).npub : '';
+
+  return (
+    <div className="profile-container">
+      {layoutCss && <style>{layoutCss}</style>}
+
+      <SEO
+        title={displayName}
+        description={`${displayName}'s profile on MyNostrSpace. ${profile?.about || ''}`}
+        image={profile?.picture}
+        url={window.location.href}
+      />
+
+      <div className="profile-header">
+        <Navbar />
+      </div>
+
+      <div className="profile-body">
+        {/* Left Column */}
+        <div className="left-column">
+          <div className="profile-pic-box">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
+              <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {displayName}
+                {profile?.nip05 && <span title={profile.nip05} style={{ color: '#0099ff', fontSize: '0.6em', verticalAlign: 'middle' }}>✓</span>}
+              </h1>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {user?.pubkey === hexPubkey && (
+                  <Link to="/edit-profile" style={{ fontSize: '8pt', textDecoration: 'none', color: '#003399' }}>[ Edit Profile ]</Link>
+                )}
+              </div>
+            </div>
+
+            <div className="profile-details-grid">
+              {profile?.picture ? (
+                <img
+                  src={profile.picture}
+                  alt={profile.name || 'Profile'}
+                  className="profile-pic"
+                  onClick={() => openLightbox(profile.picture!)}
+                  style={{ cursor: 'pointer', width: '170px' }}
+                />
+              ) : (
+                <div className="profile-pic" style={{ background: '#eee', display: 'flex', alignItems: 'center', justifyItems: 'center', width: '170px', height: '170px' }}>?</div>
+              )}
+
+              <div className="profile-text-details">
+                <div className="personal-text" style={{ fontSize: '8pt' }}>
+                  <RichTextRenderer content={extendedProfile?.headline || '...'} />
+                  <p>{extendedProfile?.gender}</p>
+                  <p>{[extendedProfile?.city, extendedProfile?.region, extendedProfile?.country].filter(Boolean).join(', ')}</p>
+                </div>
+                {profile?.nip05 && (
+                  <div className="nip05" style={{ fontSize: '8pt', color: '#666', fontWeight: 'bold' }}>{profile.nip05}</div>
+                )}
+                <div className="last-login" style={{ fontSize: '8pt', margin: '10px 0' }}>
+                  Last Login: {new Date().toLocaleDateString()}
+                </div>
+                <div
+                  className="user-stats-clickable"
+                  style={{ fontSize: '8pt', marginTop: '5px', cursor: 'pointer', fontWeight: 'bold' }}
+                  onClick={fetchStats}
+                  title="Click to load stats"
+                >
+                  {loadingStats ? (
+                    <span>Loading stats...</span>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span>Followers: {stats.followers ?? '0'}</span>
+                      <span>Posts: {stats.posts ?? '0'}</span>
+                      <span>Zaps Received: {stats.zaps ?? '0'} 丰</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <ContactBox
+            name={profile?.name || ''}
+            pubkey={hexPubkey || ''}
+            showAwardButton={isBadgeCreator && user?.pubkey !== hexPubkey}
+            onAwardBadge={() => setShowAwardModal(true)}
+          />
+
+          <div className="profile-box">
+            <h3 className="section-header">My Apps</h3>
+            <div className="profile-box-body">
+              <ul className="my-apps-list">
+                <li className="app-item" onClick={() => navigate('/blogs')}><span className="app-icon">✍️</span> Blogs</li>
+                <li className="app-item" onClick={() => navigate('/videos')}><span className="app-icon">🎥</span> Videos</li>
+                <li className="app-item" onClick={() => navigate('/music')}><span className="app-icon">🎵</span> Music</li>
+                <li className="app-item" onClick={() => navigate('/recipes')}><span className="app-icon">🍳</span> Recipes</li>
+                <li className="app-item" onClick={() => navigate('/livestreams')}><span className="app-icon">📺</span> Live</li>
+                <li className="app-item" onClick={() => navigate('/badges')}><span className="app-icon">🏆</span> Badges</li>
+                <li className="app-item" onClick={() => navigate('/marketplace')}><span className="app-icon">🛒</span> Shop</li>
+                <li className="app-item" onClick={() => navigate('/photos')}><span className="app-icon">🖼️</span> Photos</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="url-box">
+            <b>MyNostrSpace URL:</b><br />
+            http://mynostrspace.com/p/{npub || hexPubkey}
+          </div>
+
+          <div className="interests-box">
+            <h3 className="section-header">{displayName}'s Interests</h3>
+            <table className="interests-table myspace-table">
+              <tbody>
+                <tr>
+                  <td className="label">General</td>
+                  <td><RichTextRenderer content={extendedProfile?.interests?.general || 'N/A'} /></td>
+                </tr>
+                <tr>
+                  <td className="label">Music</td>
+                  <td><RichTextRenderer content={extendedProfile?.interests?.music || 'N/A'} /></td>
+                </tr>
+                <tr>
+                  <td className="label">Movies</td>
+                  <td><RichTextRenderer content={extendedProfile?.interests?.movies || 'N/A'} /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="badges-box">
+            <h3 className="section-header">Badges</h3>
+            <ProfileBadges ndk={ndk} pubkey={hexPubkey || ''} userNpub={user?.npub} />
+          </div>
+
+          {extendedProfile?.music && (
+            Array.isArray(extendedProfile.music) ? (
+              <WavlakePlayer tracks={extendedProfile.music} />
+            ) : (
+              <WavlakePlayer trackUrl={extendedProfile?.music?.url} />
+            )
+          )}
+        </div>
+
+        {/* Right Column */}
+        <div className="right-column">
+          <div className="extended-network" style={{ border: '1px solid black', padding: '10px', marginBottom: '15px', background: '#f5f5f5' }}>
+            <h2 style={{ fontSize: '14pt', margin: 0 }}>
+              {displayName} {relationshipStatus || 'is in your extended network'}
+            </h2>
+          </div>
+
+          <div className="profile-tabs" style={{ marginBottom: '0', display: 'flex', gap: '0' }}>
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '5px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '9pt',
+                  backgroundColor: activeTab === tab.id ? 'var(--myspace-orange)' : '#eee',
+                  color: activeTab === tab.id ? 'white' : '#333',
+                  border: '1px solid #ccc',
+                  borderBottom: 'none',
+                  borderRadius: '5px 5px 0 0',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="profile-tab-content-container" style={{ border: '1px solid #ccc', borderTop: 'none', background: 'white' }}>
+            {activeTab === 'home' && (
+              <>
+                <div className="blurbs-section">
+                  <h3 className="section-header">{displayName}'s Blurbs</h3>
+                  <div className="blurb-content" style={{ padding: '10px' }}>
+                    <h4>About me:</h4>
+                    <RichTextRenderer content={displayAbout} />
+                    <h4>Who I'd like to meet:</h4>
+                    <RichTextRenderer content="Developers building on Nostr and people enjoying freedom." />
+                  </div>
+                </div>
+
+                <div className="top-8-section">
+                  <h3 className="section-header">{displayName}'s Friend Space</h3>
+                  <div className="top-8-grid">
+                    {top8Loading ? (
+                      <div>Loading Top 8...</div>
+                    ) : (
+                      top8.map((friend) => (
+                        <div key={friend.pubkey} className="friend-slot">
+                          <Link to={`/p/${friend.npub || friend.pubkey}`}>
+                            <p className="friend-name">{friend.profile?.displayName || friend.profile?.name || 'Friend'}</p>
+                            <div className="friend-pic-container">
+                              {friend.profile?.image ? (
+                                <img
+                                  src={friend.profile.image}
+                                  alt={friend.profile?.name || 'Friend'}
+                                  className="friend-pic"
+                                  style={{ width: '90px', height: '90px', objectFit: 'cover', border: '1px solid white' }}
+                                />
+                              ) : (
+                                <div className="friend-pic" style={{ background: '#eee', width: '90px', height: '90px' }}></div>
+                              )}
+                            </div>
+                          </Link>
+                        </div>
+                      ))
+                    )}
+                    {!top8Loading && top8.length < 8 && [...Array(8 - top8.length)].map((_, i) => (
+                      <div key={`empty-${i}`} className="friend-slot empty">
+                        <p className="friend-name" style={{ visibility: 'hidden' }}>Top 8</p>
+                        <div className="friend-pic-placeholder" style={{ width: '90px', height: '90px' }}></div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ textAlign: 'right', marginTop: '10px', fontSize: '10pt', fontWeight: 'bold' }}>
+                    View {displayName}'s Friends: <Link to={`/p/${hexPubkey}/friends`}>All</Link>
+                  </div>
+                </div>
+
+                <div className="comment-wall-section" style={{ marginTop: '20px' }}>
+                  <CommentWall pubkey={hexPubkey || ''} />
+                </div>
+
+                <ProfileFeed ndk={ndk} pubkey={hexPubkey || ''} />
+              </>
+            )}
+
+            {activeTab === 'notes' && (
+              <div className="profile-section-tab" style={{ padding: '10px' }}>
+                <ProfileFeed ndk={ndk} pubkey={hexPubkey || ''} />
+              </div>
+            )}
+
+            {activeTab === 'photos' && (
+              <div className="profile-section-tab" style={{ padding: '10px' }}>
+                <h3 className="section-header">{displayName}'s Photos</h3>
+                <ProfilePhotos ndk={ndk} pubkey={hexPubkey || ''} />
+              </div>
+            )}
+
+            {activeTab === 'videos' && (
+              <div className="profile-section-tab" style={{ padding: '10px' }}>
+                <h3 className="section-header">{displayName}'s Videos</h3>
+                <ProfileVideos ndk={ndk} pubkey={hexPubkey || ''} />
+              </div>
+            )}
+
+            {activeTab === 'recipes' && (
+              <div className="profile-section-tab" style={{ padding: '10px' }}>
+                <h3 className="section-header">{displayName}'s Recipes</h3>
+                <ProfileRecipes ndk={ndk} pubkey={hexPubkey || ''} />
+              </div>
+            )}
+
+            {activeTab === 'livestream' && (
+              <div className="profile-section-tab" style={{ padding: '10px' }}>
+                <h3 className="section-header">{displayName}'s Livestreams</h3>
+                <ProfileLivestreams ndk={ndk} pubkey={hexPubkey || ''} />
+              </div>
+            )}
+
+            {activeTab === 'blog' && (
+              <div className="profile-section-tab" style={{ padding: '10px' }}>
+                <h3 className="section-header">{displayName}'s Blog Posts</h3>
+                <ProfileBlog ndk={ndk} pubkey={hexPubkey || ''} />
+              </div>
+            )}
+
+            {activeTab === 'badges' && (
+              <div className="profile-section-tab" style={{ padding: '10px' }}>
+                <ProfileBadges ndk={ndk} pubkey={hexPubkey || ''} userNpub={user?.npub} />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showAwardModal && hexPubkey && (
+        <AwardBadgeModal
+          recipientPubkey={hexPubkey}
+          onClose={() => setShowAwardModal(false)}
+          onSuccess={() => { }}
+        />
+      )}
     </div>
   );
 };

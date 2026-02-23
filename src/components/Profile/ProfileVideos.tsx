@@ -28,13 +28,13 @@ export interface VideoItem {
     created_at: number;
 }
 
-export const ProfileVideos = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: string }) => {
+export const ProfileVideos = ({ ndk, pubkey: hexPubkey }: { ndk: NDK | undefined; pubkey: string }) => {
     const [videos, setVideos] = useState<VideoItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedVideo, setExpandedVideo] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!ndk || !pubkey) return;
+        if (!ndk || !hexPubkey) return;
         setLoading(true);
 
         const matchVideoBaseUrl = (url: string) => {
@@ -49,13 +49,13 @@ export const ProfileVideos = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: s
 
         const filter: NDKFilter = {
             kinds: [1, 20],
-            authors: [pubkey],
+            authors: [hexPubkey],
             limit: 100,
         };
 
         const imetaFilter: NDKFilter = {
             kinds: [1063],
-            authors: [pubkey],
+            authors: [hexPubkey],
             limit: 100,
         };
 
@@ -63,6 +63,7 @@ export const ProfileVideos = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: s
             closeOnEose: false,
             cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
         });
+
 
         const newVideos: VideoItem[] = [];
 
@@ -112,7 +113,8 @@ export const ProfileVideos = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: s
         return () => {
             sub.stop();
         };
-    }, [ndk, pubkey]);
+    }, [ndk, hexPubkey]);
+
 
     if (loading && videos.length === 0) return <div style={{ padding: '20px' }}>Loading Videos...</div>;
     if (videos.length === 0) return <div style={{ padding: '20px' }}>No videos found.</div>;

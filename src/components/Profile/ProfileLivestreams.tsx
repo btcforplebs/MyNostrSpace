@@ -3,17 +3,17 @@ import { Link } from 'react-router-dom';
 import NDK, { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import type { NDKFilter } from '@nostr-dev-kit/ndk';
 
-export const ProfileLivestreams = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: string }) => {
+export const ProfileLivestreams = ({ ndk, pubkey: hexPubkey }: { ndk: NDK | undefined; pubkey: string }) => {
     const [streams, setStreams] = useState<NDKEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!ndk || !pubkey) return;
+        if (!ndk || !hexPubkey) return;
         setLoading(true);
 
         const filter: NDKFilter = {
             kinds: [30311 as number],
-            authors: [pubkey],
+            authors: [hexPubkey],
         };
 
         const sub = ndk.subscribe(filter, {
@@ -45,7 +45,7 @@ export const ProfileLivestreams = ({ ndk, pubkey }: { ndk: NDK | undefined; pubk
         return () => {
             sub.stop();
         };
-    }, [ndk, pubkey]);
+    }, [ndk, hexPubkey]);
 
     if (loading) return <div style={{ padding: '20px' }}>Loading Livestreams...</div>;
 
@@ -62,7 +62,7 @@ export const ProfileLivestreams = ({ ndk, pubkey }: { ndk: NDK | undefined; pubk
                 const dTag = stream.getMatchingTags('d')[0]?.[1];
                 const summary = stream.getMatchingTags('summary')[0]?.[1] || stream.content || '';
 
-                const url = `/live/${pubkey}/${dTag}`;
+                const url = `/live/${hexPubkey}/${dTag}`;
 
                 return (
                     <Link key={stream.id} to={url} className="stream-list-item">

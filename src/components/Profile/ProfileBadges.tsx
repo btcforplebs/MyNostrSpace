@@ -6,7 +6,7 @@ import { useNostr } from '../../context/NostrContext';
 
 export const ProfileBadges = ({
     ndk,
-    pubkey,
+    pubkey: hexPubkey,
     userNpub,
 }: {
     ndk: NDK | undefined;
@@ -14,7 +14,8 @@ export const ProfileBadges = ({
     userNpub: string | undefined;
 }) => {
     const { user } = useNostr(); // Logged-in user granting badges
-    const { badges, loadingBadges } = useProfileBadges(ndk, pubkey);
+    const { badges, loadingBadges } = useProfileBadges(ndk, hexPubkey);
+
 
     const [isAwardModalOpen, setIsAwardModalOpen] = useState(false);
 
@@ -125,8 +126,9 @@ export const ProfileBadges = ({
                 <AwardBadgeModal
                     onClose={() => setIsAwardModalOpen(false)}
                     onSuccess={() => setIsAwardModalOpen(false)}
-                    recipientPubkey={pubkey}
+                    recipientPubkey={hexPubkey}
                 />
+
             )}
         </div>
     );

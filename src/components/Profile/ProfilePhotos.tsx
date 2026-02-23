@@ -11,7 +11,7 @@ export interface PhotoFile {
     created_at: number;
 }
 
-export const ProfilePhotos = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: string }) => {
+export const ProfilePhotos = ({ ndk, pubkey: hexPubkey }: { ndk: NDK | undefined; pubkey: string }) => {
     const [photos, setPhotos] = useState<PhotoFile[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedPhotoId, setExpandedPhotoId] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export const ProfilePhotos = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: s
     }, []);
 
     useEffect(() => {
-        if (!ndk || !pubkey) return;
+        if (!ndk || !hexPubkey) return;
         setLoading(true);
 
         const matchImageBaseUrl = (url: string) => {
@@ -44,16 +44,17 @@ export const ProfilePhotos = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: s
 
         const filter: NDKFilter = {
             kinds: [1, 20],
-            authors: [pubkey],
+            authors: [hexPubkey],
             limit: 100,
         };
 
         // Imeta filter for NIP-92
         const imetaFilter: NDKFilter = {
             kinds: [1063],
-            authors: [pubkey],
+            authors: [hexPubkey],
             limit: 100,
         };
+
 
         const sub = ndk.subscribe([filter, imetaFilter], {
             closeOnEose: false,
@@ -108,7 +109,8 @@ export const ProfilePhotos = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: s
         return () => {
             sub.stop();
         };
-    }, [ndk, pubkey]);
+    }, [ndk, hexPubkey]);
+
 
     if (loading && photos.length === 0) return <div style={{ padding: '20px' }}>Loading Photos...</div>;
     if (photos.length === 0) return <div style={{ padding: '20px' }}>No photos found.</div>;

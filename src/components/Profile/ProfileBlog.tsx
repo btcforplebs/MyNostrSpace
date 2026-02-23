@@ -3,17 +3,17 @@ import { Link } from 'react-router-dom';
 import NDK, { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import type { NDKFilter } from '@nostr-dev-kit/ndk';
 
-export const ProfileBlog = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: string }) => {
+export const ProfileBlog = ({ ndk, pubkey: hexPubkey }: { ndk: NDK | undefined; pubkey: string }) => {
     const [posts, setPosts] = useState<NDKEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!ndk || !pubkey) return;
+        if (!ndk || !hexPubkey) return;
         setLoading(true);
 
         const filter: NDKFilter = {
             kinds: [30023],
-            authors: [pubkey],
+            authors: [hexPubkey],
         };
 
         const sub = ndk.subscribe(filter, {
@@ -40,7 +40,7 @@ export const ProfileBlog = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: str
         return () => {
             sub.stop();
         };
-    }, [ndk, pubkey]);
+    }, [ndk, hexPubkey]);
 
     if (loading) return <div style={{ padding: '20px' }}>Loading Blog Posts...</div>;
 
@@ -70,7 +70,7 @@ export const ProfileBlog = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: str
                             </div>
                         )}
                         <div className="blog-list-content">
-                            <Link to={`/blog/${pubkey}/${dTag}`} className="blog-list-title">
+                            <Link to={`/blog/${hexPubkey}/${dTag}`} className="blog-list-title">
                                 {title}
                             </Link>
                             <div className="blog-list-date">{dateStr}</div>

@@ -3,19 +3,20 @@ import NDK, { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import type { NDKFilter } from '@nostr-dev-kit/ndk';
 import { FeedItem } from '../Shared/FeedItem';
 
-export const ProfileFeed = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: string }) => {
+export const ProfileFeed = ({ ndk, pubkey: hexPubkey }: { ndk: NDK | undefined; pubkey: string }) => {
     const [feed, setFeed] = useState<NDKEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!ndk || !pubkey) return;
+        if (!ndk || !hexPubkey) return;
         setLoading(true);
 
         const filter: NDKFilter = {
             kinds: [1],
-            authors: [pubkey],
+            authors: [hexPubkey],
             limit: 100,
         };
+
 
         const sub = ndk.subscribe(filter, {
             closeOnEose: false,
@@ -43,7 +44,8 @@ export const ProfileFeed = ({ ndk, pubkey }: { ndk: NDK | undefined; pubkey: str
         return () => {
             sub.stop();
         };
-    }, [ndk, pubkey]);
+    }, [ndk, hexPubkey]);
+
 
     if (loading && feed.length === 0) {
         return <div style={{ padding: '20px' }}>Loading Feed...</div>;

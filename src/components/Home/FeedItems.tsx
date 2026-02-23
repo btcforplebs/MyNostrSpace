@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
+import { nip19 } from 'nostr-tools';
 import { FeedItem } from '../Shared/FeedItem';
 import { Avatar } from '../Shared/Avatar';
 import { useProfile } from '../../hooks/useProfile';
@@ -247,6 +248,10 @@ export const ReplyCard = memo(({ event }: { event: NDKEvent }) => {
     const { profile } = useProfile(event.pubkey);
     const authorName = profile?.name || profile?.displayName || event.pubkey.slice(0, 8);
 
+    const noteId = (() => {
+        try { return nip19.noteEncode(event.id); } catch { return event.id; }
+    })();
+
     return (
         <div className="reply-card">
             <div className="reply-card-header">
@@ -271,8 +276,8 @@ export const ReplyCard = memo(({ event }: { event: NDKEvent }) => {
                 </div>
                 <div className="reply-card-actions">
                     <InteractionBar event={event} onCommentClick={() => { }} />
-                    <Link to={`/thread/${event.id}`} className="show-thread-link">
-                        Show thread
+                    <Link to={`/thread/${noteId}`} className="show-thread-link">
+                        View full thread
                     </Link>
                 </div>
             </div>

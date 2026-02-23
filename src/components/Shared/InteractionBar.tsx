@@ -37,6 +37,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
   const [zapInvoice, setZapInvoice] = useState<string | null>(null);
   const [isZapping, setIsZapping] = useState(false);
   const [showRepostConfirm, setShowRepostConfirm] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState(false);
   const elementRef = useRef<HTMLDivElement>(null);
 
   // New state for file upload
@@ -288,6 +289,31 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
     },
     [user, login, ndk, event]
   );
+  const handleShare = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      try {
+        // Collect active relay URLs for the pointer
+        const activeRelays = ndk ? Array.from(ndk.pool.relays.keys()) : [];
+
+        // Prefer relays where the event might be found
+        const nevent = nip19.neventEncode({
+          id: event.id,
+          author: event.pubkey,
+          relays: activeRelays.slice(0, 3) // Add first 3 active relays as hints
+        });
+
+        const shareUrl = `${window.location.origin}/thread/${nevent}`;
+        await navigator.clipboard.writeText(shareUrl);
+
+        setCopyFeedback(true);
+        setTimeout(() => setCopyFeedback(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy share URL:', err);
+      }
+    },
+    [ndk, event]
+  );
 
   return (
     <div
@@ -348,6 +374,14 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
       <span className="interaction-separator">|</span>
       <a href="#" onClick={handleZap} style={{ color: '#003399' }}>
         {isZapping ? 'zapping...' : `zap (${stats.zaps})`}
+      </a>
+      <span className="interaction-separator">|</span>
+      <a
+        href="#"
+        onClick={handleShare}
+        style={{ color: '#003399', fontWeight: copyFeedback ? 'bold' : 'normal' }}
+      >
+        {copyFeedback ? 'copied!' : 'share'}
       </a>
       {showQuoteForm && (
         <div className="myspace-form-container" style={{ flexBasis: '100%' }}>

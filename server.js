@@ -51,10 +51,27 @@ async function fetchWithTimeout(promise, ms) {
 
 async function fetchNostrData(type, id) {
     let hex = id;
-    if (id.startsWith('npub') || id.startsWith('note')) {
+    let relayHint = null;
+
+    // Handle all Nostr Bech32 identifiers
+    if (id.startsWith('npub') || id.startsWith('note') || id.startsWith('naddr') || id.startsWith('nevent') || id.startsWith('nprofile')) {
         try {
             const decoded = nip19.decode(id);
-            hex = typeof decoded.data === 'string' ? decoded.data : toHex(decoded.data);
+            if (decoded.type === 'naddr') {
+                // For sharded notes (community/channel posts)
+                hex = decoded.data.id;
+                relayHint = decoded.data.relay;
+            } else if (decoded.type === 'nevent') {
+                // Event with relay hints
+                hex = decoded.data.id;
+                relayHint = decoded.data.relay;
+            } else if (decoded.type === 'nprofile') {
+                // Profile with relay hints
+                hex = decoded.data.pubkey;
+                relayHint = decoded.data.relay;
+            } else {
+                hex = typeof decoded.data === 'string' ? decoded.data : toHex(decoded.data);
+            }
         } catch (e) {
             console.error(`[Fetch] Invalid Bech32 ID: ${id}`);
             return null;
@@ -72,7 +89,13 @@ async function fetchNostrData(type, id) {
         }
 
         // 5-second hard timeout for the relay fetch
-        const event = await fetchWithTimeout(pool.get(RELAYS, filter), 5000);
+        // For sharded notes, prioritize the relay hint if available
+        let relaysToQuery = RELAYS;
+        if (relayHint) {
+            console.log(`[Fetch] Using relay hint: ${relayHint}`);
+            relaysToQuery = [relayHint, ...RELAYS];
+        }
+        const event = await fetchWithTimeout(pool.get(relaysToQuery, filter), 5000);
         if (!event) {
             console.log(`[Fetch] No event found for ${hex}`);
             return null;

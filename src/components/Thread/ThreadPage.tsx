@@ -242,57 +242,71 @@ export const ThreadPage = () => {
       }, 30000);
     };
 
-    const loadThreadRecursive = async () => {
-      // 1. Fetch current event
-      let currentEvent = await fetchEventById(eventId);
-      if (cancelled) return;
-      if (!currentEvent) {
-        setLoading(false);
-        return;
-      }
-
-      if (isBlockedUser(currentEvent.pubkey)) {
-        setIsBlocked(true);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Climb up the chain to find the absolute root
-      setHighlightedEventId(eventId);
-      let absoluteRoot = currentEvent;
-      let visitedIds = new Set([currentEvent.id]);
-
-      while (true) {
-        const { rootId, parentId } = getThreadPointers(absoluteRoot);
-        const nextId = rootId || parentId;
-
-        if (!nextId || visitedIds.has(nextId)) break;
-
-        console.log(`[Thread] Climbing to parent: ${nextId}`);
-        const parent = await fetchEventById(nextId);
-        if (!parent || cancelled) break;
-
-        absoluteRoot = parent;
-        visitedIds.add(parent.id);
-
-        // If we found a note with no e-tags, it's the true root
-        if (parent.tags.filter(t => t[0] === 'e').length === 0) break;
-      }
-
-      if (cancelled) return;
-
-      absoluteRoot.author.fetchProfile().catch(() => { });
-      setRootEvent(absoluteRoot);
-      setLoading(false);
-      loadReplies(absoluteRoot.id);
-    };
-
-    const loadThreadWithTimeout = async () => {
+    const loadThreadWithResilience = async () => {
       try {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Fetch timeout')), 10000)
-        );
-        await Promise.race([loadThreadRecursive(), timeoutPromise]);
+        // 1. Fetch current event with a shorter local timeout for the first hop
+        console.log(`[Thread] Fetching target event: ${eventId}`);
+        const currentEvent = await fetchEventById(eventId);
+
+        if (cancelled) return;
+        if (!currentEvent) {
+          console.error(`[Thread] Initial event not found: ${eventId}`);
+          setLoading(false);
+          return;
+        }
+
+        if (isBlockedUser(currentEvent.pubkey)) {
+          setIsBlocked(true);
+          setLoading(false);
+          return;
+        }
+
+        // 2. Immediately show the target event to the user
+        currentEvent.author.fetchProfile().catch(() => { });
+        setRootEvent(currentEvent);
+        setHighlightedEventId(eventId);
+        setLoading(false);
+
+        // 3. Start loading replies to THIS event immediately
+        loadReplies(currentEvent.id);
+
+        // 4. Background: Climb up the chain to find the absolute root
+        // We do this in a separate promise so it doesn't block the initial render
+        (async () => {
+          let absoluteRoot = currentEvent;
+          let visitedIds = new Set([currentEvent.id]);
+          let climbed = false;
+
+          while (true) {
+            const { rootId, parentId } = getThreadPointers(absoluteRoot);
+            const nextId = rootId || parentId;
+
+            if (!nextId || visitedIds.has(nextId)) break;
+
+            console.log(`[Thread] Climbing to parent: ${nextId}`);
+            const parent = await fetchEventById(nextId);
+            if (!parent || cancelled) break;
+
+            absoluteRoot = parent;
+            visitedIds.add(parent.id);
+            climbed = true;
+
+            // If we found a note with no e-tags, it's the true root
+            if (parent.tags.filter(t => t[0] === 'e').length === 0) break;
+          }
+
+          if (climbed && !cancelled) {
+            console.log(`[Thread] Found absolute root: ${absoluteRoot.id}`);
+            absoluteRoot.author.fetchProfile().catch(() => { });
+            setRootEvent(absoluteRoot);
+            // Re-fetch replies for the new root
+            replySubRef?.stop();
+            repliesRef.current.clear();
+            setReplies([]);
+            loadReplies(absoluteRoot.id);
+          }
+        })();
+
       } catch (err) {
         if (!cancelled) {
           console.error('Thread load failed:', err);
@@ -302,7 +316,18 @@ export const ThreadPage = () => {
       }
     };
 
-    loadThreadWithTimeout();
+    // Increase total timeout for discovery across relays
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Fetch timeout')), 20000)
+    );
+
+    Promise.race([loadThreadWithResilience(), timeoutPromise]).catch(err => {
+      if (!cancelled) {
+        console.error('Thread race failed:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load thread');
+        setLoading(false);
+      }
+    });
 
     return () => {
       cancelled = true;
@@ -452,27 +477,6 @@ export const ThreadPage = () => {
           position: relative;
         }
         
-        /* Thread visual connectors */
-        .reply-children::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          height: 30px;
-          width: 15px;
-          border-bottom: 1px solid #ddd;
-          border-left: 1px solid #ddd;
-          border-bottom-left-radius: 10px;
-          display: none; /* Optional: simpler border-left is often cleaner */
-        }
-
-        @media (max-width: 768px) {
-          .reply-children {
-            margin-left: 10px;
-            padding-left: 8px;
-            border-left: 1px solid #eee;
-          }
-        }
         .nested-reply {
           margin-top: 15px;
         }
@@ -482,6 +486,14 @@ export const ThreadPage = () => {
           padding-left: 12px;
           margin-left: -12px;
           border-radius: 0 4px 4px 0;
+        }
+
+        @media (max-width: 768px) {
+          .reply-children {
+            margin-left: 10px;
+            padding-left: 8px;
+            border-left: 1px solid #eee;
+          }
         }
       `}</style>
 

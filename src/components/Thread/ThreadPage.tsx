@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef, memo, useLayoutEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
-import { NDKEvent, type NDKFilter, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
+import { NDKEvent, type NDKFilter, NDKSubscriptionCacheUsage, NDKRelaySet } from '@nostr-dev-kit/ndk';
+import { nip19 } from 'nostr-tools';
 import { Navbar } from '../Shared/Navbar';
 import { FeedItem } from '../Shared/FeedItem';
 import { isBlockedUser } from '../../utils/blockedUsers';
@@ -57,6 +58,8 @@ export const ThreadPage = () => {
   const [rootEvent, setRootEvent] = useState<NDKEvent | null>(null);
   const [replies, setReplies] = useState<NDKEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [loadingReplies, setLoadingReplies] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
   const [prevEventId, setPrevEventId] = useState(eventId);
@@ -66,6 +69,8 @@ export const ThreadPage = () => {
   if (eventId !== prevEventId) {
     setPrevEventId(eventId);
     setLoading(true);
+    setError(null);
+    setIsBlocked(false);
     setRootEvent(null);
     setReplies([]);
     setHighlightedEventId(null);
@@ -114,25 +119,44 @@ export const ThreadPage = () => {
     let cancelled = false;
     let replySubRef: ReturnType<typeof ndk.subscribe> | null = null;
 
-    const fetchEventById = (id: string): Promise<NDKEvent | null> => {
-      return new Promise((resolve) => {
-        const sub = ndk.subscribe(
-          { ids: [id] },
-          { closeOnEose: true, cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
+    const fetchEventById = async (id: string): Promise<NDKEvent | null> => {
+      try {
+        let hexId = id;
+        let relays: string[] = [];
+
+        // Check if it's a bech32 ID
+        if (id.startsWith('note1') || id.startsWith('nevent1')) {
+          try {
+            const decoded = nip19.decode(id);
+            if (decoded.type === 'note') {
+              hexId = decoded.data as string;
+            } else if (decoded.type === 'nevent') {
+              hexId = decoded.data.id;
+              relays = decoded.data.relays || [];
+            }
+          } catch (e) {
+            console.warn('Failed to decode bech32 ID:', id, e);
+            return null;
+          }
+        }
+
+        // Validate hex ID format
+        if (!/^[0-9a-f]{64}$/.test(hexId)) {
+          return null;
+        }
+
+        // Use fetchEvent for better management and reliability
+        const event = await ndk.fetchEvent(
+          { ids: [hexId] },
+          { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST },
+          relays.length > 0 ? NDKRelaySet.fromRelayUrls(relays, ndk) : undefined
         );
-        let found: NDKEvent | null = null;
-        sub.on('event', (ev: NDKEvent) => {
-          found = ev;
-        });
-        sub.on('eose', () => {
-          sub.stop();
-          resolve(found);
-        });
-        setTimeout(() => {
-          sub.stop();
-          resolve(found);
-        }, 5000);
-      });
+
+        return event;
+      } catch (err) {
+        console.error('Error in fetchEventById:', id, err);
+        return null;
+      }
     };
 
     const loadReplies = async (rootId: string) => {
@@ -210,7 +234,13 @@ export const ThreadPage = () => {
 
       if (cancelled) return;
 
-      if (!clickedEvent || isBlockedUser(clickedEvent.pubkey)) {
+      if (!clickedEvent) {
+        setLoading(false);
+        return;
+      }
+
+      if (isBlockedUser(clickedEvent.pubkey)) {
+        setIsBlocked(true);
         setLoading(false);
         return;
       }
@@ -252,11 +282,27 @@ export const ThreadPage = () => {
         setRootEvent(clickedEvent);
         setHighlightedEventId(null);
         setLoading(false);
+        // If we can't find the root, we can still show replies to the clicked event
         loadReplies(clickedEvent.id);
       }
     };
 
-    loadThread();
+    const loadThreadWithTimeout = async () => {
+      try {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Fetch timeout')), 10000)
+        );
+        await Promise.race([loadThread(), timeoutPromise]);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Thread load failed:', err);
+          setError(err instanceof Error ? err.message : 'Failed to load thread');
+          setLoading(false);
+        }
+      }
+    };
+
+    loadThreadWithTimeout();
 
     return () => {
       cancelled = true;
@@ -323,11 +369,17 @@ export const ThreadPage = () => {
 
           {loading && <div style={{ padding: '20px' }}>Loading thread...</div>}
 
-          {!loading && !rootEvent && (
+          {!loading && error && (
+            <div style={{ padding: '20px', color: '#ff4444' }}>
+              Error: {error === 'Fetch timeout' ? 'Request timed out. Please try refreshing.' : error}
+            </div>
+          )}
+
+          {!loading && !error && !rootEvent && (
             <div style={{ padding: '20px' }}>
-              {isBlockedUser(eventId || '')
+              {isBlocked
                 ? 'Content from this user is blocked.'
-                : 'Event not found.'}
+                : 'Event not found. It might not have reached our relays yet.'}
             </div>
           )}
 

@@ -8,6 +8,7 @@ import { RichTextRenderer } from '../Shared/RichTextRenderer';
 import { InteractionBar } from '../Shared/InteractionBar';
 import { Avatar } from '../Shared/Avatar';
 import { useProfile } from '../../hooks/useProfile';
+import { publishWithDiscovery } from '../../utils/publishWithDiscovery';
 import './CommentWall.css';
 
 interface CommentWallProps {
@@ -132,7 +133,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
             .then(() => {
               // force update? - usually handled by store
             })
-            .catch(() => {});
+            .catch(() => { });
         });
       } catch (err) {
         console.error('Failed to fetch comments:', err);
@@ -207,7 +208,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
     ];
 
     try {
-      await event.publish();
+      await publishWithDiscovery(ndk, event, pubkey);
       event.author = user; // Ensure profile renders immediately
       setComments([event, ...comments]);
       setNewComment('');
@@ -243,7 +244,7 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
         ['client', 'MyNostrSpace'],
       ];
 
-      await reply.publish();
+      await publishWithDiscovery(ndk, reply, parentEvent.pubkey);
       reply.author = user; // Ensure profile renders immediately
       setComments((prev) => [reply, ...prev]);
       setReplyText('');

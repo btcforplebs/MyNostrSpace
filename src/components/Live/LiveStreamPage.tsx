@@ -7,6 +7,7 @@ import { Navbar } from '../Shared/Navbar';
 import Hls from 'hls.js';
 import { ChatMessage } from './ChatMessage';
 import { APP_RELAYS } from '../../utils/relay';
+import { publishWithDiscovery } from '../../utils/publishWithDiscovery';
 import './LiveStreamPage.css';
 
 const CONNECTION_TIMEOUT = 10000;
@@ -81,11 +82,11 @@ export const LiveStreamPage = () => {
       setConnectionStatus('Searching...');
 
       // Subscription
-      console.log(`Discovery (Sub): Starting subscription for ${cleanPubkey} / ${cleanDTag}...`);
+      console.log(`Discovery(Sub): Starting subscription for ${cleanPubkey} / ${cleanDTag}...`);
 
       const sub = ndk.subscribe(streamFilter, {
         closeOnEose: false,
-        subId: `sub-stream-${Date.now()}`,
+        subId: `sub - stream - ${Date.now()} `,
       });
 
       sub.on('event', (e) => {
@@ -128,7 +129,7 @@ export const LiveStreamPage = () => {
       // Use stream event author's pubkey for the a tag filter (this is how chat messages are tagged)
       const streamAuthor = event.pubkey;
       const streamDTag = event.getMatchingTags('d')[0]?.[1] || dTag;
-      const aTag = `30311:${streamAuthor}:${streamDTag}`;
+      const aTag = `30311:${streamAuthor}:${streamDTag} `;
       const chatFilter: NDKFilter = {
         kinds: [1311 as NDKKind, 9735 as NDKKind],
         '#a': [aTag],
@@ -142,7 +143,7 @@ export const LiveStreamPage = () => {
           if (!ndk.pool.relays.has(relayUrl)) {
             const relay = ndk.addExplicitRelay(relayUrl);
             if (relay && typeof relay.connect === 'function') {
-              relayPromises.push(relay.connect().catch(() => {}));
+              relayPromises.push(relay.connect().catch(() => { }));
             }
           }
         } catch {
@@ -198,7 +199,7 @@ export const LiveStreamPage = () => {
       event.kind = 1311;
       event.content = chatInput;
       event.tags = [
-        ['a', `30311:${streamAuthor}:${streamDTag}`, 'wss://relay.zap.stream'],
+        ['a', `30311:${streamAuthor}:${streamDTag} `, 'wss://relay.zap.stream'],
         ['client', 'MyNostrSpace'],
       ];
 
@@ -214,7 +215,7 @@ export const LiveStreamPage = () => {
       }
 
       // Sign and publish to all connected relays including streaming relays
-      await event.publish();
+      await publishWithDiscovery(ndk, event, streamAuthor);
 
       setChatInput('');
     } catch (e) {
@@ -298,7 +299,7 @@ export const LiveStreamPage = () => {
       await zapRequest.sign();
 
       // Explicitly publish the zap request so other platforms see it immediately
-      zapRequest.publish().catch((e) => console.warn('Failed to publish zap request', e));
+      await publishWithDiscovery(ndk, zapRequest, hostPubkey);
 
       const zapRequestJson = JSON.stringify(zapRequest.rawEvent());
 

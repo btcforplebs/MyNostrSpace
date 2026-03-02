@@ -12,6 +12,7 @@ import { Avatar } from './Avatar';
 import { isBlockedUser, hasBlockedKeyword } from '../../utils/blockedUsers';
 import { MentionInput } from './MentionInput';
 import { extractMentions } from '../../utils/mentions';
+import { publishWithDiscovery } from '../../utils/publishWithDiscovery';
 
 interface FeedItemProps {
   event: NDKEvent;
@@ -137,8 +138,7 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
         ...mentionTags,
         ['client', 'MyNostrSpace'],
       ];
-
-      await reply.publish();
+      await publishWithDiscovery(ndk, reply, parentEvent.pubkey);
       setCommentText('');
       setShowCommentForm(false);
     } catch (error) {

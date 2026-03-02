@@ -2,6 +2,16 @@
 
 All notable changes to the MyNostrSpace project will be documented in this file.
 
+## [Unreleased] - 2026-03-02
+
+### 🚀 Relay Discovery & Directed Publishing
+
+#### **Author-Inbox & User-Outbox Targeting**
+- **Smarter Interaction Routing**: Implemented `publishWithDiscovery.ts` utility to automatically identify and target the author's inbox relays (Kind 10002) and the user's outbox relays for every interaction. 
+- **Directed Interactions**: Updated all replies, reactions, reposts, and chat messages to utilize the new directed publishing logic, ensuring notifications and notes reach the author's chosen relays directly.
+- **Zap Request Propagation**: Added directed publishing for zap requests, ensuring the recipient's wallet and preferred relays receive the request immediately.
+- **Files modified:** `InteractionBar.tsx`, `FeedItem.tsx`, `CommentWall.tsx`, `LiveStreamPage.tsx`, `VideoRoomPage.tsx`, `publishWithDiscovery.ts`
+
 ## [Unreleased] - 2026-02-23
 
 ### ⚡ Performance Optimizations

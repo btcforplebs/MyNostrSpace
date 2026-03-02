@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, NDKKind, NDKRelaySet, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
+import { publishWithDiscovery } from '../../utils/publishWithDiscovery';
 import './VideoRoomPage.css';
 
 const CONNECTION_TIMEOUT = 10000;
@@ -125,7 +126,7 @@ export const VideoRoomPage = () => {
         ['client', 'MyNostrSpace'],
       ];
 
-      await event.publish();
+      await publishWithDiscovery(ndk, event, streamAuthor);
       setChatInput('');
     } catch (e) {
       console.error('Failed to send message', e);

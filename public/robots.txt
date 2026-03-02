@@ -2,6 +2,9 @@ User-agent: *
 Allow: /
 Allow: /p/
 Allow: /thread/
+Allow: /blog/
+Allow: /music/
+Allow: /live/
 
 # Allow access to assets for rich icons/images
 Allow: /assets/

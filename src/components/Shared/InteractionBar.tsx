@@ -4,6 +4,7 @@ import { nip19 } from 'nostr-tools';
 import { useNostr } from '../../context/NostrContext';
 import { subscribeToStats, updateStats, getStats, type EventStats } from '../../hooks/statsCache';
 import { uploadToBlossom } from '../../services/blossom';
+import { publishWithDiscovery } from '../../utils/publishWithDiscovery';
 import { MentionInput } from './MentionInput';
 import { extractMentions } from '../../utils/mentions';
 import './FeedItem.css';
@@ -73,7 +74,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
           ['p', event.pubkey],
           ['client', 'MyNostrSpace'],
         ];
-        await reaction.publish();
+        await publishWithDiscovery(ndk, reaction, event.pubkey);
         updateStats(event.id, (prev) => ({
           ...prev,
           likes: prev.likes + 1,
@@ -111,7 +112,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
         ['p', event.pubkey],
         ['client', 'MyNostrSpace'],
       ];
-      await repost.publish();
+      await publishWithDiscovery(ndk, repost, event.pubkey);
       updateStats(event.id, (prev) => ({
         ...prev,
         reposts: prev.reposts + 1,
@@ -171,7 +172,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
           ['q', event.id],
           ['client', 'MyNostrSpace'],
         ];
-        await quote.publish();
+        await publishWithDiscovery(ndk, quote, event.pubkey);
         setQuoteText('');
         setShowQuoteForm(false);
         alert('Quote posted!');
@@ -249,6 +250,10 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
         ];
 
         await zapRequest.sign();
+
+        // Publish zap request to author and self relays
+        await publishWithDiscovery(ndk, zapRequest, event.author.pubkey);
+
         const zapRequestJson = JSON.stringify(zapRequest.rawEvent());
 
         const cbUrl = new URL(callback);

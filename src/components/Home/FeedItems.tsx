@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, memo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import { nip19 } from 'nostr-tools';
@@ -82,9 +82,28 @@ export const VirtualFeedItem: React.FC<{ event: NDKEvent; hideThreadButton?: boo
 // Single notification item - shows who did what to your post
 export const NotificationItem = memo(
     ({ event, onClick }: { event: NDKEvent; onClick: (link: string) => void }) => {
-        const { profile } = useProfile(event.pubkey);
+        // For zap receipts (9735) event.pubkey is the recipient's LN wallet
+        // service, not the zapper. NIP-57 puts the real sender in the uppercase
+        // 'P' tag, or the embedded kind-9734 request in the 'description' tag.
+        const actorPubkey = useMemo(() => {
+            if (event.kind !== 9735) return event.pubkey;
+            const pTag = event.tags.find((t) => t[0] === 'P')?.[1];
+            if (pTag) return pTag;
+            try {
+                const desc = event.tags.find((t) => t[0] === 'description')?.[1];
+                if (desc) {
+                    const req = JSON.parse(desc);
+                    if (req?.pubkey) return req.pubkey as string;
+                }
+            } catch {
+                /* malformed description tag — fall back to signer */
+            }
+            return event.pubkey;
+        }, [event]);
 
-        const authorName = profile?.name || profile?.displayName || event.pubkey.slice(0, 8);
+        const { profile } = useProfile(actorPubkey);
+
+        const authorName = profile?.name || profile?.displayName || actorPubkey.slice(0, 8);
         const targetId = event.tags.find((t) => t[0] === 'e')?.[1] || null;
 
         // Determine action text
@@ -121,12 +140,12 @@ export const NotificationItem = memo(
                     }
                 }}
             >
-                <Avatar pubkey={event.pubkey} src={profile?.picture} size={36} />
+                <Avatar pubkey={actorPubkey} src={profile?.picture} size={36} />
                 <div className="notification-content">
                     <div className="notification-action-line">
                         <span className="notification-icon">{actionIcon}</span>
                         <Link
-                            to={`/p/${event.pubkey}`}
+                            to={`/p/${actorPubkey}`}
                             className="notification-user-name"
                             onClick={(e) => e.stopPropagation()}
                         >

@@ -17,6 +17,7 @@ interface NostrContextType {
 }
 
 import { filterRelays, ALL_INITIAL_RELAYS } from '../utils/relay';
+import { clearAllMessages } from '../services/messageCache';
 
 const NostrContext = createContext<NostrContextType | undefined>(undefined);
 
@@ -208,6 +209,11 @@ export const NostrProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('mynostrspace_pubkey');
     localStorage.removeItem('mynostrspace_semiconnected_bunker');
     localStorage.removeItem('mynostrspace_local_key');
+    // Remove the NIP-46 client secret key — otherwise the bunker-authorized
+    // signing session survives logout on this browser.
+    localStorage.removeItem('mynostrspace_nip46_client_key');
+    // Purge decrypted DM plaintext so the next account on this browser can't read it.
+    clearAllMessages().catch((err) => console.error('Failed to clear message cache:', err));
   };
 
   // Auto-login if previously logged in

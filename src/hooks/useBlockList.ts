@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NDKEvent, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { useNostr } from '../context/NostrContext';
 import { BLOCKED_PUBKEYS } from '../utils/blockedUsers';
@@ -63,15 +63,36 @@ export const useBlockList = () => {
   const blockUser = async (pubkeyToBlock: string) => {
     if (!ndk || !user?.pubkey) return;
     try {
-      const newBlocked = new Set(blockedByNostr);
-      newBlocked.add(pubkeyToBlock);
+      // Re-fetch the latest mute list immediately before writing. Rebuilding from
+      // possibly-stale local state (or an empty cold cache) would erase other
+      // muted users, and hardcoding content='' destroys NIP-51 private/encrypted
+      // mutes and any word/tag mute entries created by other clients.
+      const latest = await ndk.fetchEvent({ kinds: [10000], authors: [user.pubkey] });
+
+      // Never overwrite an established mute list we failed to load.
+      if (!latest && blockedByNostr.size > 0) {
+        alert('Could not load your current mute list. Please try again.');
+        return;
+      }
+
+      // Already muted — reflect locally, nothing to publish.
+      if (latest?.tags.some((t) => t[0] === 'p' && t[1] === pubkeyToBlock)) {
+        setBlockedByNostr((prev) => new Set(prev).add(pubkeyToBlock));
+        return;
+      }
 
       const event = new NDKEvent(ndk);
       event.kind = 10000;
-      event.content = '';
-      event.tags = Array.from(newBlocked).map((pk) => ['p', pk]);
+      event.content = latest?.content ?? ''; // preserve encrypted private mutes
+      event.tags = latest ? [...latest.tags] : []; // preserve all tags verbatim
+      event.tags.push(['p', pubkeyToBlock]);
       await event.publish();
-      setBlockedByNostr(newBlocked);
+
+      const pubkeys = new Set<string>();
+      event.tags.forEach((t) => {
+        if (t[0] === 'p' && t[1]) pubkeys.add(t[1]);
+      });
+      setBlockedByNostr(pubkeys);
       alert('User blocked successfully!');
     } catch (e) {
       console.error('Error blocking user:', e);
@@ -83,10 +104,12 @@ export const useBlockList = () => {
     return BLOCKED_PUBKEYS.has(pubkey) || blockedByNostr.has(pubkey);
   };
 
-  const allBlockedPubkeys = new Set([
-    ...Array.from(BLOCKED_PUBKEYS),
-    ...Array.from(blockedByNostr),
-  ]);
+  // Memoized so its identity is stable across renders — an unstable Set here
+  // restarts every downstream subscription/effect that depends on it.
+  const allBlockedPubkeys = useMemo(
+    () => new Set([...BLOCKED_PUBKEYS, ...blockedByNostr]),
+    [blockedByNostr]
+  );
 
   return { isBlocked, allBlockedPubkeys, blockUser, loading };
 };

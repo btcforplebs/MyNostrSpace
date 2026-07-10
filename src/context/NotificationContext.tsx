@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
 
 interface NotificationContextType {
   hasUnread: boolean;
@@ -18,18 +18,21 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   // Note: Actual notification counting logic will be controlled by components
   // that subscribe to the same events, but we provide the "lastSeen" reference here.
 
-  const markAsRead = () => {
+  // Stable identity: consumers put markAsRead in effect deps, so a fresh
+  // function each render would restart their subscriptions on every render.
+  const markAsRead = useCallback(() => {
     const now = Math.floor(Date.now() / 1000);
     setLastSeen(now);
     setHasUnread(false);
     localStorage.setItem('mynostrspace_notifications_last_seen', now.toString());
-  };
+  }, []);
 
-  return (
-    <NotificationContext.Provider value={{ hasUnread, markAsRead, lastSeen }}>
-      {children}
-    </NotificationContext.Provider>
+  const value = useMemo(
+    () => ({ hasUnread, markAsRead, lastSeen }),
+    [hasUnread, markAsRead, lastSeen]
   );
+
+  return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 };
 
 export const useNotifications = () => {

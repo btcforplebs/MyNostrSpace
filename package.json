@@ -14,7 +14,6 @@
   "dependencies": {
     "@nostr-dev-kit/ndk": "^2.18.1",
     "@nostr-dev-kit/ndk-cache-dexie": "^2.6.44",
-    "axios": "^1.13.5",
     "dexie": "^4.3.0",
     "express": "^5.2.1",
     "lucide-react": "^0.563.0",

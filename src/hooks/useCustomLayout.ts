@@ -1,6 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useNostr } from '../context/NostrContext';
 
+/**
+ * A viewed profile's custom CSS is attacker-controlled and gets injected into the
+ * visitor's page, so strip the constructs that let it attack the whole site:
+ * <style> breakout, @import (external fetch/exfiltration), fixed/sticky overlays
+ * (clickjacking / fake login prompts), and legacy script vectors. Colors, fonts,
+ * and background images — the actual customization — are left intact.
+ */
+const sanitizeCustomCss = (css: string): string =>
+  css
+    .replace(/<\/?(style|script)[^>]*>?/gi, '')
+    .replace(/<!--|-->/g, '')
+    .replace(/@import[^;]*;?/gi, '')
+    .replace(/expression\s*\(/gi, '/* blocked */(')
+    .replace(/-moz-binding\s*:[^;]*;?/gi, '')
+    .replace(/behavior\s*:[^;]*;?/gi, '')
+    .replace(/position\s*:\s*(fixed|sticky)/gi, 'position:static');
+
 export const useCustomLayout = (pubkey?: string) => {
   const { ndk } = useNostr();
   const [layoutUrl, setLayoutUrl] = useState<string | null>(null);
@@ -29,7 +46,7 @@ export const useCustomLayout = (pubkey?: string) => {
         if (event) {
           // 1. Check direct content (preferred for CSS editor)
           if (event.content && event.content.trim().length > 0) {
-            setLayoutCss(event.content);
+            setLayoutCss(sanitizeCustomCss(event.content));
           }
           // 2. Fallback to URL tag if content is empty
           else {
@@ -39,7 +56,7 @@ export const useCustomLayout = (pubkey?: string) => {
               // Fetch the content immediately to inject
               const res = await fetch(url);
               const txt = await res.text();
-              setLayoutCss(txt);
+              setLayoutCss(sanitizeCustomCss(txt));
             }
           }
         }

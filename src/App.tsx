@@ -107,7 +107,22 @@ function App() {
         <LightboxProvider>
           <div className="app-container">
             <ErrorBoundary>
-              <Suspense fallback={null}>
+              <Suspense
+                fallback={
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      minHeight: '60vh',
+                      color: '#666',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    Loading…
+                  </div>
+                }
+              >
                 <Routes>
                   <Route
                     path="/"

@@ -56,7 +56,10 @@ export function useFeedSubscription(
             }
             result.splice(lo, 0, ev);
         }
-        if (result.length > 200) result.length = 200;
+        // Bound memory growth for very long sessions without cutting off
+        // infinite-scroll pagination — VirtualFeedItem windows rendering, so
+        // this is a memory cap only, not a display/pagination limit.
+        if (result.length > 1000) result.length = 1000;
         return result;
     };
 
@@ -73,21 +76,25 @@ export function useFeedSubscription(
                 until: feedUntil,
             };
             const events = await ndk.fetchEvents(filter);
-            const newEvents = Array.from(events).filter((e) => !e.tags.some((t) => t[0] === 'e'));
+            const rawEvents = Array.from(events).sort(
+                (a, b) => (a.created_at || 0) - (b.created_at || 0)
+            );
 
-            if (newEvents.length === 0) {
+            // Advance the cursor from the oldest RAW event (not the display-filtered
+            // subset): a page that happens to be all replies must not strand
+            // pagination while older top-level posts still exist.
+            const oldestRaw = rawEvents[0];
+            if (oldestRaw?.created_at) setFeedUntil(oldestRaw.created_at - 1);
+
+            // Only stop when the relay genuinely returned a short page.
+            if (rawEvents.length < 20) {
                 setHasMoreFeed(false);
-                return;
             }
 
-            setFeed((prev) => {
-                const combined = [...prev, ...newEvents];
-                const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-                return unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 150);
-            });
-
-            const oldest = newEvents.sort((a, b) => (a.created_at || 0) - (b.created_at || 0))[0];
-            if (oldest?.created_at) setFeedUntil(oldest.created_at - 1);
+            const newEvents = rawEvents.filter((e) => !e.tags.some((t) => t[0] === 'e'));
+            if (newEvents.length > 0) {
+                setFeed((prev) => dedupAndSortFeed(newEvents, prev));
+            }
         } catch (e) {
             console.error('Error loading more feed:', e);
         } finally {
@@ -110,23 +117,35 @@ export function useFeedSubscription(
                 until: repliesUntil,
             };
             const events = await ndk.fetchEvents(filter);
-            const newEvents = Array.from(events).filter((e) =>
-                e.tags.some((t) => t[0] === 'e' || t[0] === 'q')
+            const rawEvents = Array.from(events).sort(
+                (a, b) => (a.created_at || 0) - (b.created_at || 0)
             );
 
-            if (newEvents.length === 0) {
+            // Advance from the oldest RAW event so a page of all non-replies
+            // doesn't strand pagination.
+            const oldestRaw = rawEvents[0];
+            if (oldestRaw?.created_at) setRepliesUntil(oldestRaw.created_at - 1);
+
+            if (rawEvents.length < 20) {
                 setHasMoreReplies(false);
-                return;
             }
 
-            setReplies((prev) => {
-                const combined = [...prev, ...newEvents];
-                const unique = Array.from(new Map(combined.map((item) => [item.id, item])).values());
-                return unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 150);
-            });
-
-            const oldest = newEvents.sort((a, b) => (a.created_at || 0) - (b.created_at || 0))[0];
-            if (oldest?.created_at) setRepliesUntil(oldest.created_at - 1);
+            const newEvents = rawEvents.filter((e) =>
+                e.tags.some((t) => t[0] === 'e' || t[0] === 'q')
+            );
+            if (newEvents.length > 0) {
+                setReplies((prev) => {
+                    const combined = [...prev, ...newEvents];
+                    const unique = Array.from(
+                        new Map(combined.map((item) => [item.id, item])).values()
+                    );
+                    const sorted = unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+                    // Memory cap only — VirtualFeedItem windows rendering, so this
+                    // must not gate hasMoreReplies (see loadMoreFeed).
+                    if (sorted.length > 1000) sorted.length = 1000;
+                    return sorted;
+                });
+            }
         } catch (e) {
             console.error('Error loading more replies:', e);
         } finally {
@@ -142,19 +161,28 @@ export function useFeedSubscription(
         setPendingPosts([]);
         setDisplayedFeedCount(20);
         let sub: import('@nostr-dev-kit/ndk').NDKSubscription | undefined;
+        let cancelled = false;
 
         const startFeedSub = async () => {
             if (feed.length === 0) setFeedLoading(true);
 
             await new Promise(resolve => setTimeout(resolve, 50));
+            if (cancelled) return;
 
             const authors = await getFollows();
+            // The effect may have been cleaned up while we awaited above; bail so
+            // we don't create a closeOnEose:false subscription that never stops.
+            if (cancelled) return;
             const filter: NDKFilter = { kinds: [1, 6], authors: authors, limit: 25 };
             sub = ndk.subscribe(filter, {
                 closeOnEose: false,
                 cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
                 groupable: false,
             });
+            if (cancelled) {
+                sub.stop();
+                return;
+            }
 
             let hasReceivedEose = false;
             let eventBuffer: NDKEvent[] = [];
@@ -238,6 +266,7 @@ export function useFeedSubscription(
         };
         startFeedSub();
         return () => {
+            cancelled = true;
             if (sub) sub.stop();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,13 +276,17 @@ export function useFeedSubscription(
     useEffect(() => {
         if (viewMode !== 'replies') return;
         setDisplayedRepliesCount(20);
-        setReplies((prev) => {
-            if (prev.length > 0) {
-                const oldest = prev[prev.length - 1];
-                if (oldest.created_at) setRepliesUntil(oldest.created_at - 1);
-            }
-            return prev;
-        });
+        const current = repliesRef.current;
+        if (current.length > 0) {
+            const oldest = current[current.length - 1];
+            if (oldest.created_at) setRepliesUntil(oldest.created_at - 1);
+        } else {
+            // The feed subscription (the only other source of replies) is stopped
+            // while this tab is active, so seed the cursor to "now" — otherwise
+            // repliesUntil stays null and loadMoreReplies can never bootstrap.
+            setRepliesUntil(Math.floor(Date.now() / 1000));
+            setHasMoreReplies(true);
+        }
     }, [viewMode]);
 
     const flushPendingPosts = useCallback(() => {

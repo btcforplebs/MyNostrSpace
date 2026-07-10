@@ -89,7 +89,6 @@ export const BlogsPage = () => {
           const image = event.getMatchingTags('image')[0]?.[1];
 
           setArticles((prev) => {
-            if (prev.find((a) => a.id === event.id)) return prev;
             const newArticle: BlogArticle = {
               id: event.id,
               pubkey: event.pubkey,
@@ -99,8 +98,19 @@ export const BlogsPage = () => {
               publishedAt,
               image,
             };
-            const next = [...prev, newArticle];
-            return next.sort((a, b) => b.publishedAt - a.publishedAt);
+            // Kind 30023 is replaceable: dedupe by pubkey + d identifier (not
+            // event id) and keep the newest version, so edits and divergent relay
+            // copies don't render as duplicate cards.
+            const existingIndex = prev.findIndex(
+              (a) => a.pubkey === event.pubkey && a.identifier === identifier
+            );
+            if (existingIndex !== -1) {
+              if (prev[existingIndex].publishedAt >= publishedAt) return prev;
+              const updated = [...prev];
+              updated[existingIndex] = newArticle;
+              return updated.sort((a, b) => b.publishedAt - a.publishedAt);
+            }
+            return [...prev, newArticle].sort((a, b) => b.publishedAt - a.publishedAt);
           });
 
           fetchAuthorProfile(event.pubkey);

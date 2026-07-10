@@ -1,4 +1,7 @@
 import NDK, { NDKEvent, NDKRelaySet, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
+import { filterRelays } from './relay';
+
+const DISCOVERY_TIMEOUT_MS = 4000;
 
 /**
  * Publishes an event to the author's inbox relays and the user's outbox relays.
@@ -77,8 +80,12 @@ export async function publishWithDiscovery(
         );
     }
 
-    // Wait for both discoveries to finish (or timeout if needed, but fetchEvents handles timeout)
-    await Promise.allSettled(discoveryPromises);
+    // Wait for both discoveries, but don't hang forever if a relay never sends
+    // EOSE — cap the wait and fall back to connected relays below.
+    const discoveryTimeout = new Promise<void>((resolve) =>
+        setTimeout(resolve, DISCOVERY_TIMEOUT_MS)
+    );
+    await Promise.race([Promise.allSettled(discoveryPromises), discoveryTimeout]);
 
     // 3. Add currently connected relays as the user's "own outbox" fallback.
     // This satisfies the "and your own outbox relay" requirement.
@@ -86,8 +93,15 @@ export async function publishWithDiscovery(
         targetRelays.add(url);
     });
 
-    // Filter out invalid or blacklisted relays if necessary
-    const relayUrls = Array.from(targetRelays).filter(url => url.startsWith('ws'));
+    // The author-supplied relay URLs are untrusted, so run everything through the
+    // app's relay filter (drops .onion / localhost / blacklisted / insecure ws)
+    // rather than only checking the "ws" prefix.
+    const relayUrls = filterRelays(Array.from(targetRelays).filter((url) => url.startsWith('ws')));
+
+    if (relayUrls.length === 0) {
+        // Nothing safe to target — fall back to the default publish path.
+        return event.publish();
+    }
 
     console.log(`Publishing to discovered relays: ${relayUrls.join(', ')}`);
 

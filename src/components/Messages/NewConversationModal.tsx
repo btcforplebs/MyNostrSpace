@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { nip19 } from 'nostr-tools';
 import { useProfile } from '../../hooks/useProfile';
 import './NewConversationModal.css';
 
@@ -14,24 +15,22 @@ interface NewConversationModalProps {
 }
 
 /**
- * Convert npub to hex pubkey
- * Simple decoder - for production use nostr-tools bech32 decoder
+ * Convert an npub / nprofile / hex identifier to a hex pubkey.
  */
 function decodePubkey(input: string): string | null {
-  const trimmed = input.trim().toLowerCase();
+  const trimmed = input.trim();
 
-  // Already hex
-  if (trimmed.match(/^[a-f0-9]{64}$/)) {
-    return trimmed;
+  // Already hex (don't lowercase bech32 — it would break the checksum).
+  if (/^[a-fA-F0-9]{64}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
   }
 
-  // For npub1 and nprofile1, we would need bech32 decoding from nostr-tools
-  // For now, accept hex format only and log helpful message
-  if (trimmed.startsWith('npub1') || trimmed.startsWith('nprofile1')) {
-    // In a real app, would use: import { bech32 } from 'nostr-tools'
-    // For MVP, return null and let user know to paste hex
-    console.warn('bech32 decoding not yet supported, please paste hex pubkey');
-    return null;
+  try {
+    const decoded = nip19.decode(trimmed);
+    if (decoded.type === 'npub') return decoded.data;
+    if (decoded.type === 'nprofile') return decoded.data.pubkey;
+  } catch {
+    // Not a valid bech32 identifier.
   }
 
   return null;

@@ -146,17 +146,20 @@ export const MentionInput: React.FC<MentionInputProps> = ({
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (showSuggestions) {
+        // Navigate over the SAME list that is rendered (finalSuggestions), not
+        // just friends (filteredProfiles) — otherwise Enter selects the wrong
+        // user, or nothing when only remote search results are shown.
+        if (showSuggestions && finalSuggestions.length > 0) {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                setSelectedIndex(prev => (prev + 1) % filteredProfiles.length);
+                setSelectedIndex(prev => (prev + 1) % finalSuggestions.length);
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                setSelectedIndex(prev => (prev - 1 + filteredProfiles.length) % filteredProfiles.length);
+                setSelectedIndex(prev => (prev - 1 + finalSuggestions.length) % finalSuggestions.length);
             } else if (e.key === 'Enter' || e.key === 'Tab') {
                 e.preventDefault();
-                if (filteredProfiles[selectedIndex]) {
-                    selectUser(filteredProfiles[selectedIndex]);
+                if (finalSuggestions[selectedIndex]) {
+                    selectUser(finalSuggestions[selectedIndex]);
                 }
             } else if (e.key === 'Escape') {
                 setShowSuggestions(false);

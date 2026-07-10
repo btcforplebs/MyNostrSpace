@@ -14,12 +14,12 @@ export const EmbeddedNote = ({ id, depth = 0 }: EmbeddedNoteProps) => {
   const navigate = useNavigate();
   const [event, setEvent] = useState<NDKEvent | null>(null);
   const [loading, setLoading] = useState(true);
+  // Bumped when the author profile resolves, to re-render with the real name.
+  const [, forceRender] = useState(0);
 
   useEffect(() => {
     if (!ndk || !id || id === 'undefined') return;
 
-    // Use a flag to avoid setting state if already true,
-    // though it's better to just start the fetch.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
 
@@ -29,8 +29,12 @@ export const EmbeddedNote = ({ id, depth = 0 }: EmbeddedNoteProps) => {
       .then((e) => {
         if (!isMounted) return;
         if (e) {
-          e.author.fetchProfile();
           setEvent(e);
+          // fetchProfile mutates e.author.profile asynchronously; without a
+          // state bump the header would stay stuck on the hex pubkey prefix.
+          e.author.fetchProfile().then(() => {
+            if (isMounted) forceRender((n) => n + 1);
+          });
         }
         setLoading(false);
       })

@@ -19,9 +19,21 @@ const getThreadPointers = (event: NDKEvent) => {
   const eTags = event.tags.filter((t) => t[0] === 'e');
   if (eTags.length === 0) return { rootId: null, parentId: null };
 
-  const rootTag = eTags.find((t) => t[3] === 'root') || eTags[0];
-  const replyTag = eTags.find((t) => t[3] === 'reply') || (eTags.length > 1 ? eTags[eTags.length - 1] : eTags[0]);
+  // If ANY e-tag carries a marker, trust markers only — never fall back to a
+  // positional guess, which would treat a 'mention' (quote) as the parent.
+  const hasMarkers = eTags.some((t) => t[3] === 'root' || t[3] === 'reply' || t[3] === 'mention');
+  if (hasMarkers) {
+    const rootTag = eTags.find((t) => t[3] === 'root');
+    const replyTag = eTags.find((t) => t[3] === 'reply');
+    return {
+      rootId: (rootTag ?? replyTag)?.[1] ?? null,
+      parentId: (replyTag ?? rootTag)?.[1] ?? null,
+    };
+  }
 
+  // Unmarked (legacy positional): first e-tag = root, last = reply.
+  const rootTag = eTags[0];
+  const replyTag = eTags.length > 1 ? eTags[eTags.length - 1] : eTags[0];
   return {
     rootId: rootTag[1],
     parentId: replyTag[1],
@@ -261,10 +273,12 @@ export const ThreadPage = () => {
           return;
         }
 
-        // 2. Immediately show the target event to the user
+        // 2. Immediately show the target event to the user.
+        // Highlight by the resolved HEX id — the URL param may be bech32
+        // (note1/nevent1), which would never match node.event.id.
         currentEvent.author.fetchProfile().catch(() => { });
         setRootEvent(currentEvent);
-        setHighlightedEventId(eventId);
+        setHighlightedEventId(currentEvent.id);
         setLoading(false);
 
         // 3. Start loading replies to THIS event immediately

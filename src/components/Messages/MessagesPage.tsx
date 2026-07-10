@@ -35,8 +35,12 @@ export const MessagesPage = () => {
 
   // Update total unread count
   useEffect(() => {
-    getTotalUnreadCount().then(setTotalUnread).catch(console.error);
-  }, [messages]);
+    if (!loggedInUser?.pubkey) {
+      setTotalUnread(0);
+      return;
+    }
+    getTotalUnreadCount(loggedInUser.pubkey).then(setTotalUnread).catch(console.error);
+  }, [messages, loggedInUser?.pubkey]);
 
   if (!loggedInUser) {
     return (

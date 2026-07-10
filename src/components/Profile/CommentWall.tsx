@@ -72,14 +72,37 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
           ndk.fetchEvents(authorFilter),
         ]);
 
+        const mentionsArr = Array.from(mentions);
+        const postsArr = Array.from(posts);
+
         // Combine arrays
-        const eventsArray = [...Array.from(mentions), ...Array.from(posts)];
+        const eventsArray = [...mentionsArr, ...postsArr];
 
         if (eventsArray.length === 0) {
           setHasMore(false);
           setLoading(false);
           setLoadingMore(false);
           return;
+        }
+
+        // Pagination cursor: advance from each filter's OWN oldest event, and
+        // only when that filter filled its page (so more may exist). Using the
+        // single oldest of the merged batch (or letting replies influence it)
+        // skipped every event in the gap between the two streams' ranges.
+        const oldestTs = (arr: NDKEvent[]): number | undefined =>
+          arr.length >= limit
+            ? arr.reduce((min, e) => Math.min(min, e.created_at || 0), Infinity)
+            : undefined;
+        const boundaries = [oldestTs(mentionsArr), oldestTs(postsArr)].filter(
+          (t): t is number => typeof t === 'number' && Number.isFinite(t)
+        );
+        if (boundaries.length > 0) {
+          // Continue from the NEWER boundary so neither stream is skipped;
+          // overlap is removed by the dedupe below.
+          setUntil(Math.max(...boundaries));
+          setHasMore(true);
+        } else {
+          setHasMore(false);
         }
 
         // 3. Fetch replies to these events (e-tags) - we don't paginate these strictly, we just get them for context
@@ -97,23 +120,6 @@ export const CommentWall = ({ pubkey }: CommentWallProps) => {
         const uniqueEvents = Array.from(new Map(eventsArray.map((e) => [e.id, e])).values()).sort(
           (a, b) => (b.created_at || 0) - (a.created_at || 0)
         );
-
-        // determine 'until' for next page from the MAIN feed items (mentions/posts), ignoring replies which might be older/newer
-        /* const mainFeedEvents = uniqueEvents.filter(e =>
-        (e.tags.some(t => t[0] === 'p' && t[1] === pubkey) || e.pubkey === pubkey) &&
-        !e.tags.some(t => t[0] === 'e') // top level-ish preference for pagination cursor?
-      ); */
-
-        // Fallback: use the oldest event timestamp from the fetched batch
-        const oldestEvent = uniqueEvents[uniqueEvents.length - 1];
-        if (oldestEvent && oldestEvent.created_at) {
-          setUntil(oldestEvent.created_at - 1);
-        }
-
-        if (uniqueEvents.length < 5) {
-          // Arbitrary low threshold to stop
-          setHasMore(false);
-        }
 
         setComments((prev) => {
           const combined = untilTimestamp ? [...prev, ...uniqueEvents] : uniqueEvents;

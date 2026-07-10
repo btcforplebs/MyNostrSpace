@@ -65,11 +65,19 @@ export const isBlockedUser = (pubkey: string, extraBlocks?: Set<string>): boolea
   return BLOCKED_PUBKEYS.has(pubkey) || (extraBlocks?.has(pubkey) ?? false);
 };
 
+// Precompile a word-boundary regex per keyword so we match whole words only.
+// Plain substring matching hid innocent posts ('classic' → 'ass', 'define' →
+// 'DeFi', 'document' → 'cum'). \b anchors only the ends, so multi-word phrases
+// like 'passive income' still match as phrases.
+const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const BLOCKED_KEYWORD_PATTERNS: RegExp[] = BLOCKED_KEYWORDS.map(
+  (kw) => new RegExp(`\\b${escapeRegex(kw)}\\b`, 'i')
+);
+
 /**
- * Check if content contains any blocked keywords
+ * Check if content contains any blocked keywords (whole-word match)
  */
 export const hasBlockedKeyword = (content: string): boolean => {
   if (!content) return false;
-  const lowerContent = content.toLowerCase();
-  return BLOCKED_KEYWORDS.some((kw) => lowerContent.includes(kw.toLowerCase()));
+  return BLOCKED_KEYWORD_PATTERNS.some((re) => re.test(content));
 };

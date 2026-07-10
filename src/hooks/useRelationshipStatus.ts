@@ -10,90 +10,102 @@ export type RelationshipStatus =
 
 export const useRelationshipStatus = (
   targetPubkey?: string
-): { status: RelationshipStatus | null; loading: boolean } => {
+): { status: RelationshipStatus | null; followsBack: boolean; loading: boolean } => {
   const { ndk, user } = useNostr();
   const [status, setStatus] = useState<RelationshipStatus | null>(null);
+  const [followsBack, setFollowsBack] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!targetPubkey || !user || !ndk) {
       setStatus(null);
+      setFollowsBack(false);
       setLoading(false);
       return;
     }
 
+    // Guard against a slow run for a previous target landing after the effect
+    // re-ran for a new one (which would show A's relationship on B's profile).
+    let cancelled = false;
+    setLoading(true);
+    setStatus(null);
+    setFollowsBack(false);
+
     const determineStatus = async () => {
       try {
-        // Check if it's the user themselves
         if (targetPubkey === user.pubkey) {
-          setStatus('is you!');
-          setLoading(false);
+          if (!cancelled) {
+            setStatus('is you!');
+            setLoading(false);
+          }
           return;
         }
 
-        // Check if user has blocked the target (Kind 10008)
-        const blockedEvent = await ndk.fetchEvent({
-          kinds: [10008 as number],
-          authors: [user.pubkey],
-        });
+        // Fetch mute list, current user's follows, and target's contact list in parallel
+        const [muteEvent, follows, targetContactEvent] = await Promise.all([
+          ndk.fetchEvent({ kinds: [10000], authors: [user.pubkey] }),
+          ndk.getUser({ pubkey: user.pubkey }).follows(),
+          ndk.fetchEvent({ kinds: [3], authors: [targetPubkey] }),
+        ]);
+        if (cancelled) return;
 
-        if (blockedEvent) {
-          const blockedPubkeys = blockedEvent.tags
+        // Does the target follow us back? (their Kind 3 contains our pubkey)
+        const targetFollowsPubkeys = (targetContactEvent?.tags ?? [])
+          .filter((tag) => tag[0] === 'p')
+          .map((tag) => tag[1]);
+        setFollowsBack(targetFollowsPubkeys.includes(user.pubkey));
+
+        // Have we muted the target? (Kind 10000)
+        if (muteEvent) {
+          const mutedPubkeys = muteEvent.tags
             .filter((tag) => tag[0] === 'p')
             .map((tag) => tag[1]);
-
-          if (blockedPubkeys.includes(targetPubkey)) {
+          if (mutedPubkeys.includes(targetPubkey)) {
             setStatus('is blocked');
             setLoading(false);
             return;
           }
         }
 
-        // Check if user is following the target
-        const currentUser = ndk.getUser({ pubkey: user.pubkey });
-        const follows = await currentUser.follows();
+        // Are we following the target?
         const isFollowing = Array.from(follows).some((u) => u.pubkey === targetPubkey);
-
         if (isFollowing) {
           setStatus('is in your following list');
           setLoading(false);
           return;
         }
 
-        // Check if target is in the web of trust (followed by people you follow)
+        // Web of trust: is the target followed by anyone we follow? One filtered
+        // query answers this — asking for any Kind-3 among our follows that
+        // p-tags the target — instead of fetching every follow's contact list.
         const followingPubkeys = Array.from(follows).map((u) => u.pubkey);
-
-        // Check if any of the people you follow are following the target
         let isInWebOfTrust = false;
-        for (const followerPubkey of followingPubkeys) {
-          try {
-            const followerUser = ndk.getUser({ pubkey: followerPubkey });
-            const followerFollows = await followerUser.follows();
-            if (Array.from(followerFollows).some((u) => u.pubkey === targetPubkey)) {
-              isInWebOfTrust = true;
-              break;
-            }
-          } catch (err) {
-            // Continue checking other followers if one fails
-            console.warn(`Could not fetch follows for ${followerPubkey}:`, err);
-          }
+        if (followingPubkeys.length > 0) {
+          const wotEvents = await ndk.fetchEvents({
+            kinds: [3],
+            authors: followingPubkeys,
+            '#p': [targetPubkey],
+            limit: 1,
+          });
+          isInWebOfTrust = wotEvents.size > 0;
         }
+        if (cancelled) return;
 
-        if (isInWebOfTrust) {
-          setStatus('is in your web of trust');
-        } else {
-          setStatus('is outside your web of trust');
-        }
+        setStatus(isInWebOfTrust ? 'is in your web of trust' : 'is outside your web of trust');
       } catch (error) {
         console.error('Error determining relationship status:', error);
-        setStatus('is outside your web of trust'); // Default fallback
+        if (!cancelled) setStatus('is outside your web of trust');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     determineStatus();
+
+    return () => {
+      cancelled = true;
+    };
   }, [targetPubkey, user, ndk]);
 
-  return { status, loading };
+  return { status, followsBack, loading };
 };

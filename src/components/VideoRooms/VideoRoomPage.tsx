@@ -9,6 +9,33 @@ import './VideoRoomPage.css';
 
 const CONNECTION_TIMEOUT = 10000;
 
+// The 'streaming' tag comes from an arbitrary relay event. Embedding it as an
+// iframe src without validation allows javascript: XSS in our own origin, and
+// grants camera/mic to attacker-chosen pages. Only allow https on known hosts.
+const ALLOWED_STREAM_HOSTS = ['vdo.ninja', 'hivetalk.org'];
+
+const validateStreamUrl = (raw?: string): string | null => {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'https:') return null;
+    const host = u.hostname.toLowerCase();
+    const ok = ALLOWED_STREAM_HOSTS.some((h) => host === h || host.endsWith('.' + h));
+    return ok ? u.toString() : null;
+  } catch {
+    return null;
+  }
+};
+
+const isVdoNinja = (rawUrl: string): boolean => {
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase();
+    return host === 'vdo.ninja' || host.endsWith('.vdo.ninja');
+  } catch {
+    return false;
+  }
+};
+
 export const VideoRoomPage = () => {
   const { pubkey, identifier } = useParams();
   const navigate = useNavigate();
@@ -66,7 +93,7 @@ export const VideoRoomPage = () => {
       roomEventRef.current = event;
       setConnectionStatus('Loading room...');
       const url = event.getMatchingTags('streaming')[0]?.[1];
-      setStreamUrl(url || null);
+      setStreamUrl(validateStreamUrl(url));
 
       const hostPubkey = event.getMatchingTags('p')[0]?.[1] || event.pubkey;
       ndk
@@ -268,7 +295,7 @@ export const VideoRoomPage = () => {
               <div className="video-room-main">
                 {streamUrl ? (
                   <>
-                    {streamUrl.includes('vdo.ninja') ? (
+                    {isVdoNinja(streamUrl) ? (
                       <div style={{ width: '100%', height: '600px' }}>
                         <iframe
                           src={streamUrl}

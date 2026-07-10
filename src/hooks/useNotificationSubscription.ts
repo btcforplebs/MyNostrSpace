@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NDKEvent } from '@nostr-dev-kit/ndk';
 import type { NDKFilter } from '@nostr-dev-kit/ndk';
 import NDK from '@nostr-dev-kit/ndk';
@@ -13,6 +13,15 @@ export function useNotificationSubscription(
 ) {
     const [notifications, setNotifications] = useState<NDKEvent[]>([]);
     const [hasNewNotifs, setHasNewNotifs] = useState(false);
+
+    // Read these through refs inside the effect so they don't sit in the
+    // dependency array. markAsRead() (called on eose) mutates lastSeen and, if
+    // unstable, markAsRead's identity — either in the deps would tear down and
+    // re-open the subscription on every eose, an endless subscribe loop.
+    const lastSeenRef = useRef(lastSeen);
+    lastSeenRef.current = lastSeen;
+    const markAsReadRef = useRef(markAsRead);
+    markAsReadRef.current = markAsRead;
 
     useEffect(() => {
         if (!ndk || !user || viewMode !== 'notifications') return;
@@ -46,7 +55,7 @@ export function useNotificationSubscription(
                         .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
                         .slice(0, 50);
 
-                    if (sorted.length > 0 && (sorted[0].created_at || 0) > lastSeen) {
+                    if (sorted.length > 0 && (sorted[0].created_at || 0) > lastSeenRef.current) {
                         setHasNewNotifs(true);
                     }
                     return sorted;
@@ -70,7 +79,7 @@ export function useNotificationSubscription(
                 if (notifRafId !== null) cancelAnimationFrame(notifRafId);
                 notifRafId = null;
                 flushNotifications();
-                markAsRead();
+                markAsReadRef.current();
             });
         };
 
@@ -78,7 +87,7 @@ export function useNotificationSubscription(
         return () => {
             if (sub) sub.stop();
         };
-    }, [ndk, user, viewMode, allBlockedPubkeys, lastSeen, markAsRead]);
+    }, [ndk, user, viewMode, allBlockedPubkeys]);
 
     return { notifications, hasNewNotifs, setHasNewNotifs };
 }

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNostr } from '../../context/NostrContext';
 import { uploadToBlossom } from '../../services/blossom';
-import { NDKEvent, NDKKind } from '@nostr-dev-kit/ndk';
+import { NDKEvent, NDKKind, NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
 
 const DEFAULT_CSS = `/* Custom Profile CSS */
@@ -228,6 +228,33 @@ export const LayoutEditor = () => {
   const [code, setCode] = useState(DEFAULT_CSS);
   const [status, setStatus] = useState('');
   const [uploading, setUploading] = useState(false);
+
+  // Load the user's existing saved layout so Save doesn't blow it away with the
+  // default template. Kind 30078 is replaceable, so publishing overwrites it.
+  useEffect(() => {
+    if (!ndk || !user?.pubkey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const event = await ndk.fetchEvent(
+          {
+            kinds: [30078 as number],
+            authors: [user.pubkey],
+            '#d': ['mynostrspace_layout'],
+          },
+          { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST }
+        );
+        if (!cancelled && event?.content && event.content.trim().length > 0) {
+          setCode(event.content);
+        }
+      } catch (e) {
+        console.error('Failed to load existing layout', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ndk, user?.pubkey]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

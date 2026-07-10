@@ -9,16 +9,42 @@ interface BlogEditorProps {
   onPostComplete: () => void;
 }
 
+const escapeHtml = (s: string): string =>
+  s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+// Block javascript:/vbscript:/data: (except images) style-exec URLs.
+const safeUrl = (url: string, allowData = false): string => {
+  const trimmed = url.trim();
+  if (/^(javascript|vbscript):/i.test(trimmed)) return '#';
+  if (!allowData && /^data:/i.test(trimmed)) return '#';
+  return trimmed;
+};
+
 const renderMarkdown = (md: string): string => {
-  let html = md
+  // Escape first so any raw HTML in the input is inert and attribute values
+  // (URLs, alt text) can't break out. Markdown syntax characters survive
+  // escaping, so the transforms below still match.
+  let html = escapeHtml(md)
     // Code blocks (fenced)
     .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
     // Inline code
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     // Images
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%"/>')
+    .replace(
+      /!\[([^\]]*)\]\(([^)]+)\)/g,
+      (_m, alt, src) => `<img src="${safeUrl(src, true)}" alt="${alt}" style="max-width:100%"/>`
+    )
     // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      (_m, text, href) =>
+        `<a href="${safeUrl(href)}" target="_blank" rel="noopener noreferrer">${text}</a>`
+    )
     // Bold
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     // Italic
@@ -31,8 +57,8 @@ const renderMarkdown = (md: string): string => {
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     // H1
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    // Blockquote
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+    // Blockquote ('>' was HTML-escaped to '&gt;' by escapeHtml above)
+    .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
     // Horizontal rule
     .replace(/^---$/gm, '<hr/>')
     // Unordered list items

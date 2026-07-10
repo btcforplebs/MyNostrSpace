@@ -38,7 +38,7 @@ const ProfilePage = () => {
 
   const { profile, loading: profileLoading } = useProfile(hexPubkey || '');
   const { top8, loading: top8Loading } = useTop8(hexPubkey || '');
-  const { status: relationshipStatus } = useRelationshipStatus(hexPubkey || '');
+  const { status: relationshipStatus, followsBack } = useRelationshipStatus(hexPubkey || '');
 
   const { layoutCss } = useCustomLayout(hexPubkey || '');
   const { data: extendedProfile } = useExtendedProfile(hexPubkey || '');
@@ -315,6 +315,23 @@ const ProfilePage = () => {
             <h2 style={{ fontSize: '14pt', margin: 0 }}>
               {displayName} {relationshipStatus || 'is in your extended network'}
             </h2>
+            {followsBack && relationshipStatus !== 'is you!' && (
+              <div
+                style={{
+                  marginTop: '6px',
+                  display: 'inline-block',
+                  fontSize: '9pt',
+                  fontWeight: 'bold',
+                  color: '#0a7c2f',
+                  background: '#e3f5e8',
+                  border: '1px solid #9cd6ab',
+                  borderRadius: '4px',
+                  padding: '2px 8px',
+                }}
+              >
+                ↩ Follows you back
+              </div>
+            )}
           </div>
 
           <div className="profile-tabs" style={{ marginBottom: '0', display: 'flex', gap: '0' }}>

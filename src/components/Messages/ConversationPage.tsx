@@ -30,7 +30,10 @@ export const ConversationPage = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to messages (uses NDK signer for decryption)
-  const { messages: allMessages, loading } = useMessages(loggedInUser?.pubkey || null, ndk);
+  const { messages: allMessages, loading, appendMessage } = useMessages(
+    loggedInUser?.pubkey || null,
+    ndk
+  );
 
   // Filter messages for this conversation
   const { messages: conversationMessages, unreadCount } = useConversation(
@@ -110,18 +113,21 @@ export const ConversationPage = () => {
 
       console.log('✅ Message sent successfully');
 
-      // Optimistically add to local cache
-      const messageId = dmEvent.id;
-      await addMessage({
-        id: messageId,
+      // Optimistically add to local cache AND to the live message state so the
+      // sent message appears immediately instead of only after a remount.
+      const sentMessage = {
+        id: dmEvent.id,
+        owner: loggedInUser.pubkey,
         conversationWith,
         content,
         senderPubkey: loggedInUser.pubkey,
-        originalTimestamp: Math.floor(Date.now() / 1000),
+        originalTimestamp: dmEvent.created_at || Math.floor(Date.now() / 1000),
         receivedAt: Math.floor(Date.now() / 1000),
         isOutgoing: true,
         read: true,
-      });
+      };
+      await addMessage(sentMessage);
+      appendMessage(sentMessage);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to send message';
       setError(errorMsg);

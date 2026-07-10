@@ -12,27 +12,23 @@ export const useResolvedPubkey = (identifier?: string) => {
       return;
     }
 
+    let cancelled = false;
     const resolve = async () => {
       setLoading(true);
       try {
         if (identifier.includes('@')) {
-          // Handle NIP-05
-          const user = ndk.getUser({ nip05: identifier });
-          if (user.pubkey) {
-            setHexPubkey(user.pubkey);
-          } else {
-            // Sometimes we need to fetch it
-            const resolvedUser = await ndk.getUser({ nip05: identifier });
-            if (resolvedUser) setHexPubkey(resolvedUser.pubkey);
-          }
+          // NIP-05: must use the async resolver. ndk.getUser({ nip05 }) does not
+          // set a pubkey (and the getter throws), so it can never resolve.
+          const resolvedUser = await ndk.getUserFromNip05(identifier);
+          if (!cancelled && resolvedUser?.pubkey) setHexPubkey(resolvedUser.pubkey);
         } else if (identifier.startsWith('npub') || identifier.startsWith('nprofile')) {
           const user = ndk.getUser({
             [identifier.startsWith('npub') ? 'npub' : 'nprofile']: identifier,
           });
-          setHexPubkey(user.pubkey);
+          if (!cancelled) setHexPubkey(user.pubkey);
         } else if (/^[0-9a-fA-F]{64}$/.test(identifier)) {
           // It's a hex pubkey
-          setHexPubkey(identifier);
+          if (!cancelled) setHexPubkey(identifier);
         } else {
           // Try to search for it as a name (Search fallback)
           // This allows /p/Tom to work by finding a user named Tom
@@ -56,6 +52,7 @@ export const useResolvedPubkey = (identifier?: string) => {
               }
             });
 
+            if (cancelled) return;
             if (match) {
               setHexPubkey(match.pubkey);
             } else {
@@ -67,11 +64,14 @@ export const useResolvedPubkey = (identifier?: string) => {
       } catch (e) {
         console.error('Failed to resolve pubkey', e);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     resolve();
+    return () => {
+      cancelled = true;
+    };
   }, [ndk, identifier]);
 
   return { hexPubkey, loading };

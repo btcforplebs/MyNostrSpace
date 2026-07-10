@@ -7,6 +7,7 @@ import Dexie, { type Table } from 'dexie';
 
 export interface CachedDMMessage {
   id: string; // Event ID
+  owner: string; // Logged-in pubkey this message belongs to (account scoping)
   conversationWith: string; // Other participant's pubkey
   content: string; // Decrypted message content
   senderPubkey: string; // Who sent the message
@@ -34,6 +35,17 @@ class MessageDB extends Dexie {
       messages: '&id, conversationWith, originalTimestamp', // Indexes for querying
       conversations: '&pubkey, lastMessageTime',
     });
+    // v2: add per-account owner scoping. Pre-v2 rows have no owner and cannot be
+    // safely attributed to an account, so clear them — they re-sync from relays.
+    this.version(2)
+      .stores({
+        messages: '&id, owner, conversationWith, originalTimestamp',
+        conversations: '&pubkey, lastMessageTime',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('messages').clear();
+        await tx.table('conversations').clear();
+      });
   }
 }
 
@@ -55,10 +67,13 @@ export async function getConversationMessages(pubkey: string): Promise<CachedDMM
 }
 
 /**
- * Get all messages (used for conversation grouping)
+ * Get all messages for the given account, sorted oldest-first.
+ * Sorting here keeps conversation-list previews/ordering correct even before a
+ * live subscription flush re-sorts state.
  */
-export async function getAllMessages(): Promise<CachedDMMessage[]> {
-  return db.messages.toArray();
+export async function getAllMessages(owner: string): Promise<CachedDMMessage[]> {
+  const messages = await db.messages.where('owner').equals(owner).toArray();
+  return messages.sort((a, b) => a.originalTimestamp - b.originalTimestamp);
 }
 
 /**
@@ -125,10 +140,10 @@ export async function getUnreadCount(pubkey: string): Promise<number> {
 }
 
 /**
- * Get total unread count across all conversations
+ * Get total unread count across all of the given account's conversations
  */
-export async function getTotalUnreadCount(): Promise<number> {
-  const messages = await db.messages.toArray();
+export async function getTotalUnreadCount(owner: string): Promise<number> {
+  const messages = await db.messages.where('owner').equals(owner).toArray();
   // Only count incoming, unread messages
   return messages.filter((msg) => !msg.read && !msg.isOutgoing).length;
 }

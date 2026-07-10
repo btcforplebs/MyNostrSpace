@@ -24,6 +24,9 @@ export const LandingPage = () => {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subRef = useRef<any>(null);
+  // Pubkeys we've already tried to resolve (including failures), so the profile
+  // effect below doesn't re-fetch profile-less authors on every firehose event.
+  const attemptedProfilesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!ndk) return;
@@ -33,8 +36,10 @@ export const LandingPage = () => {
     const startSubscription = async () => {
       if (!isMounted) return;
 
-      // Subscribe to recent notes (Kind 1)
-      const mainSub = ndk.subscribe({ kinds: [NDKKind.Text], limit: 100 }, { closeOnEose: false });
+      // Subscribe to recent notes (Kind 1). Landing shows a recent snapshot of
+      // the newest 10, so close on EOSE instead of holding an unfiltered global
+      // firehose open for the lifetime of the page.
+      const mainSub = ndk.subscribe({ kinds: [NDKKind.Text], limit: 100 }, { closeOnEose: true });
 
       const PINNED_PUBKEY = 'cf45a6ba1363ad7ed213a078e710d24115ae721c9b47bd1ebf4458eaefb4c2a5';
 
@@ -64,27 +69,8 @@ export const LandingPage = () => {
           });
         }
 
-        // Fetch profile if not already known
-        if (event.author) {
-          if (event.author.profile) {
-            setActiveProfiles((current) => ({
-              ...current,
-              [event.pubkey]: event.author.profile,
-            }));
-          }
-          event.author
-            .fetchProfile()
-            .then((profile) => {
-              if (profile && isMounted) {
-                setActiveProfiles((current) => ({
-                  ...current,
-                  [event.pubkey]: profile,
-                }));
-              }
-            })
-            .catch(() => {});
-        }
-
+        // Profiles for the displayed authors are resolved in one batched effect
+        // below — avoid a per-event fetchProfile for the whole firehose here.
         setHasLoaded(true);
       });
 
@@ -197,14 +183,19 @@ export const LandingPage = () => {
     if (!ndk) return;
 
     const pubkeysToFetch = new Set<string>();
-    articles.forEach((a) => {
-      if (!activeProfiles[a.pubkey]) pubkeysToFetch.add(a.pubkey);
-    });
-    globalEvents.forEach((e) => {
-      if (!activeProfiles[e.pubkey]) pubkeysToFetch.add(e.pubkey);
-    });
+    const consider = (pk: string) => {
+      if (!activeProfiles[pk] && !attemptedProfilesRef.current.has(pk)) {
+        pubkeysToFetch.add(pk);
+      }
+    };
+    articles.forEach((a) => consider(a.pubkey));
+    globalEvents.forEach((e) => consider(e.pubkey));
 
     if (pubkeysToFetch.size === 0) return;
+
+    // Mark as attempted up-front so an author with no kind-0 (or a failed fetch)
+    // isn't requeued every time this effect re-runs.
+    pubkeysToFetch.forEach((pk) => attemptedProfilesRef.current.add(pk));
 
     const fetchProfiles = async () => {
       const pks = Array.from(pubkeysToFetch);

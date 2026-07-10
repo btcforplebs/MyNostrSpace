@@ -70,9 +70,13 @@ export function subscribeToStats(
     scheduleBatchFetch();
   }
 
-  // Return unsubscribe function
+  // Return unsubscribe function. Evict the entry once nobody is listening so the
+  // module-level cache doesn't grow without bound across a long scroll session.
   return () => {
     entry!.subscribers.delete(callback);
+    if (entry!.subscribers.size === 0) {
+      cache.delete(eventId);
+    }
   };
 }
 
@@ -158,7 +162,7 @@ async function processBatch(
     const safetyTimeout = setTimeout(() => {
       sub.stop();
       tempCounts.forEach((stats, id) => {
-        updateStats(id, () => stats);
+        applyFetchedStats(id, stats);
       });
       resolve();
     }, 4000);
@@ -166,7 +170,7 @@ async function processBatch(
     sub.on('eose', () => {
       clearTimeout(safetyTimeout);
       tempCounts.forEach((stats, id) => {
-        updateStats(id, () => stats);
+        applyFetchedStats(id, stats);
       });
       sub.stop();
       resolve();
@@ -205,17 +209,45 @@ async function executeBatchFetch(): Promise<void> {
   }
 }
 
-// Update stats after user interaction (like, repost, etc.)
+// Update stats after user interaction (like, repost, etc.).
+// Initializes the entry when missing so an optimistic like/repost clicked before
+// the background batch fetch has populated stats is not silently dropped.
 export function updateStats(eventId: string, updater: (prev: EventStats) => EventStats): void {
-  const entry = cache.get(eventId);
-  if (entry && entry.stats) {
-    entry.stats = updater(entry.stats);
-    entry.subscribers.forEach((callback) => {
-      try {
-        callback(entry.stats!);
-      } catch (err) {
-        console.error('Error in stats subscriber:', err);
-      }
-    });
+  let entry = cache.get(eventId);
+  if (!entry) {
+    entry = { stats: { ...defaultStats }, subscribers: new Set() };
+    cache.set(eventId, entry);
   }
+  entry.stats = updater(entry.stats ?? { ...defaultStats });
+  entry.subscribers.forEach((callback) => {
+    try {
+      callback(entry.stats!);
+    } catch (err) {
+      console.error('Error in stats subscriber:', err);
+    }
+  });
+}
+
+// Apply relay-fetched counts WITHOUT clobbering optimistic user updates made
+// while the fetch was in flight, and without resurrecting an entry that was
+// unsubscribed and evicted in the meantime.
+function applyFetchedStats(eventId: string, fetched: EventStats): void {
+  const entry = cache.get(eventId);
+  if (!entry) return;
+  const prev = entry.stats ?? { ...defaultStats };
+  entry.stats = {
+    likes: Math.max(prev.likes, fetched.likes),
+    comments: Math.max(prev.comments, fetched.comments),
+    reposts: Math.max(prev.reposts, fetched.reposts),
+    zaps: Math.max(prev.zaps, fetched.zaps),
+    likedByMe: prev.likedByMe || fetched.likedByMe,
+    repostedByMe: prev.repostedByMe || fetched.repostedByMe,
+  };
+  entry.subscribers.forEach((callback) => {
+    try {
+      callback(entry.stats!);
+    } catch (err) {
+      console.error('Error in stats subscriber:', err);
+    }
+  });
 }

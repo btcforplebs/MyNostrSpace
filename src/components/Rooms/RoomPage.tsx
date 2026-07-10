@@ -3,10 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
 import { NDKEvent, NDKKind, type NDKFilter } from '@nostr-dev-kit/ndk';
 import { Navbar } from '../Shared/Navbar';
+import { useNip07Proxy } from '../../hooks/useNip07Proxy';
 import './RoomPage.css';
 import '../Games/GamesPage.css'; // Re-use game player styles
 
 const CONNECTION_TIMEOUT = 10000;
+const NOSTRNESTS_ORIGIN = 'https://nostrnests.com';
 
 export const RoomPage = () => {
   const { pubkey, identifier } = useParams();
@@ -17,71 +19,9 @@ export const RoomPage = () => {
   const [connectionStatus, setConnectionStatus] = useState<string>('Initializing...');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // NIP-07 Proxy Implementation
-  useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      // Security check: ensure message is from the iframe
-      if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
-
-      const { type, id, payload } = event.data;
-
-      // Only handle NIP-07 proxy messages
-      if (!type || !type.startsWith('nip07')) return;
-
-      if (!window.nostr) {
-        iframeRef.current.contentWindow?.postMessage(
-          { id, error: 'Nostr extension not found' },
-          '*'
-        );
-        return;
-      }
-
-      try {
-        let result;
-        switch (type) {
-          case 'nip07.getPublicKey':
-            result = await window.nostr.getPublicKey();
-            break;
-          case 'nip07.signEvent':
-            result = await window.nostr.signEvent(payload);
-            break;
-          case 'nip07.getRelays':
-            if (window.nostr.getRelays) {
-              result = await window.nostr.getRelays();
-            } else {
-              throw new Error('getRelays not supported');
-            }
-            break;
-          case 'nip07.nip04.encrypt':
-            if (window.nostr.nip04?.encrypt) {
-              result = await window.nostr.nip04.encrypt(payload.pubkey, payload.plaintext);
-            } else {
-              throw new Error('nip04.encrypt not supported');
-            }
-            break;
-          case 'nip07.nip04.decrypt':
-            if (window.nostr.nip04?.decrypt) {
-              result = await window.nostr.nip04.decrypt(payload.pubkey, payload.ciphertext);
-            } else {
-              throw new Error('nip04.decrypt not supported');
-            }
-            break;
-          default:
-            throw new Error(`Unknown method: ${type}`);
-        }
-
-        iframeRef.current.contentWindow?.postMessage({ id, result }, '*');
-      } catch (err: any) {
-        iframeRef.current.contentWindow?.postMessage(
-          { id, error: err.message || 'Unknown error' },
-          '*'
-        );
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  // Bridge the room iframe to the user's NIP-07 extension. The room app is
+  // always served from nostrnests.com, so the bridge is scoped to that origin.
+  useNip07Proxy(iframeRef, NOSTRNESTS_ORIGIN);
 
   // Fetch room event from relays to get metadata
   useEffect(() => {

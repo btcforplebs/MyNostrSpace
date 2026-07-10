@@ -2,7 +2,8 @@ import { useParams, Link } from 'react-router-dom';
 import { GAMES_LIST } from './gamesData';
 import { useNostr } from '../../context/NostrContext';
 import { Navbar } from '../Shared/Navbar';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
+import { useNip07Proxy } from '../../hooks/useNip07Proxy';
 import './GamesPage.css';
 
 export const GamePlayerPage = () => {
@@ -11,71 +12,8 @@ export const GamePlayerPage = () => {
   const { user } = useNostr();
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // NIP-07 Proxy Implementation
-  useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      // Security check: ensure message is from the game frame
-      if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
-
-      const { type, id, payload } = event.data;
-
-      // Only handle NIP-07 proxy messages
-      if (!type || !type.startsWith('nip07')) return;
-
-      if (!window.nostr) {
-        iframeRef.current.contentWindow?.postMessage(
-          { id, error: 'Nostr extension not found' },
-          '*'
-        );
-        return;
-      }
-
-      try {
-        let result;
-        switch (type) {
-          case 'nip07.getPublicKey':
-            result = await window.nostr.getPublicKey();
-            break;
-          case 'nip07.signEvent':
-            result = await window.nostr.signEvent(payload);
-            break;
-          case 'nip07.getRelays':
-            if (window.nostr.getRelays) {
-              result = await window.nostr.getRelays();
-            } else {
-              throw new Error('getRelays not supported');
-            }
-            break;
-          case 'nip07.nip04.encrypt':
-            if (window.nostr.nip04?.encrypt) {
-              result = await window.nostr.nip04.encrypt(payload.pubkey, payload.plaintext);
-            } else {
-              throw new Error('nip04.encrypt not supported');
-            }
-            break;
-          case 'nip07.nip04.decrypt':
-            if (window.nostr.nip04?.decrypt) {
-              result = await window.nostr.nip04.decrypt(payload.pubkey, payload.ciphertext);
-            } else {
-              throw new Error('nip04.decrypt not supported');
-            }
-            break;
-          default:
-            throw new Error(`Unknown method: ${type}`);
-        }
-
-        iframeRef.current.contentWindow?.postMessage({ id, result }, '*');
-      } catch (err: any) {
-        iframeRef.current.contentWindow?.postMessage(
-          { id, error: err.message || 'Unknown error' },
-          '*'
-        );
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [game]);
+  // Bridge the game iframe to the user's NIP-07 extension (origin-validated).
+  useNip07Proxy(iframeRef, game?.url);
 
   if (!game) {
     return (

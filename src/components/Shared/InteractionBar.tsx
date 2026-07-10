@@ -251,9 +251,10 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
 
         await zapRequest.sign();
 
-        // Publish zap request to author and self relays
-        await publishWithDiscovery(ndk, zapRequest, event.author.pubkey);
-
+        // Per NIP-57 the kind-9734 zap request is NOT published to relays — it is
+        // only handed to the LNURL callback, and the LN service publishes the
+        // kind-9735 receipt. Publishing it here spammed relays and delayed the
+        // invoice fetch by two relay-list round trips.
         const zapRequestJson = JSON.stringify(zapRequest.rawEvent());
 
         const cbUrl = new URL(callback);
@@ -446,7 +447,9 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
             Scan to Zap
           </h3>
           <img
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${zapInvoice}`}
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+              zapInvoice
+            )}`}
             alt="Zap QR Code"
             style={{ border: '1px solid #ccc', marginBottom: '10px' }}
           />

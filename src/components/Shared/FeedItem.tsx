@@ -58,7 +58,7 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
     }
   }, [event.id]);
 
-  // Parse embedded repost content synchronously to avoid "Loading..." flash
+  // Parse embedded repost content synchronously to avoid "Loading..." flash.
   const [repostEvent, setRepostEvent] = useState<NDKEvent | null>(() => {
     if (event.kind === 6 && ndk && event.content) {
       const trimmed = event.content.trim();
@@ -68,9 +68,17 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
             if (char === '\n' || char === '\t') return char;
             return '';
           });
-          return new NDKEvent(ndk, JSON.parse(sanitized));
+          const parsed = new NDKEvent(ndk, JSON.parse(sanitized));
+          // The embedded JSON is attacker-controlled: without verifying the
+          // signature (and that its id matches the reposted 'e' tag) anyone could
+          // forge "victim said X". If it doesn't verify, drop it and let the
+          // effect below fetch the real event from relays instead.
+          const targetId = event.tags.find((t: string[]) => t[0] === 'e')?.[1];
+          if (parsed.sig && (!targetId || parsed.id === targetId) && parsed.verifySignature(true)) {
+            return parsed;
+          }
         } catch {
-          /* ignore parse error */
+          /* ignore parse/verify error */
         }
       }
     }
@@ -130,14 +138,31 @@ const FeedItemInner: React.FC<FeedItemProps> = ({ event, hideThreadButton = fals
       reply.content = text;
 
       const mentionedPubkeys = extractMentions(text);
-      const mentionTags = mentionedPubkeys.map((pubkey) => ['p', pubkey]);
 
-      reply.tags = [
-        ['e', parentEvent.id, '', 'root'],
-        ['p', parentEvent.pubkey],
-        ...mentionTags,
-        ['client', 'MyNostrSpace'],
-      ];
+      // NIP-10 e-tags: resolve the real thread root from the parent's own tags.
+      // If the parent is itself a reply, the root is its root (parent becomes
+      // 'reply'); only a top-level parent is tagged as the root.
+      const parentETags = parentEvent.tags.filter((t: string[]) => t[0] === 'e');
+      const markedRoot = parentETags.find((t: string[]) => t[3] === 'root');
+      const rootId = markedRoot?.[1] ?? parentETags[0]?.[1];
+
+      const eTags: string[][] =
+        rootId && rootId !== parentEvent.id
+          ? [
+              ['e', rootId, '', 'root'],
+              ['e', parentEvent.id, '', 'reply'],
+            ]
+          : [['e', parentEvent.id, '', 'root']];
+
+      // Carry every upstream participant (deduped) so they get notified.
+      const participants = new Set<string>([
+        parentEvent.pubkey,
+        ...parentEvent.tags.filter((t: string[]) => t[0] === 'p').map((t: string[]) => t[1]),
+        ...mentionedPubkeys,
+      ]);
+      const pTags = Array.from(participants).map((pk) => ['p', pk]);
+
+      reply.tags = [...eTags, ...pTags, ['client', 'MyNostrSpace']];
       await publishWithDiscovery(ndk, reply, parentEvent.pubkey);
       setCommentText('');
       setShowCommentForm(false);

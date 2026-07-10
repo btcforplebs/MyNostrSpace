@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNostr } from '../../context/NostrContext';
 import type { NDKEvent, NDKFilter } from '@nostr-dev-kit/ndk';
-import NDK from '@nostr-dev-kit/ndk';
+import NDK, { NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import ReactPlayer from 'react-player';
 import { Navbar } from '../Shared/Navbar';
 import './FilmPage.css';
@@ -96,11 +96,12 @@ export const FilmPage = () => {
         limit: 2000, // Significantly increased limit
       };
 
-      // Use the global pool. If we needed specific relays, we could try to add them,
-      // but explicitRelayUrls on NDK constructor is the cleanest way for isolated instances.
-      // Since we are using the global one, we trust its pool.
-      // However, we might want to ensure we have coverage.
-      const sub = ndk.subscribe(filter, { closeOnEose: false });
+      // A movie catalog doesn't need a live stream, and CACHE_FIRST avoids
+      // re-pulling the whole history from the network on every visit.
+      const sub = ndk.subscribe(filter, {
+        closeOnEose: true,
+        cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
+      });
 
       // Batch updates to prevent UI freezing
       let eventBuffer: Movie[] = [];
@@ -109,11 +110,8 @@ export const FilmPage = () => {
       const flushBuffer = () => {
         if (!mountedRef.current) return;
         if (eventBuffer.length === 0) {
-          // If we have some movies, we are good. If 0, we might still be loading or have none.
-          // But we don't want to spin forever if EOSE happened.
-          // We handle loading state in EOSE or via checking buffer length.
-          // But here flushBuffer is called on EOSE too.
-          if (loading) setLoading(false);
+          // Called on EOSE too — just clear the spinner (no-op if already false).
+          setLoading(false);
           return;
         }
 
@@ -155,15 +153,16 @@ export const FilmPage = () => {
 
       sub.on('eose', () => {
         flushBuffer();
-        // Force loading off on EOSE if we haven't found anything yet?
-        // flushBuffer handles it.
       });
+
+      return sub;
     },
-    [loading]
+    []
   );
 
   useEffect(() => {
     mountedRef.current = true;
+    let sub: ReturnType<typeof fetchMovies> | undefined;
 
     if (ndk) {
       // Ensure we are connected to the film relays
@@ -175,20 +174,12 @@ export const FilmPage = () => {
         }
       });
 
-      // Debug logs
-      setTimeout(() => {
-        console.log(
-          'DEBUG: Connected relays:',
-          ndk.pool.connectedRelays().map((r) => r.url)
-        );
-        console.log('DEBUG: FILM_RELAYS:', FILM_RELAYS);
-      }, 2000);
-
-      fetchMovies(ndk);
+      sub = fetchMovies(ndk);
     }
 
     return () => {
       mountedRef.current = false;
+      if (sub) sub.stop();
     };
   }, [fetchMovies, ndk]);
 

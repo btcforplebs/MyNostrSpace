@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { NDKUser } from '@nostr-dev-kit/ndk';
+import { NDKEvent, NDKUser } from '@nostr-dev-kit/ndk';
 import { useNostr } from '../context/NostrContext';
 import { useBlockList } from './useBlockList';
 
@@ -64,30 +64,47 @@ export const useFriends = (pubkey?: string) => {
     }
 
     try {
-      // 1. Fetch latest contact list to ensure we don't overwrite
       const user = ndk.activeUser;
-      await user.fetchProfile();
-      const follows = await user.follows();
+
+      // 1. Fetch the latest contact list (Kind 3) event directly. Building the
+      //    new event from this preserves relay hints (content) and petname/other
+      //    tags, and lets us tell "follows nobody" apart from "fetch failed".
+      const contactEvent = await ndk.fetchEvent({
+        kinds: [3],
+        authors: [user.pubkey],
+      });
 
       // 2. Check if already following
-      const isFollowing = Array.from(follows).some((u) => u.pubkey === targetPubkey);
-      if (isFollowing) {
+      const alreadyFollowing = contactEvent?.tags.some(
+        (tag) => tag[0] === 'p' && tag[1] === targetPubkey
+      );
+      if (alreadyFollowing) {
         alert('You are already following this user!');
         return;
       }
 
-      // 3. Add new user
-      const targetUser = ndk.getUser({ pubkey: targetPubkey });
-      follows.add(targetUser);
+      // 3. Safety guard: never overwrite an existing follow list we failed to
+      //    load. If we know locally that this user follows people (their own
+      //    profile is loaded) but the fetch returned nothing, the fetch failed —
+      //    abort rather than replace the list with a single entry.
+      const hasEstablishedList = pubkey === user.pubkey && friends.length > 0;
+      if (!contactEvent && hasEstablishedList) {
+        alert('Could not load your current follow list. Please try again.');
+        return;
+      }
 
-      // 4. Publish updated list
-      await user.follow(targetUser);
+      // 4. Rebuild from the existing event verbatim, then append the new follow.
+      const newEvent = new NDKEvent(ndk);
+      newEvent.kind = 3;
+      newEvent.tags = contactEvent ? [...contactEvent.tags] : [];
+      newEvent.content = contactEvent?.content ?? '';
+      newEvent.tags.push(['p', targetPubkey]);
+      await newEvent.publish();
 
       alert('Followed successfully!');
-      // Update local state if we are viewing our own profile?
-      // The hook fetches based on `pubkey` prop. If that's us, we should reload.
+      // The hook fetches based on `pubkey` prop. If that's us, reflect the add.
       if (pubkey === user.pubkey) {
-        setFriends((prev) => [...prev, targetUser.pubkey]);
+        setFriends((prev) => [...prev, targetPubkey]);
       }
     } catch (e) {
       console.error('Failed to follow:', e);

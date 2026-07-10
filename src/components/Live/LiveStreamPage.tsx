@@ -86,7 +86,7 @@ export const LiveStreamPage = () => {
 
       const sub = ndk.subscribe(streamFilter, {
         closeOnEose: false,
-        subId: `sub - stream - ${Date.now()} `,
+        subId: `sub-stream-${Date.now()}`,
       });
 
       sub.on('event', (e) => {
@@ -129,7 +129,7 @@ export const LiveStreamPage = () => {
       // Use stream event author's pubkey for the a tag filter (this is how chat messages are tagged)
       const streamAuthor = event.pubkey;
       const streamDTag = event.getMatchingTags('d')[0]?.[1] || dTag;
-      const aTag = `30311:${streamAuthor}:${streamDTag} `;
+      const aTag = `30311:${streamAuthor}:${streamDTag}`;
       const chatFilter: NDKFilter = {
         kinds: [1311 as NDKKind, 9735 as NDKKind],
         '#a': [aTag],
@@ -199,7 +199,7 @@ export const LiveStreamPage = () => {
       event.kind = 1311;
       event.content = chatInput;
       event.tags = [
-        ['a', `30311:${streamAuthor}:${streamDTag} `, 'wss://relay.zap.stream'],
+        ['a', `30311:${streamAuthor}:${streamDTag}`, 'wss://relay.zap.stream'],
         ['client', 'MyNostrSpace'],
       ];
 

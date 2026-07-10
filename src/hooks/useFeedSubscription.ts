@@ -56,7 +56,10 @@ export function useFeedSubscription(
             }
             result.splice(lo, 0, ev);
         }
-        if (result.length > 200) result.length = 200;
+        // Bound memory growth for very long sessions without cutting off
+        // infinite-scroll pagination — VirtualFeedItem windows rendering, so
+        // this is a memory cap only, not a display/pagination limit.
+        if (result.length > 1000) result.length = 1000;
         return result;
     };
 
@@ -91,11 +94,6 @@ export function useFeedSubscription(
             const newEvents = rawEvents.filter((e) => !e.tags.some((t) => t[0] === 'e'));
             if (newEvents.length > 0) {
                 setFeed((prev) => dedupAndSortFeed(newEvents, prev));
-                // Feed is display-capped at 200; once full, stop paginating so we
-                // don't fetch pages only to discard them on every scroll trigger.
-                if (feedRef.current.length + newEvents.length >= 200) {
-                    setHasMoreFeed(false);
-                }
             }
         } catch (e) {
             console.error('Error loading more feed:', e);
@@ -142,12 +140,11 @@ export function useFeedSubscription(
                         new Map(combined.map((item) => [item.id, item])).values()
                     );
                     const sorted = unique.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-                    if (sorted.length > 200) sorted.length = 200;
+                    // Memory cap only — VirtualFeedItem windows rendering, so this
+                    // must not gate hasMoreReplies (see loadMoreFeed).
+                    if (sorted.length > 1000) sorted.length = 1000;
                     return sorted;
                 });
-                if (repliesRef.current.length + newEvents.length >= 200) {
-                    setHasMoreReplies(false);
-                }
             }
         } catch (e) {
             console.error('Error loading more replies:', e);

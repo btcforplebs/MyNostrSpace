@@ -27,3 +27,6 @@ dist-ssr
 
 # Debug scripts
 debug_*.ts
+
+# Claude Code local agent state (incl. git worktrees)
+.claude/

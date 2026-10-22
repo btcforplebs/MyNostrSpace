@@ -1,7 +1,15 @@
 import { useEffect, useState, useCallback, useRef, memo, useLayoutEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useNostr } from '../../context/NostrContext';
-import { NDKEvent, type NDKFilter, NDKSubscriptionCacheUsage, NDKRelaySet } from '@nostr-dev-kit/ndk';
+import type NDK from '@nostr-dev-kit/ndk';
+import {
+  NDKEvent,
+  type NDKFilter,
+  type NDKSubscription,
+  NDKSubscriptionCacheUsage,
+  NDKRelaySet,
+  getRelayListForUser,
+} from '@nostr-dev-kit/ndk';
 import { nip19 } from 'nostr-tools';
 import { Navbar } from '../Shared/Navbar';
 import { FeedItem } from '../Shared/FeedItem';
@@ -39,6 +47,48 @@ const getThreadPointers = (event: NDKEvent) => {
     parentId: replyTag[1],
   };
 };
+
+const isHex64 = (s?: string): s is string => !!s && /^[0-9a-f]{64}$/.test(s);
+
+const relaySetFrom = (urls: string[], ndk: NDK): NDKRelaySet | null => {
+  const valid = urls.filter((u) => /^wss?:\/\//.test(u));
+  if (valid.length === 0) return null;
+  try {
+    return NDKRelaySet.fromRelayUrls(valid, ndk);
+  } catch {
+    return null;
+  }
+};
+
+// The author's NIP-65 relay list (outbox model), bounded so a slow lookup
+// never stalls the page.
+const relayListFor = async (ndk: NDK, pubkey: string) => {
+  try {
+    return await Promise.race([
+      getRelayListForUser(pubkey, ndk),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+    ]);
+  } catch {
+    return null;
+  }
+};
+
+// Resolves with the first non-null result, or null once every attempt missed.
+const firstFound = <T,>(attempts: Promise<T | null>[]): Promise<T | null> =>
+  new Promise((resolve) => {
+    let pending = attempts.length;
+    if (pending === 0) return resolve(null);
+    for (const attempt of attempts) {
+      attempt
+        .then((value) => {
+          if (value) resolve(value);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (--pending === 0) resolve(null);
+        });
+    }
+  });
 
 // Memoized thread item row to prevent unnecessary re-renders
 const ThreadItemRow = memo(
@@ -159,12 +209,21 @@ export const ThreadPage = () => {
     if (!ndk || !eventId) return;
 
     let cancelled = false;
-    let replySubRef: ReturnType<typeof ndk.subscribe> | null = null;
+    let replySubs: NDKSubscription[] = [];
+    const stopReplySubs = () => {
+      replySubs.forEach((sub) => sub.stop());
+      replySubs = [];
+    };
 
-    const fetchEventById = async (id: string, relayHints: string[] = []): Promise<NDKEvent | null> => {
+    const fetchEventById = async (
+      id: string,
+      relayHints: string[] = [],
+      authorHint?: string
+    ): Promise<NDKEvent | null> => {
       try {
         let hexId = id;
         let relays = [...relayHints];
+        let author = authorHint;
 
         if (id.startsWith('note1') || id.startsWith('nevent1')) {
           try {
@@ -174,6 +233,7 @@ export const ThreadPage = () => {
             } else if (decoded.type === 'nevent') {
               hexId = decoded.data.id;
               relays = [...relays, ...(decoded.data.relays || [])];
+              author = decoded.data.author || author;
             }
           } catch (e) {
             console.warn('Failed to decode bech32 ID:', id, e);
@@ -183,18 +243,35 @@ export const ThreadPage = () => {
 
         if (!/^[0-9a-f]{64}$/.test(hexId)) return null;
 
-        return await ndk.fetchEvent(
-          { ids: [hexId] },
-          { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST },
-          relays.length > 0 ? NDKRelaySet.fromRelayUrls(relays, ndk) : undefined
-        );
+        const byId = (relaySet?: NDKRelaySet) =>
+          ndk
+            .fetchEvent(
+              { ids: [hexId] },
+              { cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST, relaySet }
+            )
+            .catch(() => null);
+
+        // Ask the default relays, any relay hints, and the author's own write
+        // relays (outbox) at once; the first one that has the note wins.
+        const attempts = [byId()];
+        const hinted = relaySetFrom(relays, ndk);
+        if (hinted) attempts.push(byId(hinted));
+        if (isHex64(author)) {
+          attempts.push(
+            relayListFor(ndk, author).then((list) => {
+              const outbox = relaySetFrom(list?.writeRelayUrls ?? [], ndk);
+              return outbox ? byId(outbox) : null;
+            })
+          );
+        }
+        return await firstFound(attempts);
       } catch (err) {
         console.error('Error in fetchEventById:', id, err);
         return null;
       }
     };
 
-    const loadReplies = async (rootId: string) => {
+    const loadReplies = async (rootId: string, rootAuthor: string) => {
       setLoadingReplies(true);
       await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -207,7 +284,7 @@ export const ThreadPage = () => {
         closeOnEose: false,
         cacheUsage: NDKSubscriptionCacheUsage.CACHE_FIRST,
       });
-      replySubRef = replySub;
+      replySubs.push(replySub);
 
       let replyBuffer: NDKEvent[] = [];
       let flushTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -232,7 +309,7 @@ export const ThreadPage = () => {
         }
       };
 
-      replySub.on('event', (reply: NDKEvent) => {
+      const onReply = (reply: NDKEvent) => {
         replyBuffer.push(reply);
         if (!flushTimeout) {
           flushTimeout = setTimeout(() => {
@@ -240,6 +317,23 @@ export const ThreadPage = () => {
             flushTimeout = null;
           }, FLUSH_INTERVAL);
         }
+      };
+      replySub.on('event', onReply);
+
+      // Replies are sent to the root author's inbox (NIP-65 read relays),
+      // which may not be among our default relays — listen there too.
+      let inboxSub: NDKSubscription | null = null;
+      relayListFor(ndk, rootAuthor).then((list) => {
+        if (cancelled || !replySubs.includes(replySub)) return;
+        const inbox = relaySetFrom(list?.readRelayUrls ?? [], ndk);
+        if (!inbox) return;
+        inboxSub = ndk.subscribe(replyFilter, {
+          closeOnEose: false,
+          cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY,
+          relaySet: inbox,
+        });
+        inboxSub.on('event', onReply);
+        replySubs.push(inboxSub);
       });
 
       replySub.on('eose', () => {
@@ -250,6 +344,7 @@ export const ThreadPage = () => {
       setTimeout(() => {
         flushBuffer();
         replySub.stop();
+        inboxSub?.stop();
         setLoadingReplies(false);
       }, 30000);
     };
@@ -282,7 +377,7 @@ export const ThreadPage = () => {
         setLoading(false);
 
         // 3. Start loading replies to THIS event immediately
-        loadReplies(currentEvent.id);
+        loadReplies(currentEvent.id, currentEvent.pubkey);
 
         // 4. Background: Climb up the chain to find the absolute root
         // We do this in a separate promise so it doesn't block the initial render
@@ -298,7 +393,13 @@ export const ThreadPage = () => {
             if (!nextId || visitedIds.has(nextId)) break;
 
             console.log(`[Thread] Climbing to parent: ${nextId}`);
-            const parent = await fetchEventById(nextId);
+            // NIP-10 e-tags may carry a relay hint and the parent's author.
+            const pointer = absoluteRoot.tags.find((t) => t[0] === 'e' && t[1] === nextId);
+            const parent = await fetchEventById(
+              nextId,
+              pointer?.[2] ? [pointer[2]] : [],
+              pointer?.[4]
+            );
             if (!parent || cancelled) break;
 
             absoluteRoot = parent;
@@ -314,10 +415,10 @@ export const ThreadPage = () => {
             absoluteRoot.author.fetchProfile().catch(() => { });
             setRootEvent(absoluteRoot);
             // Re-fetch replies for the new root
-            replySubRef?.stop();
+            stopReplySubs();
             repliesRef.current.clear();
             setReplies([]);
-            loadReplies(absoluteRoot.id);
+            loadReplies(absoluteRoot.id, absoluteRoot.pubkey);
           }
         })();
 
@@ -345,7 +446,7 @@ export const ThreadPage = () => {
 
     return () => {
       cancelled = true;
-      replySubRef?.stop();
+      stopReplySubs();
     };
   }, [ndk, eventId]);
 
